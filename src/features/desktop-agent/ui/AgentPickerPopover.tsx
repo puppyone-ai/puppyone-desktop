@@ -10,9 +10,16 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
+import { DesktopMenuItem, DesktopMenuSection, DesktopMenuSurface } from "../../../components/DesktopMenu";
 import { DesktopOverlayLayer } from "../../app-shell/DesktopOverlayPortal";
 import { useAnchoredOverlayPosition } from "../../app-shell/useAnchoredOverlayPosition";
 import { agentPickerLimits } from "./agent-picker-limits";
+import {
+  agentPickerWidthPixels,
+  type AgentPickerIndicator,
+  type AgentPickerPlacement,
+  type AgentPickerWidth,
+} from "./agent-picker-presentation";
 import { agentPickerOverlayGeometry } from "./agent-runtime-geometry";
 
 export type AgentPickerOption = {
@@ -24,7 +31,6 @@ export type AgentPickerOption = {
   keywords?: string;
   selectable: boolean;
   selected?: boolean;
-  kind?: "agent" | "provider" | "local" | "model" | "status";
   icon?: ReactNode;
 };
 
@@ -40,10 +46,12 @@ type AgentPickerPopoverProps = {
   valueLabel?: string | null;
   groups: AgentPickerGroup[];
   disabled?: boolean;
-  className?: string;
+  placement?: AgentPickerPlacement;
   title?: string;
   triggerDescription?: string;
   triggerIcon?: ReactNode;
+  indicator?: AgentPickerIndicator;
+  width?: AgentPickerWidth;
   compactWhenSelected?: boolean;
   onSelect: (id: string) => void;
 };
@@ -54,10 +62,12 @@ export function AgentPickerPopover({
   valueLabel,
   groups,
   disabled = false,
-  className = "",
+  placement = "default",
   title,
   triggerDescription,
   triggerIcon,
+  indicator = "chevron",
+  width = "wide",
   compactWhenSelected = false,
   onSelect,
 }: AgentPickerPopoverProps) {
@@ -86,6 +96,7 @@ export function AgentPickerPopover({
     open,
     anchorRef: triggerRef,
     boundarySelector: ".desktop-agent-boundary",
+    preferredWidth: agentPickerWidthPixels[width],
   });
 
   useEffect(() => {
@@ -191,8 +202,35 @@ export function AgentPickerPopover({
     }
   };
 
+  const renderOption = (option: AgentPickerOption) => (
+    <DesktopMenuItem
+      ref={(node) => {
+        if (node) optionRefs.current.set(option.id, node);
+        else optionRefs.current.delete(option.id);
+      }}
+      role="option"
+      aria-selected={Boolean(option.selected)}
+      aria-disabled={!option.selectable || undefined}
+      tabIndex={option.id === activeOptionId ? 0 : -1}
+      className="desktop-agent-picker-option"
+      key={option.id}
+      selected={option.selected}
+      icon={option.icon === null ? undefined : option.icon || initial(option.label)}
+      label={<bdi dir="auto">{option.label}</bdi>}
+      detail={option.meta ? <bdi dir="auto">{option.meta}</bdi> : undefined}
+      trailing={option.warning
+        ? <span className="desktop-agent-picker-warning" title={option.warning} aria-label={option.warning}><CircleAlert size={14} strokeWidth={1.8} aria-hidden="true" /></span>
+        : option.selected
+          ? <Check className="desktop-agent-picker-check" size={14} aria-hidden="true" />
+          : undefined}
+      onClick={() => choose(option)}
+      onFocus={() => setActiveOptionId(option.id)}
+      onKeyDown={(event) => handleOptionKeyDown(event, option)}
+    />
+  );
+
   return (
-    <div ref={rootRef} className={`desktop-agent-picker ${className}`.trim()}>
+    <div ref={rootRef} className={`desktop-agent-picker${placement === "header" ? " is-header" : ""}`}>
       <button
         ref={triggerRef}
         type="button"
@@ -211,79 +249,65 @@ export function AgentPickerPopover({
       >
         {triggerIcon && <span className="desktop-agent-picker-trigger-mark">{triggerIcon}</span>}
         {!compact && <span className="desktop-agent-picker-trigger-value" dir="auto">{valueLabel || placeholder}</span>}
-        {!compact && <ChevronDown size={12} aria-hidden="true" />}
+        {!compact && indicator === "chevron" && <ChevronDown size={12} aria-hidden="true" />}
       </button>
       {open && (
         <DesktopOverlayLayer>
-          <div
+          <DesktopMenuSurface
             ref={setOverlayRef}
             className="desktop-agent-overlay desktop-agent-picker-popover"
+            elevation="compact"
+            tone="quiet"
+            role="presentation"
             style={agentPickerOverlayGeometry(overlayPosition)}
             data-positioned={overlayPosition ? "true" : "false"}
             data-placement={overlayPosition?.placement}
             data-window-no-drag="true"
           >
-          {searchable && (
-            <label className="desktop-agent-picker-search">
-              <Search size={13} aria-hidden="true" />
-              <span className="desktop-agent-visually-hidden">{t("agent.picker.search", { name: bidiIsolate(ariaLabel) })}</span>
-              <input
-                value={query}
-                autoFocus
-                placeholder={t("agent.picker.search", { name: bidiIsolate(ariaLabel) })}
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== "ArrowDown" || flatOptions.length === 0) return;
-                  event.preventDefault();
-                  setActiveOptionId(flatOptions[0].id);
-                  optionRefs.current.get(flatOptions[0].id)?.focus();
-                }}
-              />
-            </label>
-          )}
-          <div
-            id={popupId}
-            className="desktop-agent-picker-list"
-            data-po-scrollbar="content"
-            role="listbox"
-            aria-label={t("agent.picker.options", { name: bidiIsolate(ariaLabel) })}
-          >
-            {flatOptions.map((option) => (
-              <button
-                ref={(node) => {
-                  if (node) optionRefs.current.set(option.id, node);
-                  else optionRefs.current.delete(option.id);
-                }}
-                type="button"
-                role="option"
-                aria-selected={Boolean(option.selected)}
-                aria-disabled={!option.selectable || undefined}
-                tabIndex={option.id === activeOptionId ? 0 : -1}
-                className={`desktop-agent-picker-option is-${option.kind || "status"}${option.icon === null ? " has-no-icon" : ""}${option.selected ? " is-selected" : ""}${option.warning ? " has-warning" : ""}${!option.selectable ? " is-unavailable" : ""}`}
-                key={option.id}
-                onClick={() => choose(option)}
-                onFocus={() => setActiveOptionId(option.id)}
-                onKeyDown={(event) => handleOptionKeyDown(event, option)}
-              >
-                {option.icon !== null && <span className="desktop-agent-picker-option-icon" aria-hidden="true">{option.icon || initial(option.label)}</span>}
-                <span className="desktop-agent-picker-option-copy">
-                  <span><strong dir="auto">{option.label}</strong>{option.meta && <small dir="auto">{option.meta}</small>}</span>
-                </span>
-                {option.warning
-                  ? <span className="desktop-agent-picker-warning" title={option.warning} aria-label={option.warning}><CircleAlert size={14} strokeWidth={1.8} aria-hidden="true" /></span>
-                  : option.selected
-                  ? <Check className="desktop-agent-picker-check" size={14} aria-hidden="true" />
-                  : null}
-              </button>
-            ))}
-            {flatOptions.length === 0 && <div className="desktop-agent-picker-empty">{t("agent.picker.noMatches")}</div>}
-          </div>
-          {truncated && (
-            <div className="desktop-agent-picker-footer">
-              <span role="status">{t("agent.picker.showing", { visible: flatOptions.length, total: matchedOptionCount })}</span>
+            {searchable && (
+              <label className="desktop-agent-picker-search">
+                <Search size={13} aria-hidden="true" />
+                <span className="desktop-agent-visually-hidden">{t("agent.picker.search", { name: bidiIsolate(ariaLabel) })}</span>
+                <input
+                  value={query}
+                  autoFocus
+                  placeholder={t("agent.picker.search", { name: bidiIsolate(ariaLabel) })}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== "ArrowDown" || flatOptions.length === 0) return;
+                    event.preventDefault();
+                    setActiveOptionId(flatOptions[0].id);
+                    optionRefs.current.get(flatOptions[0].id)?.focus();
+                  }}
+                />
+              </label>
+            )}
+            <div
+              id={popupId}
+              className="desktop-agent-picker-list"
+              data-po-scrollbar="content"
+              role="listbox"
+              aria-label={t("agent.picker.options", { name: bidiIsolate(ariaLabel) })}
+            >
+              {filteredGroups.length > 1 ? filteredGroups.map((group) => (
+                <DesktopMenuSection
+                  className="desktop-agent-picker-group"
+                  role="group"
+                  aria-label={group.label}
+                  key={group.id}
+                  label={<span aria-hidden="true">{group.label}</span>}
+                >
+                  {group.options.map(renderOption)}
+                </DesktopMenuSection>
+              )) : flatOptions.map(renderOption)}
+              {flatOptions.length === 0 && <div className="desktop-agent-picker-empty">{t("agent.picker.noMatches")}</div>}
             </div>
-          )}
-          </div>
+            {truncated && (
+              <div className="desktop-agent-picker-footer">
+                <span role="status">{t("agent.picker.showing", { visible: flatOptions.length, total: matchedOptionCount })}</span>
+              </div>
+            )}
+          </DesktopMenuSurface>
         </DesktopOverlayLayer>
       )}
     </div>

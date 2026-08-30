@@ -428,4 +428,4 @@ export function agentSubmissionStatusLabel(
   return null;
 }
 
-export const agentTimelineLimits = Object.freeze({ maxMountedRows: MAX_MOUNTED_ROWS, streamBatchMs: 32 });
+export const agentTimelineLimits = Object.freeze({ maxMountedRows: MAX_MOUNTED_ROWS, streamBatchMs: 16 });

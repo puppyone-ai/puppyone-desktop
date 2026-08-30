@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   AGENT_EVENT_TYPES,
   AGENT_IPC_CHANNELS,
+  AGENT_READINESS_CODES,
   AGENT_RUNTIME_CAPABILITIES,
   assertAgentEventEnvelope,
   assertAgentIpcResponse,
@@ -15,6 +16,7 @@ describe("shared Agent contract", () => {
   it("keeps runtime constants synchronized with the TypeScript contract", () => {
     const source = readFileSync(new URL("../shared/agent-contract/types.ts", import.meta.url), "utf8");
     expect(typeLiterals(source, "AgentEventType", "AgentEventPayloadBase")).toEqual([...AGENT_EVENT_TYPES]);
+    expect(typeLiterals(source, "AgentReadinessCode", "AgentRuntimeDescriptor")).toEqual([...AGENT_READINESS_CODES]);
     expect(typeKeys(source, "AgentCapabilities", "AgentAccountState")).toEqual([...AGENT_RUNTIME_CAPABILITIES]);
     expect(typeLiterals(source, "AgentIpcChannel", null)).toEqual([...AGENT_IPC_CHANNELS]);
   });
@@ -29,12 +31,14 @@ describe("shared Agent contract", () => {
       rootPath: "/workspace",
       sessionId: "session-1",
       prompt: "  keep whitespace  ",
+      effort: "high",
       unknownPrivilegedField: { shell: true },
       attachments: [{ path: "/workspace/a.md", name: "a.md", bytes: "not-authorized" }],
     })).toEqual({
       rootPath: "/workspace",
       sessionId: "session-1",
       prompt: "  keep whitespace  ",
+      effort: "high",
       attachments: [{ path: "/workspace/a.md", name: "a.md" }],
     });
     expect(() => parseAgentIpcRequest("agent:approval-resolve", {
@@ -102,12 +106,19 @@ describe("shared Agent contract", () => {
       referenceDisplays: [{ ...referenceDisplay, kind: "workspace-file", relativePath: "/private/source.txt" }],
     }))).toThrow(/workspace-relative/i);
     expect(() => assertAgentIpcResponse("agent:providers-discover", {
-      readiness: { runtimeId: "opencode", status: "ready" },
+      readiness: { runtimeId: "opencode", status: "ready", code: "READY" },
       providers: [{ id: "openai", displayName: "OpenAI", modelCount: -1 }],
       models: [],
       capabilities: {},
       warnings: [],
     })).toThrow(/modelCount/i);
+    expect(() => assertAgentIpcResponse("agent:providers-discover", {
+      readiness: { runtimeId: "cursor", status: "installed-not-authenticated", code: "AUTHENTICATION_PROBE_FAILED" },
+      providers: [],
+      models: [],
+      capabilities: {},
+      warnings: [],
+    })).toThrow(/incompatible with status/i);
   });
 
   it("bounds native history discovery and strips transcript-shaped list fields", () => {

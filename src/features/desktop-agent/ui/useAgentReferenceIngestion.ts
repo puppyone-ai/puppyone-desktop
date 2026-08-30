@@ -3,19 +3,33 @@ import type { ClipboardEvent, DragEvent } from "react";
 import {
   classifyReferenceDataTransfer,
   hasReferenceDataTransferSource,
+  isDataResourceUri,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentSessionController } from "../application/AgentSessionController";
+import type { AgentReferenceVisualPreview } from "../application/AgentReferencePreviewStore";
 import type { AgentReferenceInputCapabilities } from "../domain/agent-contract";
+
+export type AgentWorkspaceReferenceResolution = Readonly<{
+  workspaceRoot: string;
+  referencePath: string;
+  loadVisualPreview?: () => Promise<AgentReferenceVisualPreview | null>;
+}>;
+
+export type AgentWorkspaceReferenceResolver = (
+  resource: string,
+) => AgentWorkspaceReferenceResolution | null | Promise<AgentWorkspaceReferenceResolution | null>;
 
 export function useAgentReferenceIngestion({
   controller,
   workspaceId,
   capabilities,
+  resolveWorkspaceReference,
 }: {
   controller: AgentSessionController;
   workspaceId: string;
   capabilities?: AgentReferenceInputCapabilities;
+  resolveWorkspaceReference?: AgentWorkspaceReferenceResolver;
 }) {
   const { t } = useLocalization();
   const dragDepth = useRef(0);
@@ -65,13 +79,20 @@ export function useAgentReferenceIngestion({
     setDropActive(false);
     setDropInvalid(false);
     const beforeIds = new Set(controller.getSnapshot().references.map((reference) => reference.id));
-    void ingestDataTransfer(event.dataTransfer, workspaceId, controller).then((result) => {
+    void ingestDataTransfer(
+      event.dataTransfer,
+      workspaceId,
+      controller,
+      resolveWorkspaceReference,
+    ).then((result) => {
       setAnnouncement(result === "workspace-mismatch"
         ? t("agent.reference.workspaceMismatch")
-        : "");
-      if (result !== "workspace-mismatch") announceBatchResult(beforeIds, result);
+        : result === "resource-unavailable"
+          ? t("agent.reference.resourceUnavailable")
+          : "");
+      if (typeof result === "number") announceBatchResult(beforeIds, result);
     });
-  }, [announceBatchResult, controller, t, workspaceId]);
+  }, [announceBatchResult, controller, resolveWorkspaceReference, t, workspaceId]);
 
   const onPaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
     const images = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
@@ -146,11 +167,38 @@ async function ingestDataTransfer(
   dataTransfer: DataTransfer,
   workspaceId: string,
   controller: AgentSessionController,
-): Promise<number | "workspace-mismatch"> {
+  resolveWorkspaceReference: AgentWorkspaceReferenceResolver | undefined,
+): Promise<number | "workspace-mismatch" | "resource-unavailable"> {
   const source = classifyReferenceDataTransfer(dataTransfer);
   if (source.kind === "workspace-entries") {
     if (source.workspaceId && source.workspaceId !== workspaceId) return "workspace-mismatch";
-    return controller.addWorkspacePaths(source.entries.map((entry) => entry.path));
+    const paths: string[] = [];
+    const resolutions: AgentWorkspaceReferenceResolution[] = [];
+    for (const entry of source.entries) {
+      if (!isDataResourceUri(entry.path)) {
+        paths.push(entry.path);
+        continue;
+      }
+      const resolved = await resolveWorkspaceReference?.(entry.path) ?? null;
+      if (!resolved) return "resource-unavailable";
+      if (resolved.workspaceRoot !== controller.workspaceRoot) return "workspace-mismatch";
+      paths.push(resolved.referencePath);
+      resolutions.push(resolved);
+    }
+    const visualPreviews = new Map<string, AgentReferenceVisualPreview>();
+    await Promise.all(resolutions.map(async (resolved) => {
+      if (!resolved.loadVisualPreview) return;
+      const preview = await resolved.loadVisualPreview().catch(() => null);
+      if (preview) {
+        try {
+          visualPreviews.get(resolved.referencePath)?.release?.();
+        } catch {
+          // A stale duplicate preview must not block the valid reference.
+        }
+        visualPreviews.set(resolved.referencePath, preview);
+      }
+    }));
+    return controller.addWorkspacePaths(paths, visualPreviews);
   }
   if (source.kind === "files") return controller.stageExternalFiles(source.files);
   if (source.kind === "text") return (await controller.addPathTextOrDraft(source.text)) ? 1 : 0;

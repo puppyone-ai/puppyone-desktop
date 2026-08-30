@@ -46,7 +46,7 @@ export function AgentAttachmentButton({
         disabled={disabled || !available}
         onClick={choose}
       >
-        <Plus size={17} aria-hidden="true" />
+        <Plus size={17} strokeWidth={1.6} aria-hidden="true" />
       </button>
       <input
         ref={inputRef}

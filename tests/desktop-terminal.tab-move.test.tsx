@@ -225,6 +225,22 @@ describe("Terminal Session tab movement", () => {
     expect(onMoveSession).not.toHaveBeenCalled();
   });
 
+  it("never resolves the surrounding Pane chrome as a content split target", () => {
+    const canDrop = vi.fn(() => true);
+    const onMoveSession = vi.fn();
+    const harness = renderHarness({ canDrop, onMoveSession });
+    installPointerCapture(harness.tab);
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(harness.targetGroup);
+
+    act(() => harness.tab.dispatchEvent(pointer("pointerdown", 20, 20, 20)));
+    act(() => harness.tab.dispatchEvent(pointer("pointermove", 20, 102, 80)));
+
+    expect(harness.container.querySelector("[data-drop-kind]")).toBeNull();
+    expect(canDrop).not.toHaveBeenCalled();
+    act(() => harness.tab.dispatchEvent(pointer("pointerup", 20, 102, 80)));
+    expect(onMoveSession).not.toHaveBeenCalled();
+  });
+
   it("treats the empty remainder of the Header rail as an append insertion slot", () => {
     const onInsertSession = vi.fn();
     const onMoveSession = vi.fn();
@@ -439,6 +455,9 @@ function renderHarness({
     tab: container.querySelector<HTMLButtonElement>("[data-source-tab]")!,
     target: container.querySelector<HTMLElement>(
       '[data-terminal-content-drop-group-id="group-target"]',
+    )!,
+    targetGroup: container.querySelector<HTMLElement>(
+      '[data-terminal-group-pane-id="group-target"]',
     )!,
     targetBar: container.querySelector<HTMLElement>(
       '[data-terminal-tab-bar-group-id="group-target"]',

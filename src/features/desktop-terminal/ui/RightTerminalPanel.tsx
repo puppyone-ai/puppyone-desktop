@@ -74,17 +74,41 @@ export function RightTerminalPanel({
     () => new Map(workbench.items.map((item) => [item.id, item])),
     [workbench.items],
   );
+  const contributionByKind = useMemo(
+    () => new Map(contributions.map((contribution) => [contribution.kind, contribution])),
+    [contributions],
+  );
+  const {
+    headerItems,
+    itemIds,
+    setInitialSnapshot,
+    snapshotById,
+    updateSnapshot,
+  } = useTerminalWorkbenchSnapshots({
+    contributions: contributionByKind,
+    items: workbench.items,
+    runtimeRegistry: workbench.runtimeRegistry,
+    terminalById: workbench.terminalById,
+    t,
+  });
   const reserveContributionItem = useCallback((
     contribution: AuxiliaryWorkbenchContribution,
   ) => workbench.reserveContributionItem(contribution.kind, currentRoot), [currentRoot, workbench]);
   const commitContributionItem = useCallback((
-    _contribution: AuxiliaryWorkbenchContribution,
+    contribution: AuxiliaryWorkbenchContribution,
     item: AuxiliaryWorkbenchItem,
     targetGroupId: string | null,
-  ) => workbench.commitContributionItem(item, targetGroupId), [workbench]);
+    recipe: AuxiliaryWorkbenchCreationRecipe | null,
+  ) => {
+    const itemId = workbench.commitContributionItem(item, targetGroupId);
+    setInitialSnapshot(itemId, Object.freeze({
+      ...contribution.initialSnapshot,
+      iconKey: recipe?.iconKey ?? contribution.initialSnapshot.iconKey,
+    }));
+    return itemId;
+  }, [setInitialSnapshot, workbench]);
   const {
     canCreate: canCreateContribution,
-    contributionByKind,
     create: createContributionItem,
     creationFailure,
     dismissCreationFailure,
@@ -94,18 +118,6 @@ export function RightTerminalPanel({
     items: workbench.items,
     onReserve: reserveContributionItem,
     onCommit: commitContributionItem,
-  });
-  const {
-    headerItems,
-    itemIds,
-    snapshotById,
-    updateSnapshot,
-  } = useTerminalWorkbenchSnapshots({
-    contributions: contributionByKind,
-    items: workbench.items,
-    runtimeRegistry: workbench.runtimeRegistry,
-    terminalById: workbench.terminalById,
-    t,
   });
   const hosts = usePersistentTerminalSessionHosts(itemIds);
   const agentChatContribution = contributionByKind.get(AGENT_CHAT_WORKBENCH_ITEM_KIND) ?? null;

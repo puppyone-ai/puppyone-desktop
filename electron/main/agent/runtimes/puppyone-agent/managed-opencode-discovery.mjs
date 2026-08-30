@@ -94,6 +94,7 @@ export async function discoverOpenCodeExecutable({
     readiness = {
       ...readiness,
       status: "error",
+      code: "RUNTIME_DISCOVERY_FAILED",
       message: "The bundled OpenCode runtime failed integrity verification. PuppyOne will not execute it.",
       diagnostic: packagedFailures.join("; ").slice(0, 4_000),
     };
@@ -106,6 +107,7 @@ export async function discoverOpenCodeExecutable({
     readiness = {
       ...readiness,
       status: "unsupported-version",
+      code: "RUNTIME_VERSION_UNSUPPORTED",
       message: `The bundled OpenCode runtime is ${readiness.version}; PuppyOne expects ${OPENCODE_UPSTREAM.sourceVersion}.`,
     };
   }
@@ -121,7 +123,8 @@ export async function discoverOpenCodeExecutable({
     } catch (error) {
       readiness = {
         ...readiness,
-        status: "error",
+        status: "protocol-unavailable",
+        code: "PROTOCOL_PROBE_FAILED",
         message: "PuppyOne's managed Agent engine does not expose its required ACP endpoint.",
         diagnostic: error instanceof Error ? error.message : String(error),
       };

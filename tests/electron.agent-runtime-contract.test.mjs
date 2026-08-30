@@ -10,7 +10,7 @@ describe("provider-neutral AgentRuntimePort contract", () => {
   it("runs a second fake harness through AgentService without runtime-name lifecycle branches", async () => {
     const registry = new AgentRuntimeRegistry([{
       manifest: fixture.manifest,
-      discovery: { discover: async () => ({ runtimeId: fixture.descriptor.id, provider: fixture.descriptor.id, status: "ready", version: "1.0.0", executablePath: "/fixture", environment: {}, message: "ready" }) },
+      discovery: { discover: async () => ({ runtimeId: fixture.descriptor.id, provider: fixture.descriptor.id, status: "ready", code: "READY", version: "1.0.0", executablePath: "/fixture", environment: {}, message: "ready" }) },
       createAdapter: (options) => fakeAdapter(options),
     }]);
     const persistence = { findLatest: vi.fn(async () => null), save: vi.fn(async () => {}), remove: vi.fn(async () => {}) };

@@ -93,6 +93,8 @@
 }
 
 .desktop-terminal-tab-group-content {
+  /* This is the sole split-drop coordinate space. The Tab Bar is sibling
+   * chrome and must never be covered by content-edge previews or hover frames. */
   position: relative;
   display: flex;
   flex: 1 1 0;
@@ -113,15 +115,20 @@
 }
 
 .desktop-terminal-tab-group[data-handle-hot]:not([data-move-source])
+  > .desktop-terminal-tab-group-content
   > .desktop-terminal-pane-interaction-frame {
   color: var(--po-divider);
 }
 
 .desktop-terminal-tab-group[data-move-source]
+  > .desktop-terminal-tab-group-content
   > .desktop-terminal-pane-interaction-frame,
 .desktop-terminal-tab-group:has(
-  > .desktop-terminal-pane-handle-shell > .desktop-terminal-pane-handle:active
-) > .desktop-terminal-pane-interaction-frame {
+  > .desktop-terminal-tab-group-content
+  > .desktop-terminal-pane-handle-shell
+  > .desktop-terminal-pane-handle:active
+) > .desktop-terminal-tab-group-content
+  > .desktop-terminal-pane-interaction-frame {
   color: color-mix(in srgb, var(--po-pane-resizer-active-color) 76%, transparent);
 }
 
@@ -133,7 +140,7 @@
   height: 20px;
   align-items: flex-start;
   justify-content: center;
-  inset-block-start: calc(var(--desktop-terminal-group-header-size) + 4px);
+  inset-block-start: 4px;
   inset-inline-start: 50%;
   transform: translateX(-50%);
   opacity: 0;
@@ -141,11 +148,16 @@
   transition: opacity 90ms ease;
 }
 
-.desktop-terminal-tab-group[data-handle-hot] > .desktop-terminal-pane-handle-shell,
+.desktop-terminal-tab-group[data-handle-hot]
+  > .desktop-terminal-tab-group-content
+  > .desktop-terminal-pane-handle-shell,
 .desktop-terminal-pane-handle-shell:hover,
 .desktop-terminal-pane-handle-shell:focus-within,
-.desktop-terminal-tab-group[data-drop-target] > .desktop-terminal-pane-handle-shell,
-.desktop-terminal-tab-group[data-move-source] > .desktop-terminal-pane-handle-shell {
+.desktop-terminal-tab-group-content[data-drop-target]
+  > .desktop-terminal-pane-handle-shell,
+.desktop-terminal-tab-group[data-move-source]
+  > .desktop-terminal-tab-group-content
+  > .desktop-terminal-pane-handle-shell {
   opacity: 1;
 }
 

@@ -74,10 +74,18 @@ function productionHost(values, { rawDiscovery = false } = {}) {
 }
 
 function readiness(runtimeId, status) {
+  const code = status === "ready"
+    ? "READY"
+    : status === "not-installed"
+      ? "RUNTIME_NOT_INSTALLED"
+      : status === "protocol-unavailable"
+        ? "PROTOCOL_UNAVAILABLE"
+        : "RUNTIME_DISCOVERY_FAILED";
   return {
     runtimeId,
     provider: runtimeId,
     status,
+    code,
     version: status === "ready" ? "1.0.0" : null,
     minimumVersion: null,
     executablePath: status === "ready" ? `/${runtimeId}` : null,

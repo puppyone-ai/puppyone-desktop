@@ -50,6 +50,15 @@ async function runSmoke() {
     },
     localAgentInventory: { discover: async () => ({ connections: [], scannedAt: new Date(0).toISOString(), warnings: [] }) },
     agentService: {
+      getReferenceInputCapabilities: () => ({
+        workspaceFiles: true,
+        workspaceDirectories: true,
+        images: "local-snapshot",
+        genericFiles: "local-snapshot",
+        maxReferences: 32,
+        maxReferenceBytes: 25 * 1024 * 1024,
+        maxTotalReferenceBytes: 25 * 1024 * 1024,
+      }),
       startTurn: async (sender, request, authorizedRoot) => {
         if (authorizedRoot !== workspacePath || sender.id <= 0) throw new Error("Electron smoke owner correlation failed.");
         const staged = request.references.find((reference) => reference.kind === "staged-attachment");
@@ -157,50 +166,88 @@ async function runNativeGrantSmoke() {
 async function runProductionLayoutSmoke() {
   const window = createWindow({ show: false, width: 760, height: 820, preload: false });
   const matrix = [];
+  const pickerThemes = [];
   for (const theme of ["light", "dark"]) {
     nativeTheme.themeSource = theme;
     const url = pathToFileURL(rendererPath);
     url.searchParams.set("theme", theme);
     url.hash = "agent-visual-smoke";
     await window.loadURL(url.href);
-    await waitForRenderer(window, "document.querySelectorAll('.desktop-agent-reference-chips > span').length", (value) => value === 3);
+    await waitForRenderer(window, "document.querySelectorAll('.desktop-agent-reference-cards > .desktop-agent-reference-card').length", (value) => value === 3);
     for (const width of [420, 560, 760]) {
       window.setContentSize(width, 820);
       await new Promise((resolve) => setTimeout(resolve, 50));
       const snapshot = await window.webContents.executeJavaScript(`(() => {
         const boundary = document.querySelector('.desktop-agent-boundary');
         const trigger = document.querySelector('.desktop-agent-reference-trigger');
-        const error = document.querySelector('.desktop-agent-reference-chips .is-error small');
+        const error = document.querySelector('.desktop-agent-reference-card.is-error small');
         return {
           theme: document.querySelector('[data-smoke-theme]')?.getAttribute('data-smoke-theme'),
           width: Math.round(boundary?.getBoundingClientRect().width || 0),
           viewport: window.innerWidth,
           overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-          draftChips: document.querySelectorAll('.desktop-agent-reference-chips > span').length,
+          draftCards: document.querySelectorAll('.desktop-agent-reference-cards > .desktop-agent-reference-card').length,
+          markdownCards: document.querySelectorAll('.desktop-agent-reference-card.is-file-card').length,
+          imageCards: document.querySelectorAll('.desktop-agent-reference-card.is-image-card img').length,
           transcriptChips: document.querySelectorAll('.desktop-agent-message-references > span').length,
           addLabel: trigger?.getAttribute('aria-label') || '',
           visibleError: error?.textContent || '',
         };
       })()`, true);
       if (snapshot.theme !== theme || snapshot.width <= 0 || snapshot.width > snapshot.viewport
-        || snapshot.overflow || snapshot.draftChips !== 3 || snapshot.transcriptChips < 2
+        || snapshot.overflow || snapshot.draftCards !== 3 || snapshot.markdownCards < 1
+        || snapshot.imageCards !== 1 || snapshot.transcriptChips < 2
         || !snapshot.addLabel || !snapshot.visibleError) {
         throw new Error(`Production Agent reference layout smoke failed: ${JSON.stringify(snapshot)}`);
       }
       matrix.push(`${theme}:${width}`);
     }
-    await window.webContents.executeJavaScript("document.querySelector('.desktop-agent-reference-trigger').click()", true);
-    await waitForRenderer(window, "Boolean(document.querySelector('[role=menu]'))", Boolean);
-    await window.webContents.executeJavaScript(
-      "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))",
-      true,
+    const directPicker = await window.webContents.executeJavaScript(`(() => ({
+      input: Boolean(document.querySelector('.desktop-agent-attachment-control input[type=file]')),
+      menu: Boolean(document.querySelector('[role=menu]')),
+    }))()`, true);
+    if (!directPicker.input || directPicker.menu) {
+      throw new Error(`Production Agent direct picker contract failed: ${JSON.stringify(directPicker)}`);
+    }
+    await window.webContents.executeJavaScript(`(() => {
+      document.querySelector('.desktop-agent-composer-picker.is-model button')?.click();
+    })()`, true);
+    await waitForRenderer(
+      window,
+      "Boolean(document.querySelector('.desktop-agent-picker-popover[data-positioned=true]'))",
+      Boolean,
     );
-    await waitForRenderer(window, "Boolean(document.querySelector('[role=menu]'))", (value) => !value);
+    const pickerSnapshot = await window.webContents.executeJavaScript(`(() => {
+      const surface = document.querySelector('.desktop-agent-picker-popover');
+      const option = surface?.querySelector('[role=option]');
+      const rootStyle = getComputedStyle(document.documentElement);
+      const surfaceStyle = surface ? getComputedStyle(surface) : null;
+      const optionStyle = option ? getComputedStyle(option) : null;
+      return {
+        sharedSurface: surface?.classList.contains('desktop-menu-surface') || false,
+        nativeOccluder: surface?.getAttribute('data-native-surface-occluder') === 'true',
+        quietTone: surface?.getAttribute('data-menu-tone') === 'quiet',
+        compactElevation: surface?.getAttribute('data-menu-elevation') === 'compact',
+        listbox: Boolean(surface?.querySelector('[role=listbox]')),
+        optionCount: surface?.querySelectorAll('[role=option]').length || 0,
+        borderRadius: surfaceStyle?.borderRadius || '',
+        expectedBorderRadius: rootStyle.getPropertyValue('--po-menu-radius').trim(),
+        optionWeight: optionStyle?.fontWeight || '',
+      };
+    })()`, true);
+    if (!pickerSnapshot.sharedSurface || !pickerSnapshot.nativeOccluder || !pickerSnapshot.quietTone
+      || !pickerSnapshot.compactElevation || !pickerSnapshot.listbox || pickerSnapshot.optionCount < 2
+      || pickerSnapshot.borderRadius !== pickerSnapshot.expectedBorderRadius
+      || Number(pickerSnapshot.optionWeight) > 400) {
+      throw new Error(`Production Agent picker primitive smoke failed: ${JSON.stringify(pickerSnapshot)}`);
+    }
+    pickerThemes.push(theme);
     const image = await window.capturePage();
     if (image.isEmpty()) throw new Error(`Production Agent reference ${theme} capture was empty.`);
+    await window.webContents.executeJavaScript(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`, true);
   }
   window.destroy();
-  return { productionLayoutMatrix: matrix };
+  return { productionLayoutMatrix: matrix, pickerThemes };
 }
 
 function createWindow({ show, width, height, preload }) {

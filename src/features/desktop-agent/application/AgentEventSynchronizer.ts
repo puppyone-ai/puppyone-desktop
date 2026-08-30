@@ -7,8 +7,10 @@ import type { AgentClientPort, AgentClientProvider } from "./AgentClientPort";
 
 type StatePatch = (patch: Partial<AgentControllerState>) => void;
 
-const STREAM_BATCH_MS = 32;
+const STREAM_FRAME_MS = 16;
 const MAX_BUFFERED_EVENTS = 2_000;
+
+export type AgentStreamFlushScheduler = (callback: () => void) => () => void;
 
 export class AgentEventSynchronizer {
   private eventCleanup: (() => void) | null = null;
@@ -16,7 +18,7 @@ export class AgentEventSynchronizer {
   private connectedBridge: AgentClientPort | null = null;
   private bufferedEvents: AgentEvent[] = [];
   private bufferedSequences = new Set<number>();
-  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private cancelScheduledFlush: (() => void) | null = null;
   private replayPromise: Promise<void> | null = null;
   private disposed = false;
 
@@ -26,6 +28,7 @@ export class AgentEventSynchronizer {
     private readonly readState: () => AgentControllerState,
     private readonly patch: StatePatch,
     private readonly onTurnReady: () => void,
+    private readonly scheduleFlush: AgentStreamFlushScheduler = scheduleStreamTimer,
   ) {}
 
   connect() {
@@ -47,16 +50,16 @@ export class AgentEventSynchronizer {
     this.eventCleanup = null;
     this.exitCleanup = null;
     this.connectedBridge = null;
-    if (this.flushTimer) clearTimeout(this.flushTimer);
-    this.flushTimer = null;
+    this.cancelScheduledFlush?.();
+    this.cancelScheduledFlush = null;
     this.bufferedEvents = [];
     this.bufferedSequences.clear();
   }
 
   flush() {
     if (this.disposed) return;
-    if (this.flushTimer) clearTimeout(this.flushTimer);
-    this.flushTimer = null;
+    this.cancelScheduledFlush?.();
+    this.cancelScheduledFlush = null;
     if (this.bufferedEvents.length === 0) return;
     const state = this.readState();
     const ordered = this.bufferedEvents.sort((left, right) => left.sequence - right.sequence);
@@ -117,7 +120,12 @@ export class AgentEventSynchronizer {
       this.flush();
       return;
     }
-    if (!this.flushTimer) this.flushTimer = setTimeout(() => this.flush(), STREAM_BATCH_MS);
+    if (!this.cancelScheduledFlush) {
+      this.cancelScheduledFlush = this.scheduleFlush(() => {
+        this.cancelScheduledFlush = null;
+        this.flush();
+      });
+    }
   }
 
   private handleSessionExit(event: { sessionId: string; reason: string }) {
@@ -255,6 +263,7 @@ function rejectedProviderPatch(state: AgentControllerState, projection: AgentCon
   return {
     selectedProviderId: null,
     selectedModel: null,
+    selectedEffort: null,
     inspection: {
       ...state.inspection,
       providers,
@@ -264,6 +273,7 @@ function rejectedProviderPatch(state: AgentControllerState, projection: AgentCon
         : {
           ...state.inspection.readiness,
           status: "installed-not-authenticated" as const,
+          code: "PROVIDER_CREDENTIALS_REJECTED" as const,
           message: "",
         },
     },
@@ -279,6 +289,11 @@ function modelProviderId(model: string) {
 }
 
 export const agentEventSynchronizationLimits = Object.freeze({
-  streamBatchMs: STREAM_BATCH_MS,
+  streamBatchMs: STREAM_FRAME_MS,
   maxBufferedEvents: MAX_BUFFERED_EVENTS,
 });
+
+function scheduleStreamTimer(callback: () => void) {
+  const timer = setTimeout(callback, STREAM_FRAME_MS);
+  return () => clearTimeout(timer);
+}

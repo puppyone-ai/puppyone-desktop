@@ -15,6 +15,8 @@ export type AuxiliaryWorkbenchItemSnapshot = Readonly<{
   title: string;
   accessibleLabel: string;
   detail: string | null;
+  /** Product mark rendered by generic Workbench chrome. */
+  iconKey: string | null;
   status: "idle" | "selecting" | "starting" | "running" | "exited" | "error";
   running: boolean;
   /** Feature-owned native resource identity, never part of the topology. */

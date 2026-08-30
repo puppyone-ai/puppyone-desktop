@@ -154,6 +154,7 @@ describe("Desktop Agent local-tool inventory", () => {
     expect(parseCodexLocalVersion("codex-cli 0.144.1")).toBe("0.144.1");
     expect(parseCursorLocalVersion("2026.07.09-a3815c0")).toBe("2026.07.09-a3815c0");
     expect(parseCursorAuthentication("Not authenticated. Run cursor-agent login.")).toBe("signed-out");
+    expect(parseCursorAuthentication("Not authenticated: credentials expired.")).toBe("expired");
     expect(parseCursorAuthentication("Authenticated as local@example.test")).toBe("signed-in");
     expect(parseCursorAuthentication("ERROR: SecItemCopyMatching failed -50")).toBe("error");
     expect(parseCursorAuthentication("new additive status format")).toBe("unknown");
@@ -235,6 +236,28 @@ describe("Desktop Agent local-tool inventory", () => {
       authentication: "signed-in",
     });
     expect(JSON.stringify(cursor)).not.toContain("private@example.test");
+  });
+
+  it("retains a Cursor status crash as probe evidence instead of treating it as sign-out", async () => {
+    const cursor = await probeCursorLocal({
+      candidate: fixedCandidate("/tools/cursor-agent", "cursor-agent"),
+      runCommand: vi.fn(async (_file, args) => args[0] === "--version"
+        ? { code: 0, stdout: "2026.07.09-a3815c0", stderr: "" }
+        : { code: 139, signal: null, stdout: "", stderr: "ERROR: SecItemCopyMatching failed -50" }),
+    });
+
+    expect(cursor).toMatchObject({
+      installation: "detected",
+      authentication: "error",
+      authenticationFailure: "crashed",
+      authenticationExitCode: 139,
+      authenticationDiagnostic: expect.stringMatching(/exit code 139.*SecItemCopyMatching failed -50/i),
+    });
+    expect(deriveLocalConnection(cursor)).toMatchObject({
+      authentication: "error",
+      integration: "blocked",
+      selectable: false,
+    });
   });
 
   it("disposes an in-flight Codex protocol probe when application inventory is cancelled", async () => {

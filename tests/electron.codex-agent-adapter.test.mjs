@@ -219,11 +219,12 @@ describe("Codex app-server normalization", () => {
       defaultVariant: "xhigh",
     });
     await adapter.createSession({ model: "gpt-5.5" });
-    await adapter.startTurn({ prompt: "hello", model: "gpt-5.5" });
-    await adapter.startTurn({ prompt: "follow up", model: "gpt-5.5" });
-    expect(connection.requests.find((request) => request.method === "turn/start")).toMatchObject({
-      params: { threadId: "thread-1", model: "gpt-5.5", effort: "xhigh" },
-    });
+    await adapter.startTurn({ prompt: "hello", model: "gpt-5.5", effort: "low" });
+    await adapter.startTurn({ prompt: "follow up", model: "gpt-5.5", effort: "xhigh" });
+    expect(connection.requests.filter((request) => request.method === "turn/start")).toMatchObject([
+      { params: { threadId: "thread-1", model: "gpt-5.5", effort: "low" } },
+      { params: { threadId: "thread-1", model: "gpt-5.5", effort: "xhigh" } },
+    ]);
     expect(connection.requests.filter((request) => request.method === "initialize")).toHaveLength(1);
     expect(connection.requests.filter((request) => request.method === "thread/start")).toHaveLength(1);
     expect(connection.requests.filter((request) => request.method === "thread/resume")).toHaveLength(0);

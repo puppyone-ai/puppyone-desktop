@@ -106,7 +106,7 @@ describe("Terminal Group-owned Tab layout", () => {
     expect(hostB.parentElement).toBe(rightParent);
   });
 
-  it("renders four-edge drop previews on the target Group rather than a Session body", () => {
+  it("renders four-edge drop previews inside the target content viewport", () => {
     const state = createThreeTabs();
     const harness = createHarness(state);
     for (const edge of ["left", "right", "top", "bottom"] as const) {
@@ -120,7 +120,13 @@ describe("Terminal Group-owned Tab layout", () => {
       const target = harness.container.querySelector<HTMLElement>(
         '[data-terminal-group-pane-id="group-a"]',
       );
+      const content = target?.querySelector<HTMLElement>(
+        '[data-terminal-content-drop-group-id="group-a"]',
+      );
       const preview = target?.querySelector<HTMLElement>(".desktop-terminal-drop-preview");
+      expect(content?.contains(preview ?? null)).toBe(true);
+      expect(content?.dataset.dropTarget).toBe(edge);
+      expect(target?.dataset.dropTarget).toBeUndefined();
       expect(preview?.dataset.edge).toBe(edge);
       expect(preview?.dataset.allowed).toBe(edge === "top" ? "false" : "true");
     }
@@ -151,6 +157,12 @@ describe("Terminal Group-owned Tab layout", () => {
     expect(rail.classList.contains("desktop-terminal-tab-rail")).toBe(true);
     expect(content.classList.contains("desktop-terminal-tab-group-content")).toBe(true);
     expect(rail.contains(content)).toBe(false);
+    expect(content.contains(preview)).toBe(true);
+    expect(rail.contains(preview)).toBe(false);
+    expect(content.contains(target.querySelector(".desktop-terminal-pane-interaction-frame")))
+      .toBe(true);
+    expect(content.contains(target.querySelector(".desktop-terminal-pane-handle-shell")))
+      .toBe(true);
     expect(preview.dataset.operation).toBe("move-group");
     expect(preview.dataset.edge).toBe("left");
     expect(preview.dataset.allowed).toBe("true");
@@ -239,7 +251,7 @@ describe("Terminal Group-owned Tab layout", () => {
     expect(terminalA.style.getPropertyValue("--desktop-terminal-tab-inline-start")).toBe("147px");
   });
 
-  it("reveals one Ghostty-style three-dot handle in the upper third of every Group", () => {
+  it("reveals one Ghostty-style three-dot handle only from the content viewport", () => {
     const state = splitTab(createThreeTabs(), "terminal-b", "group-a", "right", "group-b");
     const harness = createHarness(state);
     harness.render();
@@ -253,15 +265,24 @@ describe("Terminal Group-owned Tab layout", () => {
     ))).toBe(true);
 
     const left = groups[0]!;
-    left.getBoundingClientRect = () => new DOMRect(0, 0, 400, 600);
-    act(() => left.dispatchEvent(new PointerEvent("pointermove", {
+    const header = left.querySelector<HTMLElement>(".desktop-terminal-subheader")!;
+    const content = left.querySelector<HTMLElement>(".desktop-terminal-tab-group-content")!;
+    content.getBoundingClientRect = () => new DOMRect(0, 38, 400, 562);
+    act(() => header.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: 200,
+      clientY: 20,
+    })));
+    expect(left.dataset.handleHot).toBeUndefined();
+
+    act(() => content.dispatchEvent(new PointerEvent("pointermove", {
       bubbles: true,
       clientX: 200,
       clientY: 100,
     })));
     expect(left.dataset.handleHot).toBe("true");
 
-    act(() => left.dispatchEvent(new PointerEvent("pointermove", {
+    act(() => content.dispatchEvent(new PointerEvent("pointermove", {
       bubbles: true,
       clientX: 200,
       clientY: 400,

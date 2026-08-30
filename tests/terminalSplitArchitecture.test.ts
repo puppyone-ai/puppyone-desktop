@@ -59,6 +59,12 @@ describe("Terminal native split architecture", () => {
     const layout = source(
       "src/features/desktop-terminal/layout/TerminalGroupViewport.tsx",
     );
+    const groupPane = source(
+      "src/features/desktop-terminal/layout/TerminalGroupPane.tsx",
+    );
+    const contentDropTarget = source(
+      "src/features/desktop-terminal/interactions/terminalContentDropTarget.ts",
+    );
     const hosts = source(
       "src/features/desktop-terminal/layout/session-host/usePersistentTerminalSessionHosts.ts",
     );
@@ -68,7 +74,8 @@ describe("Terminal native split architecture", () => {
     expect(tabMove).toContain("event.buttons & 1");
     expect(tabMove).toContain("document.elementFromPoint");
     expect(tabMove).toContain('"terminal-tab-move"');
-    expect(tabMove).toContain("[data-terminal-content-drop-group-id]");
+    expect(tabMove).toContain("resolveTerminalContentDropTarget");
+    expect(contentDropTarget).toContain("[data-terminal-content-drop-group-id]");
     expect(tabMove).toContain("resolveTerminalTabBarDropTarget");
     expect(tabMove).toContain("onInsertSession");
     expect(tabMove).not.toMatch(/DataTransfer|onDragStart|draggable/);
@@ -77,7 +84,8 @@ describe("Terminal native split architecture", () => {
     expect(sessionView).toContain("onDrop={handleTerminalDrop}");
     expect(layout).toContain("<TerminalSessionHostSlot");
     expect(layout).toContain("<TerminalSessionHeader");
-    expect(layout).toContain("data-terminal-group-pane-id={group.id}");
+    expect(layout).toContain("<TerminalGroupPane");
+    expect(groupPane).toContain("data-terminal-group-pane-id={groupId}");
     expect(hosts).toContain("document.createElement(\"div\")");
   });
 

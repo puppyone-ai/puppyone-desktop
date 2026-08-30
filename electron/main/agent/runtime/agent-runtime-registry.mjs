@@ -4,6 +4,9 @@ import {
   defineAgentRuntimeManifest,
   runtimeDescriptorFromManifest,
 } from "./agent-runtime-manifest.mjs";
+import {
+  assertAgentRuntimeReadiness,
+} from "../../../../shared/agent-contract/schema.mjs";
 
 export class AgentRuntimeRegistry {
   constructor(definitions, { defaultRuntimeId = null } = {}) {
@@ -40,6 +43,7 @@ export class AgentRuntimeRegistry {
       const definition = this.require(descriptor.id);
       try {
         const readiness = await definition.discovery.discover({ refresh });
+        assertAgentRuntimeReadiness(readiness);
         return { descriptor, readiness };
       } catch (error) {
         return {
@@ -48,6 +52,7 @@ export class AgentRuntimeRegistry {
             runtimeId: descriptor.id,
             provider: descriptor.id,
             status: "error",
+            code: "RUNTIME_DISCOVERY_FAILED",
             version: null,
             minimumVersion: null,
             executablePath: null,
@@ -114,18 +119,21 @@ export class AgentRuntimeHost {
 
 export function publicRuntimeReadiness(entry) {
   const readiness = entry?.readiness ?? {};
-  return {
+  const status = readiness.status ?? "error";
+  const result = {
     runtimeId: entry?.descriptor?.id ?? readiness.runtimeId ?? readiness.provider ?? "unknown",
     provider: entry?.descriptor?.id ?? readiness.provider ?? "unknown",
-    status: readiness.status ?? "error",
+    status,
+    code: readiness.code ?? "RUNTIME_DISCOVERY_FAILED",
     version: readiness.version ?? null,
     minimumVersion: readiness.minimumVersion ?? null,
     message: readiness.message ?? "",
     source: readiness.source ?? "external",
     compatibility: readiness.compatibility ?? "unknown",
-    selectable: readiness.status === "ready",
+    selectable: status === "ready" && readiness.selectable !== false,
     ...(readiness.diagnostic ? { diagnostic: readiness.diagnostic } : {}),
   };
+  return assertAgentRuntimeReadiness(result);
 }
 
 function validateDefinition(definition) {

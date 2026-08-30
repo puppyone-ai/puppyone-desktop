@@ -5,6 +5,7 @@ import {
   closeDocumentWorkingCopiesUnderResource,
   createWorkspaceResourceUri,
   flushActiveDocumentSessions,
+  isDataResourceUri,
   isDocumentDataNode,
   type DataNode,
   type WorkspaceFolder,
@@ -257,6 +258,32 @@ function AppContent() {
   const resolveWorkspaceResource = useCallback((path: string | null) => (
     workbenchDataService?.resolveResource(path) ?? null
   ), [workbenchDataService]);
+  const resolveAgentWorkspaceReference = useCallback(async (resource: string) => {
+    if (!workbenchDataService || !isDataResourceUri(resource)) return null;
+    try {
+      const resolved = workbenchDataService.resolveResource(resource);
+      const loadVisualPreview = resolved.providerPath
+        && isPreviewableAgentImagePath(resolved.providerPath)
+        && workbenchDataService.dataPort.getFileUrl
+        ? async () => {
+            const url = await workbenchDataService.dataPort.getFileUrl!(resource, { purpose: "file-preview" });
+            return {
+              url,
+              release: () => {
+                void Promise.resolve(workbenchDataService.dataPort.revokeFileUrl?.(url)).catch(() => undefined);
+              },
+            };
+          }
+        : undefined;
+      return {
+        workspaceRoot: resolved.folder.workspace.path,
+        referencePath: resolved.providerPath ?? ".",
+        ...(loadVisualPreview ? { loadVisualPreview } : {}),
+      };
+    } catch {
+      return null;
+    }
+  }, [workbenchDataService]);
   const editorWorkbench = useDesktopEditorWorkbench(
     workspace,
     dataPort?.resolveNode ?? null,
@@ -891,6 +918,7 @@ function AppContent() {
         title: t("agent.header.newChat"),
         accessibleLabel: `${t("agent.header.newChat")} — ${t("agent.name")}`,
         detail: t("agent.name"),
+        iconKey: null,
         status: "starting",
         running: false,
         resourceId: null,
@@ -913,6 +941,7 @@ function AppContent() {
             onPreferredModelChange={setAgentPreferredModel}
             onViewChanges={handleAgentViewChanges}
             onOpenFile={handleAgentOpenFile}
+            resolveWorkspaceReference={resolveAgentWorkspaceReference}
           />
         </Suspense>
       ),
@@ -925,6 +954,7 @@ function AppContent() {
     desktopAgentChatEnabled,
     handleAgentOpenFile,
     handleAgentViewChanges,
+    resolveAgentWorkspaceReference,
     setAgentPreferredModel,
     setAgentPreferredRoute,
     setAgentPreferredRuntime,
@@ -1278,6 +1308,10 @@ function AppContent() {
       </DesktopOverlayPortal>
     </div>
   );
+}
+
+function isPreviewableAgentImagePath(path: string) {
+  return /\.(?:png|jpe?g|gif|webp|avif)$/i.test(path);
 }
 
 function hasSameActiveDataNodeIdentity(left: DataNode | null, right: DataNode | null): boolean {

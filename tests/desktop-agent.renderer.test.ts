@@ -10,6 +10,7 @@ import { AgentApprovalDock } from "../src/features/desktop-agent/ui/AgentApprova
 import { AgentChangesPill, summarizeAgentChanges } from "../src/features/desktop-agent/ui/AgentChangesPill";
 import { AgentComposer } from "../src/features/desktop-agent/ui/AgentComposer";
 import { AgentPanelLayout } from "../src/features/desktop-agent/ui/AgentPanelLayout";
+import { AgentPanelStatus } from "../src/features/desktop-agent/ui/AgentPanelStatus";
 import { AgentPickerPopover } from "../src/features/desktop-agent/ui/AgentPickerPopover";
 import { AgentRuntimePicker } from "../src/features/desktop-agent/ui/AgentRuntimePicker";
 import { AgentSurfaceHeader } from "../src/features/desktop-agent/ui/AgentSurfaceHeader";
@@ -54,6 +55,7 @@ function runtimeEntry(id: string, displayName: string) {
       runtimeId: id,
       provider: id,
       status: "ready" as const,
+      code: "READY" as const,
       version: "1.0.0",
       minimumVersion: null,
       message: "Ready",
@@ -63,6 +65,40 @@ function runtimeEntry(id: string, displayName: string) {
 }
 
 describe("Desktop Agent renderer surfaces", () => {
+  it.each([
+    [
+      "explicit sign-out",
+      { status: "installed-not-authenticated" as const, code: "AUTHENTICATION_REQUIRED" as const },
+      "Sign in to Cursor Agent",
+    ],
+    [
+      "status probe failure",
+      { status: "error" as const, code: "AUTHENTICATION_PROBE_CRASHED" as const },
+      "Cursor Agent sign-in check crashed",
+    ],
+  ])("renders %s from the structured readiness code", (_label, reason, heading) => {
+    const container = render(React.createElement(AgentPanelStatus, {
+      unavailable: true,
+      failed: false,
+      error: null,
+      runtimeLabel: "Cursor Agent",
+      readiness: {
+        runtimeId: "cursor",
+        provider: "cursor",
+        ...reason,
+        version: "2026.08.1",
+        minimumVersion: null,
+        message: "Structured backend detail.",
+      },
+      onRetry: vi.fn(),
+    }));
+
+    const text = stripBidiIsolation(container.textContent);
+    expect(text).toContain(heading);
+    expect(text).toContain(`Status code: ${reason.code}`);
+    if (reason.code === "AUTHENTICATION_PROBE_CRASHED") expect(text).not.toContain("Sign in to Cursor Agent");
+  });
+
   it("keeps the ready empty transcript visually blank", () => {
     const container = render(React.createElement(AgentTranscript, {
       projection: createAgentProjection(),
@@ -344,6 +380,44 @@ describe("Desktop Agent renderer surfaces", () => {
     }));
 
     expect((container.querySelector("textarea") as HTMLTextAreaElement).placeholder).toBe("Ask about this project");
+    const sendButton = container.querySelector(
+      'button[aria-label="Send message"]',
+    ) as HTMLButtonElement | null;
+    expect(sendButton).not.toBeNull();
+    expect(sendButton?.disabled).toBe(true);
+  });
+
+  it("morphs the single send action into stop while a turn is running", () => {
+    const onStop = vi.fn();
+    const props = {
+      draft: "Follow up",
+      onDraftChange: vi.fn(),
+      disabled: false,
+      running: true,
+      stopping: false,
+      submitting: false,
+      runtimeLabel: "Codex",
+      steerAvailable: true,
+      queueAvailable: true,
+      onSubmit: vi.fn(async () => true),
+      onStop,
+    };
+    const container = render(React.createElement(AgentComposer, props));
+
+    const actions = container.querySelectorAll(".desktop-agent-composer-action");
+    expect(actions).toHaveLength(1);
+    const stopAction = actions[0] as HTMLButtonElement;
+    expect(stopAction.classList.contains("is-stop")).toBe(true);
+    expect(stripBidiIsolation(stopAction.getAttribute("aria-label"))).toBe(testT("agent.composer.stop", { agent: "Codex" }));
+    expect(container.querySelector(`button[aria-label="${testT("agent.composer.send")}"]`)).toBeNull();
+
+    act(() => stopAction.click());
+    expect(onStop).toHaveBeenCalledTimes(1);
+
+    act(() => root?.render(withTestLocalization(React.createElement(AgentComposer, { ...props, stopping: true }))));
+    const stoppingAction = container.querySelector(".desktop-agent-composer-action") as HTMLButtonElement;
+    expect(stoppingAction.getAttribute("aria-busy")).toBe("true");
+    expect(stoppingAction.disabled).toBe(true);
   });
 
   it("hides the configured Model in Minimal Mode without removing the composer", () => {
@@ -992,6 +1066,7 @@ describe("Desktop Agent renderer surfaces", () => {
       runtimeId: "opencode",
       provider: "opencode",
       status: "unsupported-version",
+      code: "RUNTIME_VERSION_UNSUPPORTED",
       version: "0.100.0",
       minimumVersion: "0.144.1",
       message: "The managed Agent engine is incompatible with this PuppyOne build.",

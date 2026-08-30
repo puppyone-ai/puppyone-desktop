@@ -1,4 +1,3 @@
-import { ArrowUp, LoaderCircle, Square } from "lucide-react";
 import { useRef, type ClipboardEventHandler, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
@@ -8,9 +7,8 @@ import type {
   AgentModel,
   AgentReferenceInputCapabilities,
 } from "../domain/agent-contract";
-import { AgentModelPicker } from "./AgentModelPicker";
-import { AgentAttachmentButton } from "./composer/AgentAttachmentButton";
 import { AgentCommandSuggestions, visibleAgentCommands } from "./composer/AgentCommandSuggestions";
+import { AgentComposerToolbar } from "./composer/AgentComposerToolbar";
 import { AgentDraftReferenceList } from "./composer/AgentDraftReferenceList";
 
 type AgentComposerProps = {
@@ -29,8 +27,12 @@ type AgentComposerProps = {
   models?: AgentModel[];
   selectedModel?: string | null;
   onSelectModel?: (model: string) => void;
+  efforts?: string[];
+  selectedEffort?: string | null;
+  onSelectEffort?: (effort: string) => void;
   commands?: AgentCommand[];
   references?: AgentDraftReference[];
+  getReferencePreviewUrl?: (id: string) => string | null;
   referenceCapabilities?: AgentReferenceInputCapabilities;
   steerAvailable?: boolean;
   queueAvailable?: boolean;
@@ -44,7 +46,6 @@ type AgentComposerProps = {
 };
 
 export const DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID = "agent.composer.placeholder.default";
-const ignoreSelection = () => {};
 const COMPOSER_CONTROL_SELECTOR = "textarea, button, a[href], input, select, [role='button'], [role='option'], [contenteditable='true']";
 
 export function AgentComposer({
@@ -63,8 +64,12 @@ export function AgentComposer({
   models = [],
   selectedModel = null,
   onSelectModel,
+  efforts = [],
+  selectedEffort = null,
+  onSelectEffort,
   commands = [],
   references = [],
+  getReferencePreviewUrl,
   referenceCapabilities,
   steerAvailable = false,
   queueAvailable = false,
@@ -85,6 +90,11 @@ export function AgentComposer({
   const referencesReady = references.every((reference) => reference.status === "ready");
   const hasSubmission = Boolean(draft.trim()) || Boolean(references.length && referenceCapabilities?.attachmentOnly);
   const canSubmit = hasSubmission && referencesReady && !disabled && !submitting && (!running || canSendWhileRunning);
+  const primaryActionLabel = running
+    ? t(stopping ? "agent.composer.stopping" : "agent.composer.stop", { agent: bidiIsolate(runtimeLabel) })
+    : t("agent.composer.send");
+  const primaryActionBusy = running ? stopping : submitting;
+  const primaryActionDisabled = running ? stopping : !canSubmit;
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -116,13 +126,14 @@ export function AgentComposer({
         data-input-disabled={inputDisabled || undefined}
         onMouseDown={handleSurfaceMouseDown}
       >
-        <AgentDraftReferenceList
-          references={references}
-          onRemove={onRemoveReference}
-          onRetry={onRetryReference}
-        />
         <div className="desktop-agent-composer-row">
           <div className="desktop-agent-composer-input-row">
+            <AgentDraftReferenceList
+              references={references}
+              getPreviewUrl={getReferencePreviewUrl}
+              onRemove={onRemoveReference}
+              onRetry={onRetryReference}
+            />
             <textarea
               ref={textareaRef}
               data-po-scrollbar="content"
@@ -137,30 +148,25 @@ export function AgentComposer({
               onPaste={onPaste}
             />
           </div>
-          <div className="desktop-agent-composer-trailing">
-            <div className="desktop-agent-composer-leading">
-              {!hideConfiguration && models.length > 0 && (
-                <div className="desktop-agent-composer-picker is-model">
-                  <AgentModelPicker
-                    models={models}
-                    selectedModel={selectedModel}
-                    disabled={running || configurationDisabled}
-                    onSelectModel={onSelectModel ?? ignoreSelection}
-                  />
-                </div>
-              )}
-            </div>
-            <div className="desktop-agent-composer-actions">
-              <AgentAttachmentButton
-                capabilities={referenceCapabilities}
-                disabled={inputDisabled || configurationDisabled}
-                onAddExternalFiles={onAddExternalFiles}
-                onPickWorkspaceReferences={onPickWorkspaceReferences}
-              />
-              {running && <button type="button" className="desktop-agent-composer-action is-stop" aria-label={t(stopping ? "agent.composer.stopping" : "agent.composer.stop", { agent: bidiIsolate(runtimeLabel) })} disabled={stopping} onClick={onStop}><Square size={11} fill="currentColor" /></button>}
-              {(!running || canSendWhileRunning) && <button type="button" className="desktop-agent-composer-action" aria-label={running && steerAvailable ? t("agent.composer.steer", { agent: bidiIsolate(runtimeLabel) }) : t("agent.composer.send")} aria-busy={submitting || undefined} disabled={!canSubmit} onClick={() => void submit()}>{submitting ? <LoaderCircle size={15} className="desktop-agent-spin" /> : <ArrowUp size={17} strokeWidth={2.2} />}</button>}
-            </div>
-          </div>
+          <AgentComposerToolbar
+            hideConfiguration={hideConfiguration}
+            inputDisabled={inputDisabled}
+            configurationDisabled={configurationDisabled}
+            running={running}
+            models={models}
+            selectedModel={selectedModel}
+            onSelectModel={onSelectModel}
+            efforts={efforts}
+            selectedEffort={selectedEffort}
+            onSelectEffort={onSelectEffort}
+            referenceCapabilities={referenceCapabilities}
+            onAddExternalFiles={onAddExternalFiles}
+            onPickWorkspaceReferences={onPickWorkspaceReferences}
+            primaryActionLabel={primaryActionLabel}
+            primaryActionBusy={primaryActionBusy}
+            primaryActionDisabled={primaryActionDisabled}
+            onPrimaryAction={running ? onStop : () => void submit()}
+          />
         </div>
       </div>
     </div>

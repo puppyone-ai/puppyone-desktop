@@ -11,6 +11,25 @@ export type AgentReadinessStatus =
   | "ready"
   | "error";
 
+/** Exact readiness reason. Presentation and recovery routing use this code, not backend prose. */
+export type AgentReadinessCode =
+  | "READY"
+  | "RUNTIME_NOT_INSTALLED"
+  | "RUNTIME_DISCOVERY_FAILED"
+  | "RUNTIME_INSPECTION_FAILED"
+  | "RUNTIME_VERSION_UNVERIFIED"
+  | "RUNTIME_VERSION_UNSUPPORTED"
+  | "RUNTIME_SETUP_REQUIRED"
+  | "AUTHENTICATION_REQUIRED"
+  | "AUTHENTICATION_EXPIRED"
+  | "AUTHENTICATION_PROBE_FAILED"
+  | "AUTHENTICATION_PROBE_CRASHED"
+  | "AUTHENTICATION_PROBE_TIMED_OUT"
+  | "AUTHENTICATION_STATUS_UNKNOWN"
+  | "PROVIDER_CREDENTIALS_REJECTED"
+  | "PROTOCOL_UNAVAILABLE"
+  | "PROTOCOL_PROBE_FAILED";
+
 export type AgentRuntimeDescriptor = {
   id: AgentRuntimeId;
   displayName: string;
@@ -52,6 +71,7 @@ export type AgentRuntimeReadiness = {
   runtimeId?: AgentRuntimeId;
   provider: AgentProviderId;
   status: AgentReadinessStatus;
+  code: AgentReadinessCode;
   version: string | null;
   minimumVersion: string | null;
   message: string;
@@ -138,6 +158,7 @@ export type AgentAccountState = {
   } | null;
   requiresOpenaiAuth: boolean;
   requiresRuntimeSetup?: boolean;
+  setupReason?: "authentication-required" | "authentication-expired" | "runtime-setup-required";
   error?: string;
 };
 
@@ -187,6 +208,7 @@ export type AgentSessionMetadata = {
   updatedAt: string;
   terminalState: AgentTurnTerminalState | "idle" | "running" | "provider-exited";
   selectedModel: string | null;
+  selectedEffort?: string | null;
   selectedMode?: string | null;
   activeTurnId: string | null;
   lastSequence: number;
@@ -403,6 +425,7 @@ export type AgentSessionCreateRequest = {
   rootPath: string;
   runtimeId?: AgentRuntimeId | null;
   model?: string | null;
+  effort?: string | null;
   mode?: string | null;
 };
 
@@ -490,6 +513,7 @@ export type AgentSubmissionIntent = {
   referenceEpoch: string;
   prompt: string;
   model: string | null;
+  effort: string | null;
   mode: string | null;
   references: AgentDraftReference[];
 };
@@ -499,6 +523,7 @@ export type AgentTurnStartRequest = {
   sessionId: string;
   prompt: string;
   model?: string | null;
+  effort?: string | null;
   mode?: string | null;
   referenceEpoch?: string;
   attachments?: AgentFileReference[];

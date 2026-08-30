@@ -34,6 +34,7 @@ describe("Agent Chat Workbench preparation", () => {
       "/workspace/project",
       expect.any(Function),
       "chat-item-1",
+      expect.any(Function),
     );
     expect(controller.beginInitializeForRuntime).toHaveBeenCalledWith("codex");
   });

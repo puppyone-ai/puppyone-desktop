@@ -298,6 +298,8 @@
 
 .desktop-right-sidebar {
   --desktop-right-sidebar-width: 560px;
+  --desktop-right-sidebar-background: var(--po-header);
+  --po-terminal-bg: var(--desktop-right-sidebar-background);
 
   position: relative;
   z-index: 25;
@@ -307,23 +309,11 @@
   min-height: 0;
   overflow: hidden;
   border-inline-start: 0 solid transparent;
-  background: var(--po-terminal-bg);
+  background: var(--desktop-right-sidebar-background);
   transition:
     flex-basis 260ms cubic-bezier(0.22, 1, 0.36, 1),
     width 260ms cubic-bezier(0.22, 1, 0.36, 1),
     border-color 260ms ease;
-}
-
-.desktop-right-sidebar::before {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-start: -18px;
-  width: 18px;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--po-shadow) 42%, transparent));
-  content: "";
-  opacity: 0;
-  transition: opacity 160ms ease;
 }
 
 .desktop-right-sidebar.is-open {
@@ -336,10 +326,6 @@
 
 .desktop-right-sidebar:not(.is-open) {
   overflow: visible;
-}
-
-.desktop-right-sidebar.is-open::before {
-  opacity: 1;
 }
 
 .desktop-right-sidebar-resizer {
@@ -409,7 +395,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  background: var(--po-terminal-bg);
+  background: var(--desktop-right-sidebar-background);
   color: var(--po-text);
 }
 
@@ -419,6 +405,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  background: var(--desktop-right-sidebar-background);
 }
 
 .desktop-right-sidebar-surface.is-active {

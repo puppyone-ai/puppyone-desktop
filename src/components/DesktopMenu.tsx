@@ -16,6 +16,7 @@ export type DesktopMenuSurfaceProps = HTMLAttributes<HTMLDivElement> & {
   className?: string;
   elevation?: "default" | "compact";
   style?: CSSProperties;
+  tone?: "default" | "quiet";
 };
 
 export const DesktopMenuSurface = forwardRef<HTMLDivElement, DesktopMenuSurfaceProps>(function DesktopMenuSurface(
@@ -25,6 +26,7 @@ export const DesktopMenuSurface = forwardRef<HTMLDivElement, DesktopMenuSurfaceP
     className,
     elevation = "default",
     role = "menu",
+    tone = "default",
     ...props
   },
   ref,
@@ -38,6 +40,7 @@ export const DesktopMenuSurface = forwardRef<HTMLDivElement, DesktopMenuSurfaceP
       role={role}
       aria-label={ariaLabel}
       data-menu-elevation={elevation === "compact" ? elevation : undefined}
+      data-menu-tone={tone === "quiet" ? tone : undefined}
       data-native-surface-occluder="true"
       data-po-scrollbar="menu"
       data-window-no-drag="true"
@@ -106,25 +109,29 @@ export function DesktopMenuIconButton({
   );
 }
 
-export function DesktopMenuItem({
-  className,
-  detail,
-  destructive,
-  icon,
-  label,
-  role = "menuitem",
-  selected,
-  trailing,
-  ...props
-}: DesktopMenuItemProps) {
+export const DesktopMenuItem = forwardRef<HTMLButtonElement, DesktopMenuItemProps>(function DesktopMenuItem(
+  {
+    className,
+    detail,
+    destructive,
+    icon,
+    label,
+    role = "menuitem",
+    selected,
+    trailing,
+    ...props
+  },
+  ref,
+) {
   return (
     <button
+      ref={ref}
       className={cx("desktop-menu-item", selected && "selected", destructive && "danger", className)}
       type="button"
       role={role}
       {...props}
     >
-      {icon !== undefined && <span className="desktop-menu-item-icon">{icon}</span>}
+      {icon !== undefined && <span className="desktop-menu-item-icon" aria-hidden="true">{icon}</span>}
       <span className="desktop-menu-item-body">
         <span className="desktop-menu-item-label">{label}</span>
         {detail !== undefined && <span className="desktop-menu-item-detail">{detail}</span>}
@@ -132,4 +139,4 @@ export function DesktopMenuItem({
       {trailing !== undefined && <span className="desktop-menu-item-trailing">{trailing}</span>}
     </button>
   );
-}
+});

@@ -13,6 +13,8 @@ import type { AgentChatTabPresentation } from "../domain/agent-chat-tabs";
 import type { AgentRoutePreference } from "../domain/agent-route-preference";
 import { getElectronAgentClient } from "../infrastructure/electron/electronAgentClient";
 import { AgentChatTabPanel } from "../ui/AgentChatTabPanel";
+import { scheduleAgentStreamFrame } from "../ui/agent-stream-frame-scheduler";
+import type { AgentWorkspaceReferenceResolver } from "../ui/useAgentReferenceIngestion";
 import "../ui/desktop-agent.css";
 
 export type AgentChatWorkbenchItemProps = AuxiliaryWorkbenchItemRenderContext & Readonly<{
@@ -25,6 +27,7 @@ export type AgentChatWorkbenchItemProps = AuxiliaryWorkbenchItemRenderContext & 
   preferredModel: string | null;
   preferredRoute: Readonly<AgentRoutePreference>;
   preferredRuntimeId: string | null;
+  resolveWorkspaceReference?: AgentWorkspaceReferenceResolver;
 }>;
 
 export function AgentChatWorkbenchItem({
@@ -41,10 +44,11 @@ export function AgentChatWorkbenchItem({
   preferredRoute,
   preferredRuntimeId,
   presentation,
+  resolveWorkspaceReference,
 }: AgentChatWorkbenchItemProps) {
   const { t } = useLocalization();
   const controller = useMemo(
-    () => getAgentSessionController(item.rootId, getElectronAgentClient, item.id),
+    () => getAgentSessionController(item.rootId, getElectronAgentClient, item.id, scheduleAgentStreamFrame),
     [item.id, item.rootId],
   );
   const present = useCallback((agent: AgentChatTabPresentation) => {
@@ -72,6 +76,7 @@ export function AgentChatWorkbenchItem({
     onPreferredModelChange={onPreferredModelChange}
     enabledRuntimeIds={enabledRuntimeIds}
     openSessionIds={openSessionIds}
+    resolveWorkspaceReference={resolveWorkspaceReference}
   />;
 }
 
@@ -85,7 +90,7 @@ export function prepareAgentChatWorkbenchItem(
   runtimeId: string | null,
 ) {
   if (!runtimeId) return;
-  const controller = getAgentSessionController(rootId, getElectronAgentClient, itemId);
+  const controller = getAgentSessionController(rootId, getElectronAgentClient, itemId, scheduleAgentStreamFrame);
   controller.beginInitializeForRuntime(runtimeId);
 }
 
@@ -113,6 +118,7 @@ export function presentAgentChatWorkbenchItem(
       .filter(Boolean)
       .join(" — "),
     detail,
+    iconKey: presentation.runtimeIconKey,
     status,
     running: presentation.running,
     resourceId: presentation.sessionId,

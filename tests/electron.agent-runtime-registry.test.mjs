@@ -43,6 +43,34 @@ describe("Agent runtime registry", () => {
     }])).toThrow(/derived from manifests/i);
   });
 
+  it("fails a malformed readiness code/status pair closed at the runtime boundary", async () => {
+    const adapter = {
+      inspect() {}, createSession() {}, resumeSession() {}, readHistory() {},
+      startTurn() {}, interruptTurn() {}, dispose() {},
+    };
+    const malformed = {
+      ...definition("malformed", 1, "ready", adapter),
+      discovery: {
+        discover: vi.fn(async () => ({
+          runtimeId: "malformed",
+          status: "installed-not-authenticated",
+          code: "AUTHENTICATION_PROBE_FAILED",
+        })),
+      },
+    };
+    const registry = new AgentRuntimeRegistry([malformed]);
+
+    await expect(registry.discover()).resolves.toEqual([
+      expect.objectContaining({
+        readiness: expect.objectContaining({
+          status: "error",
+          code: "RUNTIME_DISCOVERY_FAILED",
+          message: expect.stringMatching(/incompatible with status/i),
+        }),
+      }),
+    ]);
+  });
+
   it("attempts cleanup for every backend even when one cleanup fails", async () => {
     const firstDispose = vi.fn(async () => { throw new Error("first failed"); });
     const secondDispose = vi.fn(async () => undefined);
@@ -61,9 +89,10 @@ describe("Agent runtime registry", () => {
 });
 
 function definition(id, priority, status, adapter) {
+  const code = status === "ready" ? "READY" : status === "not-installed" ? "RUNTIME_NOT_INSTALLED" : "RUNTIME_DISCOVERY_FAILED";
   return {
     manifest: manifest(id, priority),
-    discovery: { discover: vi.fn(async () => ({ runtimeId: id, status, executablePath: status === "ready" ? `/${id}` : null })) },
+    discovery: { discover: vi.fn(async () => ({ runtimeId: id, status, code, executablePath: status === "ready" ? `/${id}` : null })) },
     createAdapter: vi.fn(() => adapter),
   };
 }

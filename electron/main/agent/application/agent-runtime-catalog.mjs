@@ -42,7 +42,8 @@ export function createAgentRuntimeCatalog({
       };
     }
     const publicReadiness = publicRuntimeReadiness(selected);
-    if (publicReadiness.status !== "ready") {
+    const inspectThroughRuntimeHandshake = selected.readiness?.inspectionFallback === "runtime-handshake";
+    if (publicReadiness.status !== "ready" && !inspectThroughRuntimeHandshake) {
       return {
         runtimes,
         selectedRuntimeId: selected.descriptor.id,
@@ -64,8 +65,17 @@ export function createAgentRuntimeCatalog({
         workspaceRoot: workspaceRoot || NEUTRAL_INSPECTION_ROOT,
         refresh: Boolean(request.refresh),
       });
+      const inspectedReadiness = inspectThroughRuntimeHandshake
+        ? {
+          ...publicReadiness,
+          status: "ready",
+          code: "READY",
+          selectable: true,
+          message: `${selected.descriptor.displayName} authentication was verified through its native protocol.`,
+        }
+        : publicReadiness;
       const effectiveReadiness = readinessWithAccountState(
-        publicReadiness,
+        inspectedReadiness,
         inspection.account,
         selected.descriptor.displayName,
       );
@@ -79,7 +89,22 @@ export function createAgentRuntimeCatalog({
       };
     } catch (error) {
       const message = redactSecretText(error instanceof Error ? error.message : String(error));
-      const failedReadiness = { ...publicReadiness, status: "error", selectable: false, message };
+      const failedReadiness = inspectThroughRuntimeHandshake
+        ? {
+          ...publicReadiness,
+          selectable: false,
+          diagnostic: [publicReadiness.diagnostic, `Native protocol fallback failed: ${message}`]
+            .filter(Boolean)
+            .join(" ")
+            .slice(0, 4_000),
+        }
+        : {
+          ...publicReadiness,
+          status: "error",
+          code: "RUNTIME_INSPECTION_FAILED",
+          selectable: false,
+          message,
+        };
       const selectedEntry = runtimes.find((entry) => entry.descriptor.id === selected.descriptor.id);
       if (selectedEntry) selectedEntry.readiness = failedReadiness;
       return {

@@ -48,6 +48,14 @@ export function useAgentRoutingPreferences({
   const modePreferencePending = Boolean(
     !state.session && preferredModeIsAvailable && state.selectedMode !== preferredRoute.mode,
   );
+  const selectedModelProfile = runtimeModels.find((model) => model.model === state.selectedModel);
+  const preferredEffort = preferredRoute.effort || preferredRoute.variant;
+  const preferredEffortIsAvailable = Boolean(
+    preferredEffort && selectedModelProfile?.variants?.includes(preferredEffort),
+  );
+  const effortPreferencePending = Boolean(
+    !state.session && preferredEffortIsAvailable && state.selectedEffort !== preferredEffort,
+  );
 
   useEffect(() => {
     if (!active) return;
@@ -76,20 +84,23 @@ export function useAgentRoutingPreferences({
   }, [active, controller, modePreferencePending, preferredRoute.mode]);
 
   useEffect(() => {
+    if (active && effortPreferencePending && preferredEffort) controller.selectEffort(preferredEffort);
+  }, [active, controller, effortPreferencePending, preferredEffort]);
+
+  useEffect(() => {
     if (
       !active
       || !state.initialized
       || !state.selectedRuntimeId
       || state.selectedRuntimeId !== preferredRuntimeId
       || modelPreferencePending
+      || effortPreferencePending
       || modePreferencePending
     ) return;
-    const selectedModel = state.inspection?.models.find((model) => model.model === state.selectedModel);
     const nextRoute: AgentRoutePreference = {
       providerId: state.selectedProviderId ?? undefined,
       modelId: state.selectedModel ?? undefined,
-      variant: selectedModel?.defaultVariant ?? undefined,
-      effort: selectedModel?.defaultVariant ?? undefined,
+      effort: state.selectedEffort ?? undefined,
       mode: state.selectedMode ?? undefined,
     };
     if (routeChanged(preferredRoute, nextRoute)) onPreferredRouteChange?.(nextRoute);
@@ -97,6 +108,7 @@ export function useAgentRoutingPreferences({
     active,
     onPreferredRouteChange,
     modePreferencePending,
+    effortPreferencePending,
     modelPreferencePending,
     preferredRoute,
     preferredRuntimeId,
@@ -104,6 +116,7 @@ export function useAgentRoutingPreferences({
     state.inspection?.models,
     state.selectedMode,
     state.selectedModel,
+    state.selectedEffort,
     state.selectedProviderId,
     state.selectedRuntimeId,
   ]);
@@ -111,14 +124,29 @@ export function useAgentRoutingPreferences({
   const selectModel = useCallback((model: string) => {
     controller.selectModel(model);
     const selected = runtimeModels.find((entry) => entry.model === model);
+    const currentEffort = state.selectedModel === model && selected?.variants?.includes(state.selectedEffort ?? "")
+      ? state.selectedEffort
+      : selected?.defaultVariant ?? selected?.variants?.[0] ?? undefined;
     onPreferredRouteChange?.({
+      ...preferredRoute,
       providerId: selected?.providerId,
       modelId: model,
-      variant: selected?.defaultVariant ?? undefined,
-      effort: selected?.defaultVariant ?? undefined,
+      variant: undefined,
+      effort: currentEffort ?? undefined,
     });
     onPreferredModelChange?.(model);
-  }, [controller, onPreferredModelChange, onPreferredRouteChange, runtimeModels]);
+  }, [controller, onPreferredModelChange, onPreferredRouteChange, preferredRoute, runtimeModels, state.selectedEffort, state.selectedModel]);
+
+  const selectEffort = useCallback((effort: string) => {
+    controller.selectEffort(effort);
+    onPreferredRouteChange?.({
+      ...preferredRoute,
+      providerId: state.selectedProviderId ?? undefined,
+      modelId: state.selectedModel ?? undefined,
+      variant: undefined,
+      effort,
+    });
+  }, [controller, onPreferredRouteChange, preferredRoute, state.selectedModel, state.selectedProviderId]);
 
   const selectRuntime = useCallback((runtimeId: string) => {
     void controller.selectRuntime(runtimeId).then((switched) => {
@@ -126,7 +154,12 @@ export function useAgentRoutingPreferences({
     });
   }, [controller, onPreferredRuntimeChange]);
 
-  return { selectModel, selectRuntime };
+  return {
+    selectModel,
+    selectEffort,
+    selectRuntime,
+    preferencesReady: !modelPreferencePending && !effortPreferencePending && !modePreferencePending,
+  };
 }
 
 function routeChanged(left: Readonly<AgentRoutePreference>, right: Readonly<AgentRoutePreference>) {

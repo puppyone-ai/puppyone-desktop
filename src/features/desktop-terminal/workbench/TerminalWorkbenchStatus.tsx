@@ -1,5 +1,5 @@
-import { MessageSquare } from "lucide-react";
 import { TerminalSessionHeaderStatus } from "../ui/session-header/TerminalSessionHeaderStatus";
+import { WorkbenchLauncherIcon } from "../ui/WorkbenchLauncherIcon";
 import type { TerminalWorkbenchHeaderItem } from "./TerminalWorkbenchHeader.types";
 
 export function TerminalWorkbenchStatus({
@@ -22,7 +22,7 @@ export function TerminalWorkbenchStatus({
       data-status={item.snapshot.status}
       aria-hidden="true"
     >
-      <MessageSquare size={13} strokeWidth={1.8} />
+      <WorkbenchLauncherIcon compact iconKey={item.snapshot.iconKey} />
       {item.snapshot.running && <i />}
     </span>
   );

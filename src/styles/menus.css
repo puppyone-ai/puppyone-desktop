@@ -80,8 +80,8 @@
   transition: background 0.1s ease, color 0.1s ease;
 }
 
-.desktop-menu-item:hover:not(:disabled),
-.desktop-menu-item:focus-visible:not(:disabled),
+.desktop-menu-item:hover:not(:disabled):not([aria-disabled="true"]),
+.desktop-menu-item:focus-visible:not(:disabled):not([aria-disabled="true"]),
 .desktop-menu-item.selected {
   background: var(--po-hover);
   color: var(--po-text);
@@ -95,6 +95,17 @@
 }
 
 .desktop-menu-item.selected:disabled {
+  color: var(--po-text);
+  opacity: 1;
+}
+
+.desktop-menu-item[aria-disabled="true"] {
+  color: var(--po-text-disabled);
+  cursor: default;
+  opacity: 0.58;
+}
+
+.desktop-menu-item.selected[aria-disabled="true"] {
   color: var(--po-text);
   opacity: 1;
 }
@@ -146,12 +157,25 @@
   text-transform: uppercase;
 }
 
+/* Quiet selectors share the menu geometry and interaction states while keeping
+ * configuration values visually secondary to the document being edited. */
+.desktop-menu-surface[data-menu-tone="quiet"] .desktop-menu-section-label {
+  font-weight: 500;
+  text-transform: none;
+}
+
+.desktop-menu-surface[data-menu-tone="quiet"] .desktop-menu-item,
+.desktop-menu-surface[data-menu-tone="quiet"] .desktop-menu-item-label,
+.desktop-menu-surface[data-menu-tone="quiet"] .desktop-menu-item-detail {
+  font-weight: 400;
+}
+
 .desktop-menu-item.danger {
   color: var(--po-danger);
 }
 
-.desktop-menu-item.danger:hover:not(:disabled),
-.desktop-menu-item.danger:focus-visible:not(:disabled) {
+.desktop-menu-item.danger:hover:not(:disabled):not([aria-disabled="true"]),
+.desktop-menu-item.danger:focus-visible:not(:disabled):not([aria-disabled="true"]) {
   background: color-mix(in srgb, var(--po-danger) 10%, transparent);
 }
 

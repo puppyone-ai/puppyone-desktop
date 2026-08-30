@@ -100,14 +100,14 @@
   height: 16px;
   grid-column: 1;
   place-items: center;
-  color: var(--agent-current-tool-accent, var(--agent-text-subtle));
+  color: var(--agent-tool-foreground);
 }
 .desktop-agent-tool-name {
   grid-column: 2;
-  color: var(--agent-current-tool-accent, var(--agent-text-muted));
+  color: var(--agent-tool-foreground);
   font-size: var(--agent-font-size);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 500;
+  letter-spacing: normal;
   white-space: nowrap;
 }
 .desktop-agent-tool-call.has-detail .desktop-agent-tool-row {
@@ -146,13 +146,6 @@
   border-radius: 0;
   background: transparent;
   animation: desktop-agent-disclosure-in 120ms ease-out;
-}
-
-.desktop-agent-command,
-.desktop-agent-file-query,
-.desktop-agent-file-change,
-.desktop-agent-generic-tool {
-  --agent-current-tool-accent: var(--po-accent-text);
 }
 
 .desktop-agent-command {

@@ -89,6 +89,7 @@ export function createAgentService({
       runtimeId: selected.descriptor.id,
       runtime: selected.descriptor,
       model: normalizeOptionalString(request?.model),
+      effort: normalizeOptionalString(request?.effort),
       mode: normalizeOptionalString(request?.mode),
     });
     sessionStore.add(session);
@@ -99,8 +100,10 @@ export function createAgentService({
       assertAuthenticated(inspection.account, selected.descriptor.displayName);
       applyInspection(session, inspection);
       requireAvailableModel(session, session.selectedModel);
+      requireAvailableEffort(session, session.selectedModel, session.selectedEffort);
       const providerSession = await runRuntimeStart(session, "create", () => session.adapter.createSession({
         model: session.selectedModel,
+        ...(session.selectedEffort ? { effort: session.selectedEffort } : {}),
         mode: session.selectedMode,
       }));
       applyProviderSession(session, providerSession);
@@ -155,6 +158,7 @@ export function createAgentService({
         runtimeId,
         runtime: selected.descriptor,
         model: normalizeOptionalString(persisted.selectedModel),
+        effort: normalizeOptionalString(persisted.selectedEffort),
         mode: normalizeOptionalString(persisted.selectedMode),
         events: persisted.events,
         sequence: persisted.lastSequence,
@@ -174,6 +178,7 @@ export function createAgentService({
           threadId: persisted.providerSessionId,
           model: session.selectedModel,
         };
+        if (session.selectedEffort) resumeRequest.effort = session.selectedEffort;
         if (session.selectedMode) resumeRequest.mode = session.selectedMode;
         const providerSession = await runRuntimeStart(session, "resume", () => session.adapter.resumeSession(resumeRequest));
         applyProviderSession(session, providerSession);
@@ -214,17 +219,21 @@ export function createAgentService({
       throw new Error("An Agent turn is already running or stopping.");
     }
     const model = normalizeOptionalString(request?.model) || session.selectedModel;
+    const effort = normalizeOptionalString(request?.effort) || session.selectedEffort;
     const mode = normalizeOptionalString(request?.mode) || session.selectedMode;
     requireAvailableModel(session, model);
+    requireAvailableEffort(session, model, effort);
     const { references, referenceDisplays, prompt } = beginAgentTurnReferences(session, request);
     session.turnStarting = true;
     session.activeTurnStartedAtMs = Date.now();
     session.selectedModel = model;
+    session.selectedEffort = effort;
     session.selectedMode = mode;
     try {
       const result = await session.adapter.startTurn({
         prompt,
         model,
+        ...(effort ? { effort } : {}),
         mode,
         references,
         attachments: references.filter((entry) => entry.kind === "staged-attachment"),
@@ -237,7 +246,7 @@ export function createAgentService({
           type: "turn.started",
           providerSessionId: session.providerSessionId,
           turnId: result.turnId,
-          payload: { status: "running", prompt, model, mode, referenceDisplays },
+          payload: { status: "running", prompt, model, effort, mode, referenceDisplays },
         });
       }
       session.pendingPrompt = null;
@@ -427,6 +436,7 @@ export function createAgentService({
       runtimeId: source.runtimeId,
       runtime: source.runtime,
       model: source.selectedModel,
+      effort: source.selectedEffort,
       mode: source.selectedMode,
       title: `${source.title} (fork)`,
     });
@@ -439,6 +449,7 @@ export function createAgentService({
       const resumed = await runRuntimeStart(session, "resume-fork", () => session.adapter.resumeSession({
         threadId: forked.providerSessionId,
         model: session.selectedModel,
+        ...(session.selectedEffort ? { effort: session.selectedEffort } : {}),
         mode: session.selectedMode,
       }));
       applyProviderSession(session, resumed);
@@ -609,6 +620,7 @@ export function createAgentService({
           ...(event.payload || {}),
           prompt: session.pendingPrompt,
           model: session.selectedModel,
+          effort: session.selectedEffort,
           referenceDisplays: session.pendingReferenceDisplays,
         };
       }
@@ -850,6 +862,16 @@ export function createAgentService({
       throw new Error("The selected model is no longer available from a connected provider. Refresh Agent providers and choose again.");
     }
     return model;
+  }
+
+  function requireAvailableEffort(session, model, effort) {
+    const selected = session.models.find((candidate) => candidate.model === model);
+    const available = selected?.variants ?? [];
+    if (!effort && available.length === 0) return null;
+    if (!effort || !available.includes(effort)) {
+      throw new Error("The selected reasoning effort is no longer available for this model. Refresh Agent models and choose again.");
+    }
+    return effort;
   }
 
   /** Main-process preflight used before staged files are read into transport form. */

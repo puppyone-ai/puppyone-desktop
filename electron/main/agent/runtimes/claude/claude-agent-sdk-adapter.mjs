@@ -102,6 +102,7 @@ export class ClaudeAgentSdkAdapter {
     this.interruptRequested = false;
     this.pendingApprovals = new Map();
     this.pendingQuestions = new Map();
+    this.modelProfiles = new Map();
     this.disposed = false;
   }
 
@@ -119,6 +120,7 @@ export class ClaudeAgentSdkAdapter {
         "Claude Code inspection timed out.",
       );
       const models = normalizeModels(initialized?.models);
+      this.modelProfiles = new Map(models.map((model) => [model.model, model]));
       const account = normalizeAccount(initialized?.account, models, this.readiness.environment);
       return {
         account,
@@ -166,7 +168,7 @@ export class ClaudeAgentSdkAdapter {
     };
   }
 
-  async createSession({ model = null, mode = "agent" } = {}) {
+  async createSession({ model = null, effort = null, mode = "agent" } = {}) {
     this.#assertIdle();
     await this.#closePersistentQuery("Starting a new Claude Code session.");
     this.sessionId = null;
@@ -176,13 +178,14 @@ export class ClaudeAgentSdkAdapter {
       providerSessionId: null,
       title: "New Claude Code session",
       model,
+      effort,
       mode,
       createdAt: now,
       updatedAt: now,
     };
   }
 
-  async resumeSession({ threadId, model = null, mode = "agent" } = {}) {
+  async resumeSession({ threadId, model = null, effort = null, mode = "agent" } = {}) {
     this.#assertIdle();
     await this.#closePersistentQuery("Resuming a Claude Code session.");
     const sdk = await this.#loadSdk();
@@ -196,6 +199,7 @@ export class ClaudeAgentSdkAdapter {
       providerSessionId: info.sessionId,
       title: info.customTitle || info.summary || "Claude Code session",
       model,
+      effort,
       mode,
       createdAt: normalizeDate(info.createdAt),
       updatedAt: normalizeDate(info.lastModified),
@@ -213,7 +217,7 @@ export class ClaudeAgentSdkAdapter {
     return normalizeClaudeHistory(messages, this.sessionId);
   }
 
-  async startTurn({ prompt, model = null, mode = "agent", references: allReferences = [], attachments = [], contextReferences = [] }) {
+  async startTurn({ prompt, model = null, effort = null, mode = "agent", references: allReferences = [], attachments = [], contextReferences = [] }) {
     this.#assertUsable();
     if (this.activeTurnId) throw new Error("A Claude Code turn is already running.");
     const sdk = await this.#loadSdk();
@@ -226,7 +230,8 @@ export class ClaudeAgentSdkAdapter {
     const turnId = `claude:${randomUUID()}`;
     const controller = new AbortController();
     const state = createClaudeEventState({ turnId, resumed: this.resuming || Boolean(this.sessionId) });
-    await this.#ensurePersistentQuery({ sdk, controller, model, mode, projectInstructions });
+    const selectedEffort = compatibleClaudeEffort(this.modelProfiles.get(model), effort);
+    await this.#ensurePersistentQuery({ sdk, controller, model, effort: selectedEffort, mode, projectInstructions });
     this.activeTurnId = turnId;
     this.activeState = state;
     this.interruptRequested = false;
@@ -377,9 +382,10 @@ export class ClaudeAgentSdkAdapter {
     }
   }
 
-  async #ensurePersistentQuery({ sdk, controller, model, mode, projectInstructions }) {
+  async #ensurePersistentQuery({ sdk, controller, model, effort, mode, projectInstructions }) {
     const configurationKey = JSON.stringify({
       model: model ?? null,
+      effort: effort ?? null,
       mode,
       instructions: projectInstructionIdentity(projectInstructions),
     });
@@ -398,6 +404,7 @@ export class ClaudeAgentSdkAdapter {
       options: this.#queryOptions({
         abortController: controller,
         model,
+        effort,
         mode,
         resume: this.sessionId,
         projectInstructions,
@@ -436,6 +443,7 @@ export class ClaudeAgentSdkAdapter {
   #queryOptions({
     abortController,
     model = null,
+    effort = null,
     mode = "agent",
     resume = null,
     projectInstructions = [],
@@ -451,6 +459,7 @@ export class ClaudeAgentSdkAdapter {
       }),
       ...(this.readiness.executablePath ? { pathToClaudeCodeExecutable: this.readiness.executablePath } : {}),
       ...(model ? { model } : {}),
+      ...(effort ? { effort } : {}),
       ...(resume ? { resume } : {}),
       permissionMode: mode === "plan" ? "plan" : "default",
       canUseTool: (toolName, input, options) => this.#requestPermission(toolName, input, options),
@@ -584,6 +593,12 @@ function normalizeModels(value) {
   }).filter((model) => model.id);
 }
 
+function compatibleClaudeEffort(model, requested) {
+  if (!requested) return model?.defaultVariant ?? null;
+  if (model?.variants?.includes(requested)) return requested;
+  throw new Error("The selected Claude Code reasoning effort is no longer available for this model.");
+}
+
 function normalizeCommands(value) {
   return asArray(value).slice(0, 500).map((command) => ({
     name: bounded(command?.name, 160),
@@ -611,6 +626,7 @@ function normalizeAccount(value, models, environment = {}) {
     requiresOpenaiAuth: false,
     requiresRuntimeSetup: !authenticated,
     ...(!authenticated ? {
+      setupReason: "runtime-setup-required",
       error: hasNativeIdentity && !authenticated
         ? "Claude subscription OAuth cannot be used by a third-party product. Configure an Anthropic API key or a supported cloud provider, then refresh."
         : models.length

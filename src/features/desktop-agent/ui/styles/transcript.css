@@ -140,7 +140,7 @@
   padding: 8px var(--agent-message-content-inset);
   border: 0;
   border-radius: var(--agent-radius-message);
-  background: var(--agent-composer-surface);
+  background: var(--agent-user-message-surface);
   box-shadow: none;
 }
 
