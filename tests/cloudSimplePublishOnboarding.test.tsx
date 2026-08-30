@@ -41,7 +41,7 @@ describe("simple Cloud publish onboarding", () => {
       />,
     )));
 
-    expect(container.querySelector("h1")?.textContent).toBe("MCP");
+    expect(container.querySelector("h1")?.textContent).toBe("Serve this project via MCP");
     expect(container.textContent).toContain("ChatGPT");
     expect(container.textContent).toContain("Claude");
     expect(container.textContent).toContain("Cursor");
@@ -59,10 +59,12 @@ describe("simple Cloud publish onboarding", () => {
     expect(primary).not.toBeNull();
 
     act(() => primary?.click());
-    expect(container.querySelector("[role='dialog']")?.textContent).toContain("May upload");
+    const dialog = document.querySelector<HTMLElement>("#desktop-overlay-root [role='dialog']");
+    expect(dialog?.textContent).toContain("May upload");
+    expect(container.querySelector("[role='dialog']")).toBeNull();
     expect(onPublishWorkspace).not.toHaveBeenCalled();
 
-    const confirm = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+    const confirm = Array.from(dialog?.querySelectorAll<HTMLButtonElement>("button") ?? [])
       .find((button) => button.textContent === "Confirm");
     act(() => confirm?.click());
     expect(onPublishWorkspace).toHaveBeenCalledWith("org-1");

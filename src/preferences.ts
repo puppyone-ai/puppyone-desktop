@@ -92,6 +92,7 @@ export type ExperimentalSettings = {
   enableCloudAutomation: boolean;
   enableCloudWorkspace: boolean;
   enableEditorSaveStatus: boolean;
+  enableFirstProjectStarter: boolean;
   enableGitAutoCommit: boolean;
   enableMarkdownBlockDrag: boolean;
   enableMultiRootWorkspaces: boolean;
@@ -179,6 +180,7 @@ export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableCloudAutomation: false,
   enableCloudWorkspace: false,
   enableEditorSaveStatus: false,
+  enableFirstProjectStarter: false,
   enableGitAutoCommit: false,
   enableMarkdownBlockDrag: false,
   enableMultiRootWorkspaces: false,
@@ -551,6 +553,7 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
       enableCloudAutomation: parsed.enableCloudAutomation === true,
       enableCloudWorkspace: parsed.enableCloudWorkspace === true,
       enableEditorSaveStatus: parsed.enableEditorSaveStatus === true,
+      enableFirstProjectStarter: parsed.enableFirstProjectStarter === true,
       // Main-owned Git Auto Commit consent is intentionally never restored
       // from renderer localStorage. The Electron capability bridge hydrates it.
       enableGitAutoCommit: false,

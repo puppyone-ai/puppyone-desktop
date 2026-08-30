@@ -133,6 +133,8 @@
   "experimental.gitAutoCommit.detail": "Autorise les commits automatiques par espace de travail. Chaque espace reste désactivé jusqu’à son activation dans les réglages Git.",
   "experimental.projectsHome.title": "Page d’accueil des projets",
   "experimental.projectsHome.detail": "Essayez la disposition expérimentale des cartes unifiées pour les projets cloud et locaux.",
+  "experimental.firstProjectStarter.title": "Point de départ du premier projet",
+  "experimental.firstProjectStarter.detail": "Affiche une fois le sélecteur expérimental Vide, Bien démarrer, Notes et Table de données après la création d’un projet local vide.",
   "experimental.agentChat.title": "Discussion avec les agents",
   "experimental.agentChat.detail": "Afficher l’icône de discussion expérimentale dans l’en-tête. Le terminal reste un bouton séparé et reste disponible lorsqu’il est désactivé.",
   "experimental.cloudWorkspace.title": "PuppyOne Cloud",
