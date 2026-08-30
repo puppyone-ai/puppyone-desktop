@@ -62,6 +62,31 @@ describe("Sub Theme CSS compiler", () => {
     })).rejects.toThrow("Application Sub Themes may only declare public color tokens");
   });
 
+  it("derives mode-specific first paint only from opaque public canvas tokens", async () => {
+    const result = await compileThemeCss({
+      css: [
+        ":root { --po-canvas: #abc; --po-surface-canvas: #ffffff }",
+        ".dark .theme-root { --po-canvas: #101114; --po-surface-canvas: #101114 }",
+      ].join("\n"),
+      themeId: "com.example.first-paint",
+      target: "application",
+      supportedModes: ["light", "dark"],
+    });
+
+    expect(result.firstPaint).toEqual({
+      light: { background: "#aabbcc", colorScheme: "light" },
+      dark: { background: "#101114", colorScheme: "dark" },
+    });
+
+    const derived = await compileThemeCss({
+      css: ":root { --po-canvas: var(--po-surface-editor) }",
+      themeId: "com.example.derived-paint",
+      target: "application",
+      supportedModes: ["light"],
+    });
+    expect(derived).not.toHaveProperty("firstPaint");
+  });
+
   it("supports root-level dark variants while retaining the same host boundary", async () => {
     const result = await compileThemeCss({
       css: ".theme-root.dark, .dark .theme-root { --po-surface-canvas: #111827 }",

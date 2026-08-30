@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 
 const titlebarCss = readFileSync(new URL("../src/styles/titlebar.css", import.meta.url), "utf8");
 const tokensCss = readFileSync(new URL("../src/styles/tokens.css", import.meta.url), "utf8");
+const neutralThemeCss = readFileSync(
+  new URL("../sub-themes/default-neutral/theme.css", import.meta.url),
+  "utf8",
+);
 const typographyFoundationsCss = readFileSync(
   new URL("../src/styles/typography/foundations.css", import.meta.url),
   "utf8",
@@ -27,8 +31,9 @@ describe("titlebar typography architecture", () => {
     expect(tokensCss).toContain(
       "--po-header: color-mix(in srgb, var(--po-surface-chrome) 40%, var(--po-surface-editor));",
     );
-    expect(tokensCss).toContain("--po-cloud-titlebar-bg: #dbeaf1;");
-    expect(tokensCss).toContain("--po-cloud-titlebar-bg: #263a45;");
+    expect(tokensCss).not.toContain("--po-cloud-titlebar-bg:");
+    expect(neutralThemeCss).toContain("--po-cloud-titlebar-bg: #dbeaf1;");
+    expect(neutralThemeCss).toContain("--po-cloud-titlebar-bg: #263a45;");
     expect(titlebarRule).toContain("--desktop-titlebar-bg: var(--po-header);");
     expect(titlebarRule).toContain("background: var(--desktop-titlebar-bg);");
     expect(cloudTitlebarRule).toContain("--desktop-titlebar-bg: var(--po-cloud-titlebar-bg);");

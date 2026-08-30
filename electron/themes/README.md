@@ -11,9 +11,13 @@ PuppyOne resolves appearance in four layers:
 3. **Sub Theme** supplies a compatible visual variant for the effective mode. Light and Dark selections are remembered independently inside each Root Theme.
 4. **Surface overrides** are typed product settings, such as Markdown heading scale. They have final authority and are not arbitrary CSS.
 
-The effective cascade is:
+The user-facing resolution is:
 
 `Root Theme → effective Color Mode → compatible Sub Theme variant → typed surface overrides → accessibility/last-resort product overrides`
+
+Underneath that model, a generated Neutral fallback sits at the lowest CSS
+layer. It keeps the client readable when a theme is missing or damaged; it is
+not another selectable theme and never outranks a valid Root/Sub Theme.
 
 Shared editors remain generic. They inherit public `--po-host-md-*` and `--po-host-csv-*` tokens from the application root; installed themes cannot select CodeMirror, Markdown, CSV, or other editor implementation nodes.
 
@@ -93,8 +97,17 @@ Rules:
 @puppyone application {
   :root {
     --po-surface-canvas: #f5f0e8;
+    /* An opaque literal enables matching browser and native first paint. */
+    --po-canvas: #f5f0e8;
     --po-text: #2f2b27;
     --po-accent: #8b2f24;
+  }
+
+  .dark .theme-root {
+    --po-surface-canvas: #17130f;
+    --po-canvas: #17130f;
+    --po-text: #f4eee6;
+    --po-accent: #d99082;
   }
 }
 
@@ -125,6 +138,14 @@ both modes, while `.dark` declarations provide Dark overrides. A light-only
 theme may not contain hidden `.dark` selectors, and themes may not use
 `prefers-color-scheme` to bypass the selected Color Mode.
 
+For an Application target, declare `--po-canvas` as an opaque three- or
+six-digit hex literal in every supported mode. PuppyOne compiles this token
+into the synchronous browser and native-window first-paint value. Other CSS
+forms remain valid as runtime tokens, but cannot be safely evaluated before
+CSS loads; a missing or invalid first-paint literal therefore uses the Neutral
+fallback until the selected theme mounts. Built-in Application themes are
+stricter and fail generation when a declared mode omits this literal.
+
 ## Built-in source packages
 
 Checked-in Sub Themes use the same single-file parser and token compiler as
@@ -144,7 +165,9 @@ There is no hand-written `manifest.ts` and no hand-maintained built-in registry.
 Each package contains exactly one `theme.css`. Run `npm run generate:sub-themes`
 after editing or adding a package; the generator parses metadata, validates Root
 Theme compatibility and targets, compiles public tokens, and writes the runtime
-registry. `npm run check:sub-themes` rejects stale output or an invalid package.
+registry plus generated fallback/first-paint projections. `default-neutral`
+is both a normal theme and the sole editable fallback source.
+`npm run check:sub-themes` rejects stale output or an invalid package.
 
 Reserved two-segment IDs, `builtin-order`, and `legacy-*-preset` metadata are
 accepted only by this checked-in generator. Installed themes continue to use

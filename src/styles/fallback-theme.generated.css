@@ -1,16 +1,6 @@
-@puppyone-theme {
-  id: default.neutral;
-  name: Neutral;
-  version: 1.0.0;
-  compatible-root-themes: default;
-  modes: light dark;
-  builtin-order: 10;
-  legacy-light-preset: neutral;
-  legacy-dark-preset: default;
-}
-
-@puppyone application {
-  :root {
+/* This file is generated from sub-themes/default-neutral/theme.css. */
+/* It is the lowest cascade layer only; selected Sub Themes override it. */
+:root, :where([data-po-appearance-root]) {
     --po-surface-canvas: #f5f4f0;
     --po-surface-chrome: #ece9e2;
     --po-surface-panel: #fafafa;
@@ -121,7 +111,7 @@
     --po-scrollbar-thumb-hover: rgba(45, 43, 38, 0.22);
   }
 
-  .dark .theme-root {
+  :root[data-initial-theme="dark"], :where([data-po-appearance-root].dark) {
     --po-surface-canvas: #161413;
     --po-surface-chrome: #1d1b1a;
     --po-surface-panel: #1a1715;
@@ -236,8 +226,3 @@
     --po-scrollbar-thumb: rgba(255, 255, 255, 0.08);
     --po-scrollbar-thumb-hover: rgba(255, 255, 255, 0.16);
   }
-}
-
-@puppyone markdown {}
-
-@puppyone csv {}

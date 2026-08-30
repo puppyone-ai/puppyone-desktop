@@ -52,6 +52,14 @@ describe("built-in Sub Theme package architecture", () => {
         });
         expect(result.css).not.toMatch(/\.cm-|\.markdown-codemirror-editor|\.csv-table-editor/);
         expect(result.css).not.toContain("@puppyone");
+        if (target === "application") {
+          for (const mode of theme.modes) {
+            expect(result.firstPaint?.[mode], `${theme.id}:${mode}`).toMatchObject({
+              background: expect.stringMatching(/^#[0-9a-f]{6}$/),
+              colorScheme: mode,
+            });
+          }
+        }
       }
       themes.push(theme);
     }
@@ -100,7 +108,11 @@ describe("built-in Sub Theme package architecture", () => {
 
   it("removes legacy preset palettes from the global token layer", () => {
     const globalTokens = readFileSync(path.join(repoRoot, "src/styles/tokens.css"), "utf8");
+    const fallback = readFileSync(path.join(repoRoot, "src/styles/fallback-theme.generated.css"), "utf8");
     expect(globalTokens).not.toContain("data-light-theme-preset=");
     expect(globalTokens).not.toContain("data-dark-theme-preset=");
+    expect(globalTokens).not.toContain("--po-surface-panel: #fafafa");
+    expect(fallback).toContain("generated from sub-themes/default-neutral/theme.css");
+    expect(fallback).toContain("--po-surface-panel: #fafafa");
   });
 });

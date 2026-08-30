@@ -563,6 +563,10 @@ async function runSmoke() {
     }
 
     if (style === "windows-xp") {
+      // A previous matrix window may still own macOS focus even though this
+      // BrowserWindow is visible. Focus the target before synthesizing hover.
+      window.focus();
+      await new Promise((resolve) => setTimeout(resolve, 50));
       const hoverPoint = await window.webContents.executeJavaScript(`(() => {
         const button = document.querySelector('[data-navigation-item="git"]');
         const rect = button.getBoundingClientRect();

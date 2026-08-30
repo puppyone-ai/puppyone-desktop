@@ -24,7 +24,7 @@ const genericFormControlPattern = /(^|[\s>:,(])(?:input|textarea|select)(?=[\s.#
 const ownedFormControlScopePattern = /\.(?:desktop-settings-view|desktop-settings-switch|desktop-dialog-surface|onboarding-shell|desktop-agent-composer)\b/;
 const rootRelativeAssetPattern = /(["'`])\/(?!\/)[^"'`]+\.(?:png|svg|webp|jpe?g|gif|ico|woff2?)(?:[?#][^"'`]*)?\1/gi;
 
-if (cascade.trim() !== "@layer reset, tokens, primitives, patterns, features, interface-style, sub-theme, appearance-overrides, accessibility, overrides;") {
+if (cascade.trim() !== "@layer reset, fallback, tokens, primitives, patterns, features, interface-style, sub-theme, appearance-overrides, accessibility, overrides;") {
   errors.push("Renderer cascade order must keep Root Theme → Sub Theme → semantic User Overrides → safety layers explicit.");
 }
 
@@ -52,6 +52,10 @@ if (!/corePlugins\s*:\s*\{[\s\S]*?preflight\s*:\s*false/.test(tailwindConfig)) {
 
 if (!productStyles.includes('@import "./styles/base.css" layer(reset);')) {
   errors.push("The PuppyOne base stylesheet must remain explicitly owned by the reset layer.");
+}
+
+if (!productStyles.includes('@import "./styles/fallback-theme.generated.css" layer(fallback);')) {
+  errors.push("The generated Neutral recovery palette must remain in the lowest fallback layer.");
 }
 
 if (!productStyles.includes('@import "@puppyone/shared-ui/shared-ui-patterns.css" layer(patterns);')) {
