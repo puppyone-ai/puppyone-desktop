@@ -1,9 +1,12 @@
 import type { DesktopThemeSnapshot } from "../../types/electron";
 import type { InterfaceStyle } from "../appearance/interfaceStyles";
 import { GENERATED_BUILTIN_SUB_THEMES } from "./builtinSubThemes.generated";
-import type {
-  SubThemeCatalogSnapshot,
-  SubThemeDefinition,
+import {
+  getSubThemeVariant,
+  type SubThemeColorMode,
+  type SubThemeCatalogSnapshot,
+  type SubThemeDefinition,
+  type SubThemeModeVariant,
 } from "./themeTypes";
 import {
   LEGACY_CUSTOM_CSS_THEME_ID,
@@ -29,12 +32,15 @@ export function createSubThemeCatalogSnapshot(external: DesktopThemeSnapshot): S
       continue;
     }
     knownIds.add(id);
+    const { modes, compiledCss, ...metadata } = theme;
+    const frozenCompiledCss = Object.freeze({ ...compiledCss });
     subThemes.push(Object.freeze({
-      ...theme,
+      ...metadata,
       id,
       family: id.split(".")[0] ?? "external",
       contractVersion: theme.contractVersion ?? 1,
       compatibleRootThemeIds: normalizeCompatibleRootThemeIds(theme.compatibleRootThemeIds),
+      variants: createModeVariants(modes, frozenCompiledCss),
     }));
   }
   return Object.freeze({
@@ -46,9 +52,11 @@ export function createSubThemeCatalogSnapshot(external: DesktopThemeSnapshot): S
 export function getCompatibleSubThemes(
   snapshot: SubThemeCatalogSnapshot,
   rootThemeId: InterfaceStyle,
+  mode?: SubThemeColorMode,
 ): readonly SubThemeDefinition[] {
   return snapshot.subThemes.filter((subTheme) => (
     subTheme.compatibleRootThemeIds.includes(rootThemeId)
+    && (mode === undefined || getSubThemeVariant(subTheme, mode) !== null)
   ));
 }
 
@@ -58,4 +66,14 @@ export function isCompleteSubTheme(subTheme: SubThemeDefinition): boolean {
 
 function normalizeCompatibleRootThemeIds(value: readonly string[] | undefined): readonly string[] {
   return Object.freeze(value === undefined ? ["default"] : [...value]);
+}
+
+function createModeVariants(
+  modes: readonly SubThemeColorMode[],
+  compiledCss: SubThemeModeVariant["compiledCss"],
+): SubThemeDefinition["variants"] {
+  return Object.freeze(Object.fromEntries(modes.map((mode) => [
+    mode,
+    Object.freeze({ compiledCss }),
+  ])));
 }

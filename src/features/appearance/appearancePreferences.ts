@@ -21,15 +21,17 @@ import {
 } from "../markdown/markdownPresentation";
 import {
   APPEARANCE_PREFERENCES_STORAGE_KEY,
-  getInterfaceStyleSubThemePolicy,
+  getDefaultSubThemeId,
+  isInterfaceStyle,
   parseInterfaceStyle,
   type InterfaceStyle,
+  type ResolvedTheme,
 } from "./interfaceStyles";
 import { isSubThemeId, normalizeSubThemeId } from "../themes/subThemePreferences";
 
 export { APPEARANCE_PREFERENCES_STORAGE_KEY };
 
-export const APPEARANCE_PREFERENCES_SCHEMA_VERSION = 3 as const;
+export const APPEARANCE_PREFERENCES_SCHEMA_VERSION = 4 as const;
 
 export type AppearanceSharedPreferences = Readonly<{
   textSize: TextSize;
@@ -41,15 +43,15 @@ export type AppearanceSharedPreferences = Readonly<{
 }>;
 
 export type RootThemeAppearancePreferences = Readonly<{
-  requestedSubThemeId: string;
   requestedColorMode: ThemeMode;
+  requestedSubThemeIds: Readonly<Record<ResolvedTheme, string>>;
 }>;
 
 export type AppearanceSurfaceOverridePreferences = Readonly<{
   markdown: MarkdownPresentationSettings;
 }>;
 
-export type AppearancePreferencesV3 = Readonly<{
+export type AppearancePreferencesV4 = Readonly<{
   schemaVersion: typeof APPEARANCE_PREFERENCES_SCHEMA_VERSION;
   activeRootThemeId: InterfaceStyle;
   shared: AppearanceSharedPreferences;
@@ -73,8 +75,8 @@ export type LegacyAppearanceSnapshot = Readonly<{
 }>;
 
 export type AppearancePreferencesReadResult = Readonly<{
-  preferences: AppearancePreferencesV3;
-  source: "v3" | "migrated" | "legacy" | "future";
+  preferences: AppearancePreferencesV4;
+  source: "v4" | "migrated" | "legacy" | "future";
   writable: boolean;
 }>;
 
@@ -105,23 +107,23 @@ export function readAppearancePreferences(
 
   return {
     preferences: parsed.schemaVersion === APPEARANCE_PREFERENCES_SCHEMA_VERSION
-      ? normalizeV3(parsed, legacy)
+      ? normalizeV4(parsed, legacy)
       : migrateLegacyDocument(parsed, legacy),
-    source: parsed.schemaVersion === APPEARANCE_PREFERENCES_SCHEMA_VERSION ? "v3" : "migrated",
+    source: parsed.schemaVersion === APPEARANCE_PREFERENCES_SCHEMA_VERSION ? "v4" : "migrated",
     writable: true,
   };
 }
 
-export function serializeAppearancePreferences(preferences: AppearancePreferencesV3): string {
+export function serializeAppearancePreferences(preferences: AppearancePreferencesV4): string {
   return JSON.stringify(preferences);
 }
 
-export function createAppearancePreferencesV3(input: {
+export function createAppearancePreferencesV4(input: {
   activeRootThemeId: InterfaceStyle;
   shared: AppearanceSharedPreferences;
   byRootTheme: Readonly<Record<string, RootThemeAppearancePreferences>>;
   bySurface?: Partial<AppearanceSurfaceOverridePreferences>;
-}): AppearancePreferencesV3 {
+}): AppearancePreferencesV4 {
   return Object.freeze({
     schemaVersion: APPEARANCE_PREFERENCES_SCHEMA_VERSION,
     activeRootThemeId: input.activeRootThemeId,
@@ -135,15 +137,15 @@ export function createAppearancePreferencesV3(input: {
   });
 }
 
-function fromLegacy(legacy: LegacyAppearanceSnapshot): AppearancePreferencesV3 {
+function fromLegacy(legacy: LegacyAppearanceSnapshot): AppearancePreferencesV4 {
   const activeRootThemeId = legacy.activeStyle;
-  return createAppearancePreferencesV3({
+  return createAppearancePreferencesV4({
     activeRootThemeId,
     shared: sharedFromLegacy(legacy),
     byRootTheme: createDefaultRootThemePreferences({
       activeRootThemeId,
       requestedColorMode: legacy.themeMode,
-      requestedSubThemeId: resolveLegacyDefaultSubTheme(legacy),
+      requestedSubThemeIds: resolveLegacyDefaultSubThemes(legacy),
     }),
     bySurface: {
       markdown: legacy.markdownPresentation ?? DEFAULT_MARKDOWN_PRESENTATION_SETTINGS,
@@ -154,24 +156,27 @@ function fromLegacy(legacy: LegacyAppearanceSnapshot): AppearancePreferencesV3 {
 function migrateLegacyDocument(
   input: Record<string, unknown>,
   legacy: LegacyAppearanceSnapshot,
-): AppearancePreferencesV3 {
+): AppearancePreferencesV4 {
   const shared = isRecord(input.shared) ? input.shared : input;
   const activeRootThemeId = parseInterfaceStyle(
-    asString(input.activeStyle) ?? asString(input.style) ?? legacy.activeStyle,
+    asString(input.activeRootThemeId)
+      ?? asString(input.activeStyle)
+      ?? asString(input.style)
+      ?? legacy.activeStyle,
   );
   const requestedColorMode = parseThemeMode(asString(shared.themeMode) ?? legacy.themeMode);
-  const requestedSubThemeId = resolveLegacyDefaultSubTheme({
+  const requestedSubThemeIds = resolveLegacyDefaultSubThemes({
     ...legacy,
     themeMode: requestedColorMode,
     lightThemePreset: parseLegacyLightPreset(shared.lightThemePreset, legacy.lightThemePreset),
     darkThemePreset: parseLegacyDarkPreset(shared.darkThemePreset, legacy.darkThemePreset),
   });
   const legacyByRoot = isRecord(input.byRootTheme)
-    ? readRootThemePreferences(input.byRootTheme, requestedColorMode)
-    : readLegacyByStyle(input.byStyle, requestedColorMode);
+    ? readRootThemePreferences(input.byRootTheme, requestedColorMode, requestedSubThemeIds)
+    : readLegacyByStyle(input.byStyle, requestedColorMode, requestedSubThemeIds);
   const bySurface = isRecord(input.bySurface) ? input.bySurface : {};
 
-  return createAppearancePreferencesV3({
+  return createAppearancePreferencesV4({
     activeRootThemeId,
     shared: normalizeShared({
       ...shared,
@@ -181,7 +186,7 @@ function migrateLegacyDocument(
       ...createDefaultRootThemePreferences({
         activeRootThemeId,
         requestedColorMode,
-        requestedSubThemeId,
+        requestedSubThemeIds,
       }),
       ...legacyByRoot,
     },
@@ -191,26 +196,31 @@ function migrateLegacyDocument(
   });
 }
 
-function normalizeV3(
+function normalizeV4(
   input: Record<string, unknown>,
   legacy: LegacyAppearanceSnapshot,
-): AppearancePreferencesV3 {
+): AppearancePreferencesV4 {
   const activeRootThemeId = parseInterfaceStyle(
     asString(input.activeRootThemeId) ?? legacy.activeStyle,
   );
   const shared = isRecord(input.shared) ? input.shared : {};
   const bySurface = isRecord(input.bySurface) ? input.bySurface : {};
   const fallbackMode = legacy.themeMode;
-  const normalizedRoots = readRootThemePreferences(input.byRootTheme, fallbackMode);
+  const fallbackSubThemeIds = resolveLegacyDefaultSubThemes(legacy);
+  const normalizedRoots = readRootThemePreferences(
+    input.byRootTheme,
+    fallbackMode,
+    fallbackSubThemeIds,
+  );
 
-  return createAppearancePreferencesV3({
+  return createAppearancePreferencesV4({
     activeRootThemeId,
     shared: normalizeShared(shared, legacy),
     byRootTheme: {
       ...createDefaultRootThemePreferences({
         activeRootThemeId,
         requestedColorMode: fallbackMode,
-        requestedSubThemeId: resolveLegacyDefaultSubTheme(legacy),
+        requestedSubThemeIds: fallbackSubThemeIds,
       }),
       ...normalizedRoots,
     },
@@ -261,22 +271,22 @@ function sharedFromLegacy(legacy: LegacyAppearanceSnapshot): AppearanceSharedPre
 function createDefaultRootThemePreferences({
   activeRootThemeId,
   requestedColorMode,
-  requestedSubThemeId,
+  requestedSubThemeIds,
 }: {
   activeRootThemeId: InterfaceStyle;
   requestedColorMode: ThemeMode;
-  requestedSubThemeId: string;
+  requestedSubThemeIds: Readonly<Record<ResolvedTheme, string>>;
 }): Record<string, RootThemeAppearancePreferences> {
   return {
     default: {
       requestedColorMode: activeRootThemeId === "default" ? requestedColorMode : "system",
-      requestedSubThemeId: activeRootThemeId === "default"
-        ? requestedSubThemeId
-        : getInterfaceStyleSubThemePolicy("default").defaultSubThemeId,
+      requestedSubThemeIds: activeRootThemeId === "default"
+        ? requestedSubThemeIds
+        : createRootDefaultSubThemeIds("default"),
     },
     "windows-xp": {
       requestedColorMode: activeRootThemeId === "windows-xp" ? requestedColorMode : "light",
-      requestedSubThemeId: getInterfaceStyleSubThemePolicy("windows-xp").defaultSubThemeId,
+      requestedSubThemeIds: createRootDefaultSubThemeIds("windows-xp"),
     },
   };
 }
@@ -284,17 +294,21 @@ function createDefaultRootThemePreferences({
 function readRootThemePreferences(
   input: unknown,
   fallbackMode: ThemeMode,
+  fallbackSubThemeIds: Readonly<Record<ResolvedTheme, string>>,
 ): Record<string, RootThemeAppearancePreferences> {
   if (!isRecord(input)) return {};
   return Object.fromEntries(Object.entries(input).flatMap(([rootThemeId, value]) => {
     if (!isRecord(value)) return [];
-    const requestedSubThemeId = asString(value.requestedSubThemeId);
-    if (!requestedSubThemeId) return [];
-    const normalized = normalizeSubThemeId(requestedSubThemeId);
-    if (!isSubThemeId(normalized)) return [];
+    const defaults = isInterfaceStyle(rootThemeId)
+      ? createRootDefaultSubThemeIds(rootThemeId)
+      : fallbackSubThemeIds;
+    const legacyId = parseSubThemeId(value.requestedSubThemeId ?? value.subThemeId);
+    const rawByMode = isRecord(value.requestedSubThemeIds) ? value.requestedSubThemeIds : {};
+    const light = parseSubThemeId(rawByMode.light) ?? legacyId ?? defaults.light;
+    const dark = parseSubThemeId(rawByMode.dark) ?? legacyId ?? defaults.dark;
     return [[rootThemeId, {
-      requestedSubThemeId: normalized,
       requestedColorMode: parseThemeMode(asString(value.requestedColorMode) ?? fallbackMode),
+      requestedSubThemeIds: Object.freeze({ light, dark }),
     }]];
   }));
 }
@@ -302,6 +316,7 @@ function readRootThemePreferences(
 function readLegacyByStyle(
   input: unknown,
   fallbackMode: ThemeMode,
+  fallbackSubThemeIds: Readonly<Record<ResolvedTheme, string>>,
 ): Record<string, RootThemeAppearancePreferences> {
   if (!isRecord(input)) return {};
   return readRootThemePreferences(Object.fromEntries(Object.entries(input).map(([key, value]) => {
@@ -310,7 +325,7 @@ function readLegacyByStyle(
       requestedSubThemeId: value.requestedSubThemeId ?? value.subThemeId,
       requestedColorMode: value.requestedColorMode ?? value.themeMode ?? fallbackMode,
     }];
-  })), fallbackMode);
+  })), fallbackMode, fallbackSubThemeIds);
 }
 
 function readMarkdownOverrides(
@@ -321,26 +336,41 @@ function readMarkdownOverrides(
   return parseMarkdownPresentationSettings(JSON.stringify({ version: 2, ...input }));
 }
 
-function resolveLegacyDefaultSubTheme(legacy: LegacyAppearanceSnapshot): string {
+function resolveLegacyDefaultSubThemes(
+  legacy: LegacyAppearanceSnapshot,
+): Readonly<Record<ResolvedTheme, string>> {
   if (legacy.legacySubThemeId) {
     const normalized = normalizeSubThemeId(legacy.legacySubThemeId);
-    if (isSubThemeId(normalized)) return normalized;
+    if (isSubThemeId(normalized)) return Object.freeze({ light: normalized, dark: normalized });
   }
-  if (legacy.lightThemePreset === "warm" && legacy.darkThemePreset === "warm") {
-    return "default.warm";
-  }
-  if (legacy.lightThemePreset === "graphite" && legacy.darkThemePreset === "graphite") {
-    return "default.graphite";
-  }
-  if (legacy.themeMode === "dark") {
-    if (legacy.darkThemePreset === "warm") return "default.warm";
-    if (legacy.darkThemePreset === "graphite") return "default.graphite";
-  }
-  if (legacy.themeMode === "light") {
-    if (legacy.lightThemePreset === "warm") return "default.warm";
-    if (legacy.lightThemePreset === "graphite") return "default.graphite";
-  }
-  return getInterfaceStyleSubThemePolicy("default").defaultSubThemeId;
+  return Object.freeze({
+    light: legacy.lightThemePreset === "warm"
+      ? "default.warm"
+      : legacy.lightThemePreset === "graphite"
+        ? "default.graphite"
+        : getDefaultSubThemeId("default", "light"),
+    dark: legacy.darkThemePreset === "warm"
+      ? "default.warm"
+      : legacy.darkThemePreset === "graphite"
+        ? "default.graphite"
+        : getDefaultSubThemeId("default", "dark"),
+  });
+}
+
+function createRootDefaultSubThemeIds(
+  rootThemeId: InterfaceStyle,
+): Readonly<Record<ResolvedTheme, string>> {
+  return Object.freeze({
+    light: getDefaultSubThemeId(rootThemeId, "light"),
+    dark: getDefaultSubThemeId(rootThemeId, "dark"),
+  });
+}
+
+function parseSubThemeId(value: unknown): string | null {
+  const raw = asString(value);
+  if (!raw) return null;
+  const normalized = normalizeSubThemeId(raw);
+  return isSubThemeId(normalized) ? normalized : null;
 }
 
 function parseLegacyLightPreset(value: unknown, fallback: LightThemePreset): LightThemePreset {
@@ -355,7 +385,10 @@ function freezeRootThemePreferences(
   input: Readonly<Record<string, RootThemeAppearancePreferences>>,
 ): Readonly<Record<string, RootThemeAppearancePreferences>> {
   return Object.freeze(Object.fromEntries(
-    Object.entries(input).map(([key, value]) => [key, Object.freeze({ ...value })]),
+    Object.entries(input).map(([key, value]) => [key, Object.freeze({
+      ...value,
+      requestedSubThemeIds: Object.freeze({ ...value.requestedSubThemeIds }),
+    })]),
   ));
 }
 

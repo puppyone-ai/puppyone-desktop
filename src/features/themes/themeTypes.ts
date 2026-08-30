@@ -10,6 +10,10 @@ export type AppearanceSurfaceTarget = DesktopThemeTarget;
 export type SubThemeColorMode = DesktopThemeColorMode;
 export type SubThemeSource = DesktopThemeDefinition["source"] | "builtin";
 
+export type SubThemeModeVariant = Readonly<{
+  compiledCss: Readonly<Partial<Record<AppearanceSurfaceTarget, string>>>;
+}>;
+
 export type SubThemeDefinition = Readonly<{
   id: string;
   family: string;
@@ -18,15 +22,29 @@ export type SubThemeDefinition = Readonly<{
   contractVersion: number;
   author?: string;
   compatibleRootThemeIds: readonly string[];
-  modes: readonly SubThemeColorMode[];
   targets: readonly AppearanceSurfaceTarget[];
   source: SubThemeSource;
-  compiledCss: Readonly<Partial<Record<AppearanceSurfaceTarget, string>>>;
+  variants: Readonly<Partial<Record<SubThemeColorMode, SubThemeModeVariant>>>;
   legacyPresets?: Readonly<{
     light?: LightThemePreset;
     dark?: DarkThemePreset;
   }>;
 }>;
+
+export function getSubThemeModes(
+  subTheme: SubThemeDefinition,
+): readonly SubThemeColorMode[] {
+  return (Object.keys(subTheme.variants) as SubThemeColorMode[]).filter(
+    (mode) => subTheme.variants[mode] !== undefined,
+  );
+}
+
+export function getSubThemeVariant(
+  subTheme: SubThemeDefinition,
+  mode: SubThemeColorMode,
+): SubThemeModeVariant | null {
+  return subTheme.variants[mode] ?? null;
+}
 
 export type SubThemeCatalogSnapshot = Readonly<{
   subThemes: readonly SubThemeDefinition[];

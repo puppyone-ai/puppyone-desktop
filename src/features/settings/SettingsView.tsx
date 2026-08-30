@@ -271,14 +271,6 @@ export function SettingsView({
             />
             <div className="desktop-settings-list">
               <InterfaceStyleSetting value={interfaceStyle} onChange={onInterfaceStyleChange} />
-              <SubThemeSettingsSection
-                catalog={subThemeCatalog}
-                rootThemeId={interfaceStyle}
-                requestedSubThemeId={requestedSubThemeId}
-                effectiveSubThemeId={resolvedAppearance.subThemeId}
-                effectiveColorMode={resolvedAppearance.effectiveColorMode}
-                onSubThemeChange={onSubThemeChange}
-              />
               <InterfacePaletteSettings
                 interfaceStyle={interfaceStyle}
                 subThemeId={resolvedAppearance.subThemeId}
@@ -286,6 +278,14 @@ export function SettingsView({
                 lightThemePreset={lightThemePreset}
                 darkThemePreset={darkThemePreset}
                 onThemeModeChange={onThemeModeChange}
+              />
+              <SubThemeSettingsSection
+                catalog={subThemeCatalog}
+                rootThemeId={interfaceStyle}
+                requestedSubThemeId={requestedSubThemeId}
+                effectiveSubThemeId={resolvedAppearance.subThemeId}
+                effectiveColorMode={resolvedAppearance.effectiveColorMode}
+                onSubThemeChange={onSubThemeChange}
               />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.textSize.title")}</span>

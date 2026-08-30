@@ -45,7 +45,10 @@ export const INTERFACE_STYLE_MANIFEST = {
         }
       },
       "subThemes": {
-        "defaultSubThemeId": "default.neutral",
+        "defaultSubThemeIds": {
+          "light": "default.neutral",
+          "dark": "default.neutral"
+        },
         "allowedTargets": [
           "application",
           "markdown",
@@ -149,7 +152,9 @@ export const INTERFACE_STYLE_MANIFEST = {
         }
       },
       "subThemes": {
-        "defaultSubThemeId": "windows-xp.luna-blue",
+        "defaultSubThemeIds": {
+          "light": "windows-xp.luna-blue"
+        },
         "allowedTargets": [
           "markdown",
           "csv"

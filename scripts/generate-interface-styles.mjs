@@ -99,7 +99,6 @@ function validateManifest(value) {
     }
     validateComposition(style);
     validatePolicies(style);
-    validateSubThemes(style);
 
     const palette = style.palette;
     if (palette?.kind === "fixed") {
@@ -129,6 +128,7 @@ function validateManifest(value) {
     } else {
       fail(`${style.id}.palette.kind must be adaptive or fixed`);
     }
+    validateSubThemes(style);
 
     if (style.stylesheet !== null) {
       if (!isNonEmptyString(style.stylesheet) || !/^[a-z0-9-]+(?:\/[a-z0-9-]+)*\.css$/.test(style.stylesheet)) {
@@ -150,10 +150,30 @@ function validateSubThemes(style) {
     fail(`${style.id}.subThemes is required`);
   }
   if (
-    !isNonEmptyString(definition.defaultSubThemeId)
-    || !SUB_THEME_ID_PATTERN.test(definition.defaultSubThemeId)
+    !definition.defaultSubThemeIds
+    || typeof definition.defaultSubThemeIds !== "object"
+    || Array.isArray(definition.defaultSubThemeIds)
   ) {
-    fail(`${style.id}.subThemes.defaultSubThemeId must be a namespaced id`);
+    fail(`${style.id}.subThemes.defaultSubThemeIds is required`);
+  }
+  const requiredModes = style.palette.kind === "fixed"
+    ? [style.palette.mode]
+    : style.palette.modes.includes("system")
+      ? ["light", "dark"]
+      : style.palette.modes;
+  const defaultModes = Object.keys(definition.defaultSubThemeIds);
+  if (
+    defaultModes.length !== requiredModes.length
+    || requiredModes.some((mode) => !defaultModes.includes(mode))
+    || defaultModes.some((mode) => !requiredModes.includes(mode))
+  ) {
+    fail(`${style.id}.subThemes.defaultSubThemeIds must match its effective Color Modes`);
+  }
+  for (const mode of requiredModes) {
+    const id = definition.defaultSubThemeIds[mode];
+    if (!isNonEmptyString(id) || !SUB_THEME_ID_PATTERN.test(id)) {
+      fail(`${style.id}.subThemes.defaultSubThemeIds.${mode} must be a namespaced id`);
+    }
   }
   if (
     !Array.isArray(definition.allowedTargets)

@@ -7,13 +7,13 @@ This folder is the runtime guide copied into the user Themes Folder. A Sub Theme
 PuppyOne resolves appearance in four layers:
 
 1. **Root Theme** owns shell structure, component geometry, interaction policy, and the public token contract. Current Root Themes are `default` and `windows-xp`.
-2. **Sub Theme** supplies a compatible visual token set. A Sub Theme must declare which Root Themes, color modes, and surface targets it supports.
-3. **Color Mode** resolves `light` or `dark` inside the active Root Theme. Preferences are remembered independently for each Root Theme.
+2. **Color Mode** resolves `light` or `dark` inside the active Root Theme. `system` is a request that resolves to one of those effective modes.
+3. **Sub Theme** supplies a compatible visual variant for the effective mode. Light and Dark selections are remembered independently inside each Root Theme.
 4. **Surface overrides** are typed product settings, such as Markdown heading scale. They have final authority and are not arbitrary CSS.
 
 The effective cascade is:
 
-`Root Theme → Sub Theme → typed surface overrides → accessibility/last-resort product overrides`
+`Root Theme → effective Color Mode → compatible Sub Theme variant → typed surface overrides → accessibility/last-resort product overrides`
 
 Shared editors remain generic. They inherit public `--po-host-md-*` and `--po-host-csv-*` tokens from the application root; installed themes cannot select CodeMirror, Markdown, CSV, or other editor implementation nodes.
 
@@ -67,6 +67,8 @@ Rules:
 - `id` is a stable lowercase reverse-domain identifier with at least three segments.
 - `compatibleRootThemeIds` defaults to `["default"]` when omitted.
 - `modes` contains one or both of `light` and `dark`.
+- A theme appears only when it declares a variant for the current effective mode. A light-only theme is never offered while Dark is active.
+- Light and Dark are independent user slots. Selecting a theme for Light does not overwrite the remembered Dark theme, and vice versa.
 - `targets` contains one or more of `application`, `markdown`, and `csv` and must match `entrypoints` exactly.
 - Each entrypoint is a direct package-local `.css` filename.
 
@@ -109,6 +111,13 @@ Rules:
 ```
 
 A metadata-free top-level CSS file is accepted as a Markdown-only compatibility theme only when it follows the same root-token contract.
+
+`modes` is a capability contract, not descriptive text. Internally PuppyOne
+normalizes it into explicit `variants.light` / `variants.dark` records and
+injects only the effective variant. Common root declarations may be shared by
+both modes, while `.dark` declarations provide Dark overrides. A light-only
+theme may not contain hidden `.dark` selectors, and themes may not use
+`prefers-color-scheme` to bypass the selected Color Mode.
 
 ## Built-in source packages
 
