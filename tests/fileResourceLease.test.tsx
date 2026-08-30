@@ -87,16 +87,16 @@ describe("file resource lease", () => {
         });
       };
 
-      await render({ sequence: 0, paths: [] });
+      await render({ sequence: 0, rootUri: null, paths: [] });
       await waitFor(() => getFileUrl.mock.calls.length === 1);
       const firstUrl = container.dataset.url;
       expect(firstUrl).toBe(`blob:${formatCase.path}:1`);
 
-      await render({ sequence: 1, paths: ["unrelated.txt"] });
+      await render({ sequence: 1, rootUri: null, paths: ["unrelated.txt"] });
       expect(getFileUrl).toHaveBeenCalledTimes(1);
       expect(container.dataset.url).toBe(firstUrl);
 
-      await render({ sequence: 2, paths: [formatCase.path] });
+      await render({ sequence: 2, rootUri: null, paths: [formatCase.path] });
       await waitFor(() => getFileUrl.mock.calls.length === 2 && container.dataset.url !== firstUrl);
       expect(container.dataset.url).toBe(`blob:${formatCase.path}:2`);
       expect(revokeFileUrl).toHaveBeenCalledWith(firstUrl);
@@ -114,12 +114,12 @@ describe("file resource lease", () => {
     root = createRoot(container);
 
     await act(async () => {
-      root?.render(<ResourceLeaseProbe dataPort={dataPort} path="photo.png" refresh={{ sequence: 0, paths: [] }} />);
+      root?.render(<ResourceLeaseProbe dataPort={dataPort} path="photo.png" refresh={{ sequence: 0, rootUri: null, paths: [] }} />);
       await Promise.resolve();
     });
     await waitFor(() => getFileUrl.mock.calls.length === 1);
     await act(async () => {
-      root?.render(<ResourceLeaseProbe dataPort={dataPort} path="photo.png" refresh={{ sequence: 1, paths: null }} />);
+      root?.render(<ResourceLeaseProbe dataPort={dataPort} path="photo.png" refresh={{ sequence: 1, rootUri: null, paths: null }} />);
       await Promise.resolve();
     });
     await waitFor(() => getFileUrl.mock.calls.length === 2);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Workspace, WorkspaceContentChange } from "@puppyone/shared-ui";
+import type { Workspace } from "@puppyone/shared-ui";
 import {
   fetchWorkspaceGit,
   getWorkspaceGitStatus,
@@ -30,13 +30,11 @@ import {
 type UseGitRepositoryLifecycleOptions = {
   workspace: Workspace | null;
   remoteUpdatesActive: boolean;
-  onWorkspaceContentChanged: (paths?: WorkspaceContentChange["paths"] | string) => void;
 };
 
 export function useGitRepositoryLifecycle({
   workspace,
   remoteUpdatesActive,
-  onWorkspaceContentChanged,
 }: UseGitRepositoryLifecycleOptions) {
   const workspacePathRef = useRef<string | null>(null);
   const gitStatusRef = useRef<GitStatusSnapshot | null>(null);
@@ -294,7 +292,6 @@ export function useGitRepositoryLifecycle({
     const scheduler = ensureScheduler();
     let cancelled = false;
     let metadataSubscriptionId: string | null = null;
-    let stopContentWatch: (() => void) | null = null;
     const unsubscribeInvalidations = subscribeWorkspaceGitRepositoryInvalidations((event) => {
       if (cancelled) return;
       if (metadataSubscriptionId && event.subscriptionId !== metadataSubscriptionId) return;
@@ -305,27 +302,9 @@ export function useGitRepositoryLifecycle({
       });
     });
 
-    const bridge = window.puppyoneDesktop;
-    const contentWatch = typeof bridge?.watchWorkspace === "function"
-      ? bridge.watchWorkspace(rootPath, (event) => {
-        if (cancelled) return;
-        if (event.error && !("recovered" in event && event.recovered)) return;
-        onWorkspaceContentChanged(event.paths ?? event.path ?? null);
-        scheduler.invalidate({
-          reason: createRepositoryRefreshReason("working-tree", "watcher"),
-          priority: "debounced",
-        });
-      })
-      : null;
-    stopContentWatch = contentWatch?.stop ?? null;
-
     void (async () => {
       try {
-        const contentReady = contentWatch?.ready ?? Promise.resolve(null);
-        const [metadataResult] = await Promise.all([
-          startWorkspaceGitRepositoryWatch(rootPath),
-          contentReady.catch(() => null),
-        ]);
+        const metadataResult = await startWorkspaceGitRepositoryWatch(rootPath);
         if (cancelled) {
           if (metadataResult?.subscriptionId) {
             await stopWorkspaceGitRepositoryWatch(metadataResult.subscriptionId);
@@ -347,10 +326,9 @@ export function useGitRepositoryLifecycle({
     return () => {
       cancelled = true;
       unsubscribeInvalidations();
-      stopContentWatch?.();
       if (metadataSubscriptionId) void stopWorkspaceGitRepositoryWatch(metadataSubscriptionId);
     };
-  }, [ensureScheduler, onWorkspaceContentChanged, workspace?.path]);
+  }, [ensureScheduler, workspace?.path]);
 
   useEffect(() => {
     const scheduler = ensureScheduler();

@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { useLocalization } from "@puppyone/localization";
 import {
   getAiEditFileForPath,
   getEditorPanes,
@@ -40,6 +41,7 @@ import {
 } from "../drag-and-drop/usePaneMoveDrag";
 import { createEditorNodeIndex, type EditorNodeIndex } from "../runtime/editorNodeIndex";
 import { EditorPaneRuntime } from "../runtime/EditorPaneRuntime";
+import { EditorPaneRenderBoundary } from "../runtime/EditorPaneRenderBoundary";
 import { EditorPaneShell } from "./EditorPaneShell";
 import { EditorSplitResizeHandle } from "./EditorSplitResizeHandle";
 import { EditorPaneHostSlot } from "./pane-host/EditorPaneHostSlot";
@@ -286,6 +288,7 @@ function EditorPane({
   onOpenActionsPaneChange,
   onSplitPane,
 }: EditorPaneProps) {
+  const { t } = useLocalization();
   const active = pane.id === activePaneId;
   const actionsOpen = pane.id === openActionsPaneId;
   const editor = pane.editorId ? editorById.get(pane.editorId) ?? null : null;
@@ -337,22 +340,27 @@ function EditorPane({
         : null}
       onSplit={(direction, placement) => onSplitPane(pane.id, direction, placement)}
     >
-      <EditorPaneRuntime
-        aiEditFile={getAiEditFileForPath(aiEditRequest, editor?.resource) ?? null}
-        dataPort={dataPort}
-        editor={editor}
-        editorInteractionPreferences={editorInteractionPreferences}
-        fileIconTheme={fileIconTheme}
-        markdownEnvironment={markdownEnvironment}
-        refreshKey={refreshKey}
-        treeNode={treeNode}
-        viewerExtensionAdapter={viewerExtensionAdapter}
-        workspaceId={editorWorkspace.id}
-        workspaceRoot={editorWorkspace.path}
-        markdownDialect={editorWorkspace.markdownDialect}
-        onFindCommandChange={setFindCommand}
-        onMenuContributionChange={publishMenuContribution}
-      />
+      <EditorPaneRenderBoundary
+        failureTitle={t("shared-ui.preview.crashed")}
+        resetKey={editor?.resource ?? null}
+      >
+        <EditorPaneRuntime
+          aiEditFile={getAiEditFileForPath(aiEditRequest, editor?.resource) ?? null}
+          dataPort={dataPort}
+          editor={editor}
+          editorInteractionPreferences={editorInteractionPreferences}
+          fileIconTheme={fileIconTheme}
+          markdownEnvironment={markdownEnvironment}
+          refreshKey={refreshKey}
+          treeNode={treeNode}
+          viewerExtensionAdapter={viewerExtensionAdapter}
+          workspaceId={editorWorkspace.id}
+          workspaceRoot={editorWorkspace.path}
+          markdownDialect={editorWorkspace.markdownDialect}
+          onFindCommandChange={setFindCommand}
+          onMenuContributionChange={publishMenuContribution}
+        />
+      </EditorPaneRenderBoundary>
     </EditorPaneShell>
   );
 }

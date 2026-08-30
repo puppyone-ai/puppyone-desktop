@@ -3,7 +3,7 @@ import {
   getEditorSourceRequirement,
   shouldReadEditorContent,
   useFileResourceLease,
-  workspaceContentChangeMatchesPath,
+  workspaceContentChangeMatchesResource,
   type DataPort,
   type DocumentDataNode,
   type DocumentPersistedCommit,
@@ -41,7 +41,7 @@ export function useEditorPaneSource(
   useEffect(() => {
     const pathChanged = lastObservedPathRef.current !== nodePath;
     lastObservedPathRef.current = nodePath;
-    if (!pathChanged && !workspaceContentChangeMatchesPath(refreshKey, nodePath)) return undefined;
+    if (!pathChanged && !workspaceContentChangeMatchesResource(refreshKey, nodePath)) return undefined;
     if (!nodePath || !needsContent || !dataPort.readFile) {
       setLoading(false);
       return undefined;

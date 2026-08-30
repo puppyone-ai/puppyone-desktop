@@ -217,8 +217,8 @@ const paneSourceSource = readFileSync(paneSourcePath, "utf8");
 if (/\bsetContent\(null\)/.test(paneSourceSource)) {
   errors.push(`${relative(paneSourcePath)} destroys stable editable content during refresh`);
 }
-if (!/workspaceContentChangeMatchesPath\(refreshKey,\s*nodePath\)/.test(paneSourceSource)) {
-  errors.push(`${relative(paneSourcePath)} does not scope external refreshes by resource path`);
+if (!/workspaceContentChangeMatchesResource\(refreshKey,\s*nodePath\)/.test(paneSourceSource)) {
+  errors.push(`${relative(paneSourcePath)} does not scope external refreshes by resource identity`);
 }
 
 const workspaceWatchPath = path.join(repoRoot, "electron/main/workspace-watch-service.mjs");
@@ -388,10 +388,10 @@ if (!/"conflict"/.test(readFileSync(path.join(sharedEditorRoot, "document-sessio
 const resourceLeasePath = path.join(sharedEditorRoot, "resource/useFileResourceLease.ts");
 const paneSourceSourceForLease = readFileSync(paneSourcePath, "utf8");
 if (
-  !/workspaceContentChangeMatchesPath/.test(readFileSync(resourceLeasePath, "utf8"))
+  !/workspaceContentChangeMatchesResource/.test(readFileSync(resourceLeasePath, "utf8"))
   || !/useFileResourceLease/.test(paneSourceSourceForLease)
 ) {
-  errors.push("Editor resources do not use the shared path-scoped resource lease");
+  errors.push("Editor resources do not use the shared identity-scoped resource lease");
 }
 
 const desktopWorkspaceContentPath = path.join(repoRoot, "src/features/app-shell/DesktopWorkspaceContent.tsx");

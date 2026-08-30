@@ -7,6 +7,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  createWorkspaceResourceUri,
+  createWorkspaceRootUri,
   EMPTY_MARKDOWN_WORKSPACE_ENVIRONMENT,
   type DataNode,
   type DataPort,
@@ -20,21 +22,23 @@ import { withTestLocalization } from "./testLocalization";
   .IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root | null = null;
+const workspaceRootUri = createWorkspaceRootUri("workspace");
+const noteResource = createWorkspaceResourceUri(workspaceRootUri, "note.md");
 
 afterEach(async () => {
   act(() => root?.unmount());
   root = null;
   await closeDocumentWorkingCopy({
     storageIdentity: "test:editor-pane-external-change",
-    resourcePath: "note.md",
+    resourcePath: noteResource,
   }).catch(() => undefined);
   document.body.innerHTML = "";
 });
 
 describe("split-pane external document change", () => {
-  it("adopts an Agent edit while the Markdown pane stays open and performs zero writeback", async () => {
+  it("adopts a Terminal or Agent filesystem edit while the Markdown pane stays open", async () => {
     let storage: FileContent = {
-      path: "note.md",
+      path: noteResource,
       name: "note.md",
       type: "markdown",
       content: "alpha",
@@ -52,8 +56,8 @@ describe("split-pane external document change", () => {
       },
     };
     const node: DataNode = {
-      id: "note.md",
-      path: "note.md",
+      id: noteResource,
+      path: noteResource,
       name: "note.md",
       type: "markdown",
     };
@@ -61,12 +65,16 @@ describe("split-pane external document change", () => {
     document.body.appendChild(container);
     root = createRoot(container);
 
-    const render = (refreshKey: { sequence: number; paths: readonly string[] | null }) => {
+    const render = (refreshKey: {
+      sequence: number;
+      rootUri: typeof workspaceRootUri | null;
+      paths: readonly string[] | null;
+    }) => {
       root?.render(withTestLocalization(
         <EditorPaneDocumentRuntime
           aiEditFile={null}
           dataPort={dataPort}
-          editor={{ id: "note.md", resource: "note.md", label: "note.md" }}
+          editor={{ id: noteResource, resource: noteResource, label: "note.md" }}
           editorInteractionPreferences={{
             showSaveStatus: false,
             markdownBlockDragEnabled: false,
@@ -82,14 +90,14 @@ describe("split-pane external document change", () => {
       ));
     };
 
-    await act(async () => render({ sequence: 0, paths: null }));
+    await act(async () => render({ sequence: 0, rootUri: null, paths: null }));
     await waitFor(
       () => editorContent(container) === "alpha",
       () => `Initial editor failed: ${container.innerHTML}`,
     );
 
     storage = { ...storage, content: "agent version", version: "v2" };
-    await act(async () => render({ sequence: 1, paths: ["note.md"] }));
+    await act(async () => render({ sequence: 1, rootUri: workspaceRootUri, paths: ["note.md"] }));
     await waitFor(
       () => editorContent(container) === "agent version",
       () => `External update failed: ${container.innerHTML}`,
@@ -99,7 +107,11 @@ describe("split-pane external document change", () => {
     expect(persist).not.toHaveBeenCalled();
     expect(container.querySelector(".editor-inline-error")).toBeNull();
 
-    await act(async () => render({ sequence: 2, paths: ["other.md"] }));
+    await act(async () => render({
+      sequence: 2,
+      rootUri: workspaceRootUri,
+      paths: ["other.md"],
+    }));
     await act(async () => Promise.resolve());
     expect(readFile).toHaveBeenCalledTimes(2);
   });

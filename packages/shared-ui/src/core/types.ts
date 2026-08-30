@@ -38,10 +38,18 @@ export type Workspace = {
   markdownDialect?: "puppy-gfm" | "openknowledge-mdx";
 };
 
-/** Resource-scoped invalidation signal; null path means a genuine bulk refresh. */
+/**
+ * Resource-scoped invalidation signal.
+ *
+ * `paths` are provider-relative to `rootUri`. A null `paths` value means every
+ * resource under that root is invalidated; a null root makes that invalidation
+ * Workbench-wide. Standalone DataPorts that do not expose Resource URIs use a
+ * null root and provider-relative paths.
+ */
 export type WorkspaceContentChange = Readonly<{
   sequence: number;
-  /** null means the watcher could not enumerate the affected resources. */
+  rootUri: ResourceUri | null;
+  /** null means the mutation source could not enumerate the affected resources. */
   paths: readonly string[] | null;
 }>;
 

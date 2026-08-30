@@ -50,7 +50,10 @@ export type PendingBranchSwitch = {
 type UseDesktopGitControllerOptions = {
   workspace: Workspace | null;
   gitViewActive: boolean;
-  onWorkspaceContentChanged: (paths?: readonly string[] | string | null) => void;
+  onWorkspaceContentChanged: (
+    paths?: readonly string[] | string | null,
+    workspaceFolderId?: string | null,
+  ) => void;
   onEnterGitView: () => void;
 };
 
@@ -79,7 +82,6 @@ export function useDesktopGitController({
   } = useGitRepositoryLifecycle({
     workspace,
     remoteUpdatesActive: gitViewActive,
-    onWorkspaceContentChanged,
   });
   const historyRequestRef = useRef(0);
   const workingDiffRequestRef = useRef(0);

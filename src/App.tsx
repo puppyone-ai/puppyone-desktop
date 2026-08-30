@@ -3,11 +3,13 @@ import {
   closeAllDocumentWorkingCopies,
   closeDocumentWorkingCopy,
   closeDocumentWorkingCopiesUnderResource,
+  createWorkspaceContentChange,
   createWorkspaceResourceUri,
   flushActiveDocumentSessions,
   isDataResourceUri,
   isDocumentDataNode,
   type DataNode,
+  type WorkspaceContentChange,
   type WorkspaceFolder,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
@@ -82,6 +84,7 @@ import { createExplorerDataPort } from "./features/data-workspace/explorer";
 import { createWorkbenchDataService } from "./features/data-workspace/workbenchDataPort";
 import { useDataNodeActions } from "./features/data-workspace/useDataNodeActions";
 import { useAiEditReviewRequest } from "./features/data-workspace/useAiEditReviewRequest";
+import { useWorkbenchWorkspaceContentWatch } from "./features/data-workspace/useWorkbenchWorkspaceContentWatch";
 import {
   BranchSwitchConflictDialog,
   GitOperationErrorDialog,
@@ -100,6 +103,7 @@ import type { AuxiliaryWorkbenchContribution } from "./features/app-shell/auxili
 import { AGENT_CHAT_CREATION_RECIPES } from "./features/app-shell/auxiliary-workbench/agentChatCreationRecipes";
 
 const AgentChatWorkbenchItem = lazy(loadAgentChatWorkbenchItem);
+const EMPTY_WORKSPACE_FOLDERS: readonly WorkspaceFolder[] = Object.freeze([]);
 
 export function App() {
   return <AppContent />;
@@ -230,8 +234,9 @@ function AppContent() {
   });
   const Homepage = assetLibraryHomeEnabled ? AssetLibraryHome : MinimalOnboarding;
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("general");
-  const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState({
+  const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState<WorkspaceContentChange>({
     sequence: 0,
+    rootUri: null,
     paths: null as readonly string[] | null,
   });
   const workbenchDataService = useMemo(
@@ -358,17 +363,41 @@ function AppContent() {
     setRightSidebarOpen,
     setRightSidebarSurface,
   ]);
-  const refreshWorkspaceContent = useCallback((paths: readonly string[] | string | null = null) => {
-    setWorkspaceRefreshToken((current) => ({
-      sequence: current.sequence + 1,
-      paths: typeof paths === "string" ? [paths] : paths,
-    }));
-  }, []);
+  const refreshWorkspaceContent = useCallback((
+    paths: readonly string[] | string | null = null,
+    workspaceFolderId: string | null = null,
+  ) => {
+    setWorkspaceRefreshToken((current) => {
+      const folder = workspaceFolderId
+        ? workbenchWorkspace?.folders.find((candidate) => candidate.id === workspaceFolderId) ?? null
+        : null;
+      // A scoped event whose Folder disappeared between fs.watch delivery and
+      // React dispatch must become a safe Workbench-wide refresh. Never let an
+      // unscoped relative path alias the primary Folder by accident.
+      const normalizedPaths = workspaceFolderId && !folder ? null : paths;
+      return createWorkspaceContentChange({
+        sequence: current.sequence + 1,
+        rootUri: folder?.uri ?? null,
+        paths: normalizedPaths,
+      });
+    });
+  }, [workbenchWorkspace]);
   const git = useDesktopGitController({
     workspace: focusedWorkspace,
     gitViewActive: activeView === "git",
     onWorkspaceContentChanged: refreshWorkspaceContent,
     onEnterGitView: () => setActiveView("git"),
+  });
+  const invalidateGitStatus = git.invalidateGitStatus;
+  const handleWorkspaceActivity = useCallback((folder: WorkspaceFolder) => {
+    if (folder.workspace.path === focusedWorkspace?.path) {
+      invalidateGitStatus("working-tree");
+    }
+  }, [focusedWorkspace?.path, invalidateGitStatus]);
+  useWorkbenchWorkspaceContentWatch({
+    folders: workbenchWorkspace?.folders ?? EMPTY_WORKSPACE_FOLDERS,
+    onWorkspaceContentChanged: refreshWorkspaceContent,
+    onWorkspaceActivity: handleWorkspaceActivity,
   });
   const {
     activeGitStatus,

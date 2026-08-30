@@ -50,7 +50,12 @@ export type {
   WorkspaceFolderTrustState,
   WorkspaceFoldersChange,
 } from "./core/workbenchWorkspace";
-export { workspaceContentChangeMatchesPath } from "./core/workspaceContentChange";
+export {
+  createWorkspaceContentChange,
+  workspaceContentChangeMatchesPath,
+  workspaceContentChangeMatchesResource,
+} from "./core/workspaceContentChange";
+export type { WorkspaceContentChangeInput } from "./core/workspaceContentChange";
 export {
   TYPOGRAPHY_CHANGE_EVENT,
   dispatchTypographyChange,
