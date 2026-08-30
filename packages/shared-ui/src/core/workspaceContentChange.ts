@@ -1,4 +1,7 @@
-import type { WorkspaceContentChange } from "./types";
+import type {
+  WorkspaceContentChange,
+  WorkspaceContentChangeEntry,
+} from "./types";
 import { isDataResourceUri } from "./dataResourcePath";
 import { canonicalizeResourcePath, looksLikeResourceUri } from "./resourcePath";
 import {
@@ -9,6 +12,7 @@ import {
 } from "./resourceUri";
 
 const resourceIdentity = new ResourceUriIdentityService();
+export const MAX_WORKSPACE_CONTENT_CHANGE_ENTRIES = 128;
 
 export type WorkspaceContentChangeInput = Readonly<{
   sequence: number;
@@ -24,9 +28,31 @@ export type WorkspaceContentChangeInput = Readonly<{
 export function createWorkspaceContentChange(
   input: WorkspaceContentChangeInput,
 ): WorkspaceContentChange {
-  const sequence = Number.isSafeInteger(input.sequence) && input.sequence >= 0
-    ? input.sequence
-    : 0;
+  const entry = createWorkspaceContentChangeEntry(input);
+  return Object.freeze({
+    sequence: entry.sequence,
+    entries: Object.freeze([entry]),
+  });
+}
+
+export function appendWorkspaceContentChange(
+  current: WorkspaceContentChange,
+  input: Omit<WorkspaceContentChangeInput, "sequence">,
+): WorkspaceContentChange {
+  const sequence = normalizeSequence(current.sequence + 1);
+  const entry = createWorkspaceContentChangeEntry({ ...input, sequence });
+  return Object.freeze({
+    sequence,
+    entries: Object.freeze(
+      [...current.entries, entry].slice(-MAX_WORKSPACE_CONTENT_CHANGE_ENTRIES),
+    ),
+  });
+}
+
+function createWorkspaceContentChangeEntry(
+  input: WorkspaceContentChangeInput,
+): WorkspaceContentChangeEntry {
+  const sequence = normalizeSequence(input.sequence);
   const rootUri = normalizeRootUri(input.rootUri);
   if (input.rootUri && !rootUri) {
     return Object.freeze({ sequence, rootUri: null, paths: null });
@@ -59,32 +85,17 @@ export function createWorkspaceContentChange(
 export function workspaceContentChangeMatchesResource(
   change: WorkspaceContentChange | null | undefined,
   resource: string | null,
+  afterSequence = Number.NEGATIVE_INFINITY,
 ): boolean {
-  if (!change || !resource) return false;
-  try {
-    if (change.rootUri) {
-      if (!isDataResourceUri(resource)) return false;
-      const canonicalRoot = canonicalizeResourceUri(change.rootUri);
-      if (!resourceIdentity.isEqualOrParent(resource, canonicalRoot)) return false;
-      if (change.paths === null) return true;
-      return change.paths.some((path) => (
-        resourceIdentity.isEqual(
-          createWorkspaceResourceUri(canonicalRoot, canonicalizeResourcePath(path)),
-          resource,
-        )
-      ));
-    }
-
-    if (change.paths === null) return true;
-    if (isDataResourceUri(resource) || looksLikeResourceUri(resource)) return false;
-    const canonicalResource = canonicalizeResourcePath(resource);
-    return change.paths.some((path) => {
-      if (looksLikeResourceUri(path)) return false;
-      return canonicalizeResourcePath(path) === canonicalResource;
-    });
-  } catch {
-    return false;
-  }
+  if (!change || !resource || !Array.isArray(change.entries)) return false;
+  const entries = change.entries.filter((entry) => entry.sequence > afterSequence);
+  if (entries.length === 0) return false;
+  const oldestRetained = change.entries[0]?.sequence ?? change.sequence;
+  if (
+    change.entries.length === MAX_WORKSPACE_CONTENT_CHANGE_ENTRIES
+    && afterSequence < oldestRetained - 1
+  ) return true;
+  return entries.some((entry) => workspaceContentChangeEntryMatchesResource(entry, resource));
 }
 
 /** @deprecated Prefer workspaceContentChangeMatchesResource. */
@@ -96,5 +107,39 @@ function normalizeRootUri(rootUri: ResourceUri | null): ResourceUri | null {
     return canonicalizeResourceUri(rootUri);
   } catch {
     return null;
+  }
+}
+
+function normalizeSequence(value: number): number {
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
+function workspaceContentChangeEntryMatchesResource(
+  entry: WorkspaceContentChangeEntry,
+  resource: string,
+): boolean {
+  try {
+    if (entry.rootUri) {
+      if (!isDataResourceUri(resource)) return false;
+      const canonicalRoot = canonicalizeResourceUri(entry.rootUri);
+      if (!resourceIdentity.isEqualOrParent(resource, canonicalRoot)) return false;
+      if (entry.paths === null) return true;
+      return entry.paths.some((path) => (
+        resourceIdentity.isEqual(
+          createWorkspaceResourceUri(canonicalRoot, canonicalizeResourcePath(path)),
+          resource,
+        )
+      ));
+    }
+
+    if (entry.paths === null) return true;
+    if (isDataResourceUri(resource) || looksLikeResourceUri(resource)) return false;
+    const canonicalResource = canonicalizeResourcePath(resource);
+    return entry.paths.some((path) => {
+      if (looksLikeResourceUri(path)) return false;
+      return canonicalizeResourcePath(path) === canonicalResource;
+    });
+  } catch {
+    return false;
   }
 }

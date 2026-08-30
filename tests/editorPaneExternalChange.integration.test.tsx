@@ -7,12 +7,14 @@ import { createRoot, type Root } from "react-dom/client";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  createWorkspaceContentChange,
   createWorkspaceResourceUri,
   createWorkspaceRootUri,
   EMPTY_MARKDOWN_WORKSPACE_ENVIRONMENT,
   type DataNode,
   type DataPort,
   type FileContent,
+  type WorkspaceContentChange,
 } from "@puppyone/shared-ui";
 import { closeDocumentWorkingCopy } from "../packages/shared-ui/src/editor/document-session/documentWorkingCopies";
 import { EditorPaneDocumentRuntime } from "../src/features/editor-workbench/runtime/EditorPaneDocumentRuntime";
@@ -65,11 +67,7 @@ describe("split-pane external document change", () => {
     document.body.appendChild(container);
     root = createRoot(container);
 
-    const render = (refreshKey: {
-      sequence: number;
-      rootUri: typeof workspaceRootUri | null;
-      paths: readonly string[] | null;
-    }) => {
+    const render = (refreshKey: WorkspaceContentChange) => {
       root?.render(withTestLocalization(
         <EditorPaneDocumentRuntime
           aiEditFile={null}
@@ -90,14 +88,14 @@ describe("split-pane external document change", () => {
       ));
     };
 
-    await act(async () => render({ sequence: 0, rootUri: null, paths: null }));
+    await act(async () => render(change(0, null, null)));
     await waitFor(
       () => editorContent(container) === "alpha",
       () => `Initial editor failed: ${container.innerHTML}`,
     );
 
     storage = { ...storage, content: "agent version", version: "v2" };
-    await act(async () => render({ sequence: 1, rootUri: workspaceRootUri, paths: ["note.md"] }));
+    await act(async () => render(change(1, workspaceRootUri, ["note.md"])));
     await waitFor(
       () => editorContent(container) === "agent version",
       () => `External update failed: ${container.innerHTML}`,
@@ -107,15 +105,19 @@ describe("split-pane external document change", () => {
     expect(persist).not.toHaveBeenCalled();
     expect(container.querySelector(".editor-inline-error")).toBeNull();
 
-    await act(async () => render({
-      sequence: 2,
-      rootUri: workspaceRootUri,
-      paths: ["other.md"],
-    }));
+    await act(async () => render(change(2, workspaceRootUri, ["other.md"])));
     await act(async () => Promise.resolve());
     expect(readFile).toHaveBeenCalledTimes(2);
   });
 });
+
+function change(
+  sequence: number,
+  rootUri: typeof workspaceRootUri | null,
+  paths: readonly string[] | null,
+): WorkspaceContentChange {
+  return createWorkspaceContentChange({ sequence, rootUri, paths });
+}
 
 function editorContent(container: HTMLElement): string | null {
   const editor = container.querySelector<HTMLElement>(".cm-editor");

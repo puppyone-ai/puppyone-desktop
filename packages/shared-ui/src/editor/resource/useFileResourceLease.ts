@@ -39,8 +39,9 @@ export function useFileResourceLease({
 
   useEffect(() => {
     if (!refresh || lastRefreshSequenceRef.current === refresh.sequence) return;
+    const previousSequence = lastRefreshSequenceRef.current ?? Number.NEGATIVE_INFINITY;
     lastRefreshSequenceRef.current = refresh.sequence;
-    if (workspaceContentChangeMatchesResource(refresh, path)) {
+    if (workspaceContentChangeMatchesResource(refresh, path, previousSequence)) {
       setReloadSequence((current) => current + 1);
     }
   }, [path, refresh]);

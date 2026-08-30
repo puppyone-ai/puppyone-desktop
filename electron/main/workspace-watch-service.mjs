@@ -11,6 +11,7 @@ import { getWorkspaceTextVersion } from "../../local-api/workspace.mjs";
 
 export const WORKSPACE_WATCH_REARM_MIN_DELAY_MS = 250;
 export const WORKSPACE_WATCH_REARM_MAX_DELAY_MS = 30_000;
+export const WORKSPACE_WATCH_MAX_PENDING_PATHS = 4_096;
 const WORKSPACE_INTERNAL_WRITE_TTL_MS = 2_000;
 
 let workspaceWatchSubscriptionSequence = 0;
@@ -204,8 +205,19 @@ function armWorkspaceWatcher(entry) {
       const eventPath = normalizeWorkspaceRelativePath(
         typeof filename === "string" ? filename : null,
       );
-      if (eventPath) entry.pendingPaths.add(eventPath);
-      else entry.pendingUnknownPath = true;
+      if (eventPath && !entry.pendingUnknownPath) {
+        if (entry.pendingPaths.size < WORKSPACE_WATCH_MAX_PENDING_PATHS) {
+          entry.pendingPaths.add(eventPath);
+        } else {
+          // Never grow an unbounded IPC payload during generated-file storms.
+          // A root-scoped bulk invalidation is conservative and lossless.
+          entry.pendingPaths.clear();
+          entry.pendingUnknownPath = true;
+        }
+      } else if (!eventPath) {
+        entry.pendingPaths.clear();
+        entry.pendingUnknownPath = true;
+      }
       entry.lastEvent = {
         rootPath: entry.rootPath,
         eventType: eventType ?? "change",

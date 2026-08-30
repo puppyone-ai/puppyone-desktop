@@ -38,19 +38,21 @@ export type Workspace = {
   markdownDialect?: "puppy-gfm" | "openknowledge-mdx";
 };
 
-/**
- * Resource-scoped invalidation signal.
- *
- * `paths` are provider-relative to `rootUri`. A null `paths` value means every
- * resource under that root is invalidated; a null root makes that invalidation
- * Workbench-wide. Standalone DataPorts that do not expose Resource URIs use a
- * null root and provider-relative paths.
- */
-export type WorkspaceContentChange = Readonly<{
+export type WorkspaceContentChangeEntry = Readonly<{
   sequence: number;
   rootUri: ResourceUri | null;
   /** null means the mutation source could not enumerate the affected resources. */
   paths: readonly string[] | null;
+}>;
+
+/**
+ * Bounded mutation journal consumed by renderers since their last observed
+ * sequence. Keeping entries, rather than only the latest event, prevents React
+ * batching from dropping near-simultaneous changes from different Folders.
+ */
+export type WorkspaceContentChange = Readonly<{
+  sequence: number;
+  entries: readonly WorkspaceContentChangeEntry[];
 }>;
 
 export type DataNode = {

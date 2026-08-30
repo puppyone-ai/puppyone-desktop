@@ -51,6 +51,8 @@ export type {
   WorkspaceFoldersChange,
 } from "./core/workbenchWorkspace";
 export {
+  MAX_WORKSPACE_CONTENT_CHANGE_ENTRIES,
+  appendWorkspaceContentChange,
   createWorkspaceContentChange,
   workspaceContentChangeMatchesPath,
   workspaceContentChangeMatchesResource,

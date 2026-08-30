@@ -68,7 +68,7 @@ describe("editor pane resource invalidation", () => {
       "notes/today.md",
     )).toBe(true);
     expect(workspaceContentChangeMatchesResource(
-      { sequence: 8, rootUri: null, paths: [] },
+      createWorkspaceContentChange({ sequence: 8, rootUri: null, paths: [] }),
       "notes/today.md",
     )).toBe(false);
   });
@@ -77,12 +77,21 @@ describe("editor pane resource invalidation", () => {
     const resource = createWorkspaceResourceUri(firstRoot, "No3D");
     const malformed = {
       sequence: 9,
-      rootUri: firstRoot,
-      paths: ["puppyone-local:/broken"],
+      entries: [{
+        sequence: 9,
+        rootUri: firstRoot,
+        paths: ["puppyone-local:/broken"],
+      }],
     };
 
     expect(() => workspaceContentChangeMatchesResource(malformed, resource)).not.toThrow();
     expect(workspaceContentChangeMatchesResource(malformed, resource)).toBe(false);
+    const legacyShape = { sequence: 10, rootUri: firstRoot, paths: ["No3D"] };
+    expect(() => workspaceContentChangeMatchesResource(
+      legacyShape as never,
+      resource,
+    )).not.toThrow();
+    expect(workspaceContentChangeMatchesResource(legacyShape as never, resource)).toBe(false);
   });
 
   it("degrades malformed watcher paths to a safe scoped refresh at ingestion", () => {
@@ -92,7 +101,7 @@ describe("editor pane resource invalidation", () => {
       paths: ["../outside.md"],
     });
 
-    expect(event.paths).toBeNull();
+    expect(event.entries[0]?.paths).toBeNull();
     expect(workspaceContentChangeMatchesResource(
       event,
       createWorkspaceResourceUri(firstRoot, "notes/today.md"),

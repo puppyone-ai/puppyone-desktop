@@ -83,6 +83,65 @@ describe("Workbench Workspace content watch", () => {
     await act(async () => root.unmount());
     expect(stops.every((stop) => stop.mock.calls.length === 1)).toBe(true);
   });
+
+  it("reconciles attached and detached Folders without accepting stale callbacks", async () => {
+    const registrations: Array<{
+      rootPath: string;
+      callback: (event: WorkspaceChangedEvent) => void;
+      stop: ReturnType<typeof vi.fn>;
+    }> = [];
+    Object.defineProperty(window, "puppyoneDesktop", {
+      configurable: true,
+      value: {
+        watchWorkspace: vi.fn((
+          rootPath: string,
+          callback: (event: WorkspaceChangedEvent) => void,
+        ) => {
+          const registration = { rootPath, callback, stop: vi.fn() };
+          registrations.push(registration);
+          return {
+            stop: registration.stop,
+            ready: Promise.resolve({ subscriptionId: rootPath, rootPath }),
+          };
+        }),
+      },
+    });
+    const alpha = createWorkspaceFolder(workspace("alpha", "/workspace/alpha"));
+    const beta = createWorkspaceFolder(workspace("beta", "/workspace/beta"), { index: 1 });
+    const gamma = createWorkspaceFolder(workspace("gamma", "/workspace/gamma"), { index: 1 });
+    const onWorkspaceContentChanged = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    function Probe({ folders }: { folders: readonly typeof alpha[] }) {
+      useWorkbenchWorkspaceContentWatch({ folders, onWorkspaceContentChanged });
+      return null;
+    }
+
+    await act(async () => root.render(<Probe folders={[alpha, beta]} />));
+    const staleAlpha = registrations.find((entry) => entry.rootPath === alpha.workspace.path)!;
+    await act(async () => root.render(<Probe folders={[beta, gamma]} />));
+    expect(staleAlpha.stop).toHaveBeenCalledOnce();
+
+    await act(async () => staleAlpha.callback({
+      rootPath: alpha.workspace.path,
+      eventType: "change",
+      path: "stale.md",
+    }));
+    expect(onWorkspaceContentChanged).not.toHaveBeenCalled();
+
+    const activeGamma = registrations.findLast((entry) => entry.rootPath === gamma.workspace.path)!;
+    await act(async () => activeGamma.callback({
+      rootPath: gamma.workspace.path,
+      eventType: "change",
+      path: "live.md",
+    }));
+    expect(onWorkspaceContentChanged).toHaveBeenCalledWith("live.md", gamma.id);
+
+    await act(async () => root.unmount());
+    expect(registrations.every((entry) => entry.stop.mock.calls.length === 1)).toBe(true);
+  });
 });
 
 function workspace(id: string, path: string): Workspace {

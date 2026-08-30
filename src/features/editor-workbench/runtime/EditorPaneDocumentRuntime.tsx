@@ -207,7 +207,11 @@ function sameDocumentRefresh(
   if (isContextMapDocumentDescriptor(null, resource)) {
     return previous?.sequence === next?.sequence;
   }
-  return !workspaceContentChangeMatchesResource(next, resource);
+  return !workspaceContentChangeMatchesResource(
+    next,
+    resource,
+    previous?.sequence ?? Number.NEGATIVE_INFINITY,
+  );
 }
 
 function isContextMapDocumentDescriptor(node: DataNode | null, resource: string | null): boolean {

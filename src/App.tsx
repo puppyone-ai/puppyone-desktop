@@ -3,7 +3,6 @@ import {
   closeAllDocumentWorkingCopies,
   closeDocumentWorkingCopy,
   closeDocumentWorkingCopiesUnderResource,
-  createWorkspaceContentChange,
   createWorkspaceResourceUri,
   flushActiveDocumentSessions,
   isDataResourceUri,
@@ -85,6 +84,7 @@ import { createWorkbenchDataService } from "./features/data-workspace/workbenchD
 import { useDataNodeActions } from "./features/data-workspace/useDataNodeActions";
 import { useAiEditReviewRequest } from "./features/data-workspace/useAiEditReviewRequest";
 import { useWorkbenchWorkspaceContentWatch } from "./features/data-workspace/useWorkbenchWorkspaceContentWatch";
+import { appendWorkbenchWorkspaceContentChange } from "./features/data-workspace/workbenchWorkspaceContentChange";
 import {
   BranchSwitchConflictDialog,
   GitOperationErrorDialog,
@@ -236,8 +236,7 @@ function AppContent() {
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("general");
   const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState<WorkspaceContentChange>({
     sequence: 0,
-    rootUri: null,
-    paths: null as readonly string[] | null,
+    entries: [],
   });
   const workbenchDataService = useMemo(
     () => (workbenchWorkspace ? createWorkbenchDataService(workbenchWorkspace) : null),
@@ -367,20 +366,11 @@ function AppContent() {
     paths: readonly string[] | string | null = null,
     workspaceFolderId: string | null = null,
   ) => {
-    setWorkspaceRefreshToken((current) => {
-      const folder = workspaceFolderId
-        ? workbenchWorkspace?.folders.find((candidate) => candidate.id === workspaceFolderId) ?? null
-        : null;
-      // A scoped event whose Folder disappeared between fs.watch delivery and
-      // React dispatch must become a safe Workbench-wide refresh. Never let an
-      // unscoped relative path alias the primary Folder by accident.
-      const normalizedPaths = workspaceFolderId && !folder ? null : paths;
-      return createWorkspaceContentChange({
-        sequence: current.sequence + 1,
-        rootUri: folder?.uri ?? null,
-        paths: normalizedPaths,
-      });
-    });
+    setWorkspaceRefreshToken((current) => appendWorkbenchWorkspaceContentChange(
+      current,
+      workbenchWorkspace,
+      { paths, workspaceFolderId },
+    ));
   }, [workbenchWorkspace]);
   const git = useDesktopGitController({
     workspace: focusedWorkspace,

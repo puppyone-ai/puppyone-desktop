@@ -24,6 +24,7 @@ export function useEditorPaneSource(
   // while the image transition clears its content, so returning to the CSV is
   // incorrectly treated as already loaded and remains pending forever.
   const lastObservedPathRef = useRef<string | null>(null);
+  const lastRefreshSequenceRef = useRef(refreshKey?.sequence ?? Number.NEGATIVE_INFINITY);
   const nodePath = node?.path ?? null;
   const needsContent = Boolean(node && dataPort.readFile && shouldReadEditorContent(node));
   const sourceRequirement = node ? getEditorSourceRequirement(node) : "none";
@@ -41,7 +42,12 @@ export function useEditorPaneSource(
   useEffect(() => {
     const pathChanged = lastObservedPathRef.current !== nodePath;
     lastObservedPathRef.current = nodePath;
-    if (!pathChanged && !workspaceContentChangeMatchesResource(refreshKey, nodePath)) return undefined;
+    const previousRefreshSequence = lastRefreshSequenceRef.current;
+    lastRefreshSequenceRef.current = refreshKey?.sequence ?? previousRefreshSequence;
+    if (
+      !pathChanged
+      && !workspaceContentChangeMatchesResource(refreshKey, nodePath, previousRefreshSequence)
+    ) return undefined;
     if (!nodePath || !needsContent || !dataPort.readFile) {
       setLoading(false);
       return undefined;
