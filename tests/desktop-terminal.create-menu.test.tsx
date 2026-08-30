@@ -63,6 +63,7 @@ describe("Unified Workbench create menu", () => {
     const trigger = container.querySelector<HTMLButtonElement>('[aria-label="New terminal"]');
     await act(async () => trigger?.click());
     const menu = document.body.querySelector('[role="menu"]');
+    expect((menu as HTMLElement | null)?.style.position).toBe("fixed");
     const sections = menu?.querySelectorAll(".desktop-menu-section") ?? [];
     expect(sections).toHaveLength(2);
     expect(sections[0].querySelector(".desktop-menu-section-label")?.textContent).toBe("Chat");

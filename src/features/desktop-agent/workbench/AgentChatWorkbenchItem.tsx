@@ -79,14 +79,14 @@ export async function requestCloseAgentChatWorkbenchItem(rootId: string, itemId:
   return closeAgentSessionController(rootId, itemId);
 }
 
-export async function prepareAgentChatWorkbenchItem(
+export function prepareAgentChatWorkbenchItem(
   rootId: string,
   itemId: string,
   runtimeId: string | null,
 ) {
   if (!runtimeId) return;
   const controller = getAgentSessionController(rootId, getElectronAgentClient, itemId);
-  await controller.initializeForRuntime(runtimeId);
+  controller.beginInitializeForRuntime(runtimeId);
 }
 
 export function discardPreparedAgentChatWorkbenchItem(rootId: string, itemId: string) {

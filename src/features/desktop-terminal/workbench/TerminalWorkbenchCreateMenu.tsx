@@ -59,21 +59,28 @@ export function TerminalWorkbenchCreateMenu({
     };
   }, [open, overlayRef]);
 
-  const menuStyle = overlayPosition
-    ? {
-        left: overlayPosition.left,
-        top: overlayPosition.top,
-        width: overlayPosition.width,
-        maxHeight: overlayPosition.maxHeight,
-      }
-    : {
-        left: 0,
-        top: 0,
-        width: 216,
-        maxHeight: 360,
-        visibility: "hidden",
-        pointerEvents: "none",
-      } satisfies CSSProperties;
+  const menuStyle: CSSProperties = {
+    position: "fixed",
+    zIndex: "var(--po-overlay-z-menu, 80)",
+    boxSizing: "border-box",
+    overflowX: "hidden",
+    overflowY: "auto",
+    ...(overlayPosition
+      ? {
+          left: overlayPosition.left,
+          top: overlayPosition.top,
+          width: overlayPosition.width,
+          maxHeight: overlayPosition.maxHeight,
+        }
+      : {
+          left: 0,
+          top: 0,
+          width: 216,
+          maxHeight: 360,
+          visibility: "hidden",
+          pointerEvents: "none",
+        }),
+  };
 
   return (
     <>

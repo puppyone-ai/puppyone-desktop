@@ -79,6 +79,44 @@ describe("AgentSessionController", () => {
     expect(bridge.createAgentSession).not.toHaveBeenCalled();
   });
 
+  it("begins direct-recipe discovery without blocking Workbench admission", async () => {
+    const bridge = bridgeFixture(() => {});
+    const inspection = await bridge.discoverAgentRuntimes();
+    bridge.discoverAgentRuntimes.mockClear();
+    let resolveDiscovery: ((value: typeof inspection) => void) | null = null;
+    bridge.discoverAgentRuntimes.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveDiscovery = resolve;
+    }));
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+
+    controller.beginInitializeForRuntime("codex");
+
+    expect(bridge.discoverAgentRuntimes).toHaveBeenCalledWith({
+      rootPath: "/workspace",
+      runtimeId: "codex",
+      refresh: false,
+    });
+    expect(controller.getSnapshot()).toMatchObject({
+      initialized: false,
+      phase: "discovering",
+      selectedRuntimeId: "codex",
+      session: null,
+    });
+
+    resolveDiscovery?.({
+      ...inspection,
+      selectedRuntimeId: "codex",
+      runtime: { id: "codex", displayName: "Codex", iconKey: "codex" },
+      readiness: readinessFor("codex"),
+    });
+    await vi.waitFor(() => expect(controller.getSnapshot()).toMatchObject({
+      initialized: true,
+      phase: "ready",
+      selectedRuntimeId: "codex",
+    }));
+    expect(bridge.resumeAgentSession).not.toHaveBeenCalled();
+  });
+
   it("rebuilds a deterministic projection, repairs sequence gaps, and preserves the old locator on New Chat", async () => {
     let eventListener: ((event: AgentEvent) => void) | null = null;
     const bridge = bridgeFixture((listener) => { eventListener = listener; });

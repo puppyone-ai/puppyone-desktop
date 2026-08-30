@@ -173,6 +173,21 @@ export class AgentSessionController {
     return this.getSnapshot().inspection?.selectedRuntimeId === runtimeId;
   }
 
+  /**
+   * Binds a direct-creation recipe synchronously, then lets the mounted Chat
+   * surface own discovery progress and recovery instead of blocking topology.
+   */
+  beginInitializeForRuntime(runtimeId: string) {
+    void this.initializeForRuntime(runtimeId).catch((error: unknown) => {
+      this.patch({
+        phase: "failed",
+        error: formatAgentError(error),
+        initialized: true,
+        sessionPreparation: "failed",
+      });
+    });
+  }
+
   private async initializeRuntime(refresh: boolean, restoreLatest: boolean) {
     if (this.initializePromise) return this.initializePromise;
     if (restoreLatest && !refresh && hasFreshAgentRuntimeInspection(this.state, this.lastInspectionAt)) return;
