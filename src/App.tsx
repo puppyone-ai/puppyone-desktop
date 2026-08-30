@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   closeAllDocumentWorkingCopies,
   closeDocumentWorkingCopy,
@@ -8,6 +8,7 @@ import {
   flushActiveDocumentSessions,
   isDataResourceUri,
   isDocumentDataNode,
+  ThemeSurfaceProvider,
   type DataNode,
   type WorkspaceContentChange,
   type WorkspaceFolder,
@@ -63,7 +64,6 @@ import { DesktopOverlayPortal } from "./features/app-shell/DesktopOverlayPortal"
 import { DesktopHelpLauncher } from "./features/app-shell/DesktopHelpLauncher";
 import { RestoringWorkspaceScreen } from "./features/app-shell/RestoringWorkspaceScreen";
 import { useDesktopPreferences } from "./features/app-shell/useDesktopPreferences";
-import { resolveMarkdownPresentationStyle } from "./features/markdown/markdownPresentation";
 import { isAssetLibraryHomeEnabled } from "./features/app-shell/homeFeatureGate";
 import { useWorkspaceLifecycle } from "./features/app-shell/useWorkspaceLifecycle";
 import { usePuppyoneConfig } from "./features/app-shell/usePuppyoneConfig";
@@ -101,6 +101,8 @@ import {
 import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
 import type { AuxiliaryWorkbenchContribution } from "./features/app-shell/auxiliary-workbench/types";
 import { AGENT_CHAT_CREATION_RECIPES } from "./features/app-shell/auxiliary-workbench/agentChatCreationRecipes";
+import { ThemeStyleHost } from "./features/themes/ThemeStyleHost";
+import { useThemeCatalog } from "./features/themes/useThemeCatalog";
 
 const AgentChatWorkbenchItem = lazy(loadAgentChatWorkbenchItem);
 const EMPTY_WORKSPACE_FOLDERS: readonly WorkspaceFolder[] = Object.freeze([]);
@@ -115,6 +117,11 @@ function AppContent() {
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
   const multiRootWorkspacesEnabled = preferences.experimentalSettings.enableMultiRootWorkspaces;
+  const themeCatalog = useThemeCatalog({
+    colorMode: preferences.resolvedTheme,
+    preferences: preferences.surfaceThemePreferences,
+    onThemePackChange: preferences.setThemePack,
+  });
   const { setRightSidebarOpen } = preferences;
   const fontCatalog = useTypographyCatalog();
   const typography = useTypographyRuntime(
@@ -223,10 +230,6 @@ function AppContent() {
   const createNewItems = useMemo(
     () => resolveVisibleCreateNewMenuItems(createNewMenuSettings, experimentalSettings),
     [createNewMenuSettings, experimentalSettings],
-  );
-  const markdownPresentationStyle = useMemo(
-    () => resolveMarkdownPresentationStyle(markdownPresentation),
-    [markdownPresentation],
   );
   const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
     available: assetLibraryHomeAvailable,
@@ -994,8 +997,25 @@ function AppContent() {
     [agentChatContribution],
   );
 
+  const themeRuntime = (content: ReactNode) => (
+    <ThemeSurfaceProvider value={themeCatalog.selection}>
+      <ThemeStyleHost
+        snapshot={themeCatalog.snapshot}
+        selection={themeCatalog.selection}
+        markdownPresentation={markdownPresentation}
+      />
+      <div
+        className={`desktop-theme-bootstrap-surface ${resolvedTheme === "dark" ? "dark" : ""}`}
+        data-po-theme-surface="application"
+        data-po-theme-id={themeCatalog.selection.application}
+      >
+        {content}
+      </div>
+    </ThemeSurfaceProvider>
+  );
+
   if (restoringWorkspace && !workspace) {
-    return (
+    return themeRuntime(
       <RestoringWorkspaceScreen
         themeMode={activeThemeMode}
         lightThemePreset={lightThemePreset}
@@ -1005,12 +1025,13 @@ function AppContent() {
         pointerCursors={pointerCursors}
         diffMarkers={diffMarkers}
         resolvedTheme={resolvedTheme}
-      />
+        applicationThemeId={themeCatalog.selection.application}
+      />,
     );
   }
 
   if (!workspace) {
-    return (
+    return themeRuntime(
       <Homepage
         onChooseWorkspace={openFolder}
         onChooseProjectLocation={chooseProjectLocation}
@@ -1029,7 +1050,8 @@ function AppContent() {
         pointerCursors={pointerCursors}
         diffMarkers={diffMarkers}
         resolvedTheme={resolvedTheme}
-      />
+        applicationThemeId={themeCatalog.selection.application}
+      />,
     );
   }
 
@@ -1089,6 +1111,7 @@ function AppContent() {
   const feedbackLauncher = (
     <DesktopHelpLauncher
       theme={resolvedTheme}
+      applicationThemeId={themeCatalog.selection.application}
       lightThemePreset={lightThemePreset}
       darkThemePreset={darkThemePreset}
       textSize={textSize}
@@ -1114,8 +1137,16 @@ function AppContent() {
     ) : undefined;
 
   return (
-    <div
+    <ThemeSurfaceProvider value={themeCatalog.selection}>
+      <ThemeStyleHost
+        snapshot={themeCatalog.snapshot}
+        selection={themeCatalog.selection}
+        markdownPresentation={markdownPresentation}
+      />
+      <div
       className={`app-shell cloud-runtime ${resolvedTheme === "dark" ? "dark" : ""}`}
+      data-po-theme-surface="application"
+      data-po-theme-id={themeCatalog.selection.application}
       data-theme-mode={activeThemeMode}
       data-interface-style={interfaceStyle}
       data-interface-style-family={resolvedAppearance.profile.family}
@@ -1137,7 +1168,7 @@ function AppContent() {
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
       {...typographyRootProps}
-      style={{ ...typographyRootProps.style, ...markdownPresentationStyle }}
+      style={typographyRootProps.style}
     >
       <DesktopCloudShell
           leftSidebarCollapsed={sidebarCollapsed}
@@ -1232,6 +1263,7 @@ function AppContent() {
           puppyoneConfigLoading={puppyoneConfigLoading}
           puppyoneConfigSaving={puppyoneConfigSaving}
           settingsSection={activeSettingsSection}
+          themeCatalog={themeCatalog}
           workspace={focusedWorkspace ?? workspace}
           workspaceFolders={workbenchWorkspace?.folders ?? []}
           resolveWorkspaceResource={resolveWorkspaceResource}
@@ -1248,6 +1280,7 @@ function AppContent() {
       </DesktopCloudShell>
       <DesktopOverlayPortal
         theme={resolvedTheme}
+        applicationThemeId={themeCatalog.selection.application}
         lightThemePreset={lightThemePreset}
         darkThemePreset={darkThemePreset}
         textSize={textSize}
@@ -1335,7 +1368,8 @@ function AppContent() {
           )}
         </>
       </DesktopOverlayPortal>
-    </div>
+      </div>
+    </ThemeSurfaceProvider>
   );
 }
 

@@ -7,6 +7,7 @@
  */
 .markdown-codemirror-editor {
   --po-md-presentation-version: 2;
+  --po-md-surface-background: var(--po-editor-bg);
   --po-md-content-font: var(--po-font-content, var(--po-font-sans));
   --po-md-content-size: var(--po-text-size-content, 14px);
   --po-md-content-weight: var(--po-content-reading-weight, 450);
@@ -32,6 +33,8 @@
   --po-md-h6-size: inherit;
   --po-md-strong-weight: inherit;
   --po-md-strong-color: inherit;
+  background: var(--po-md-surface-background);
+  color: var(--po-md-content-color);
 }
 
 :where(.app-shell, .onboarding-shell, .desktop-overlay-root) {

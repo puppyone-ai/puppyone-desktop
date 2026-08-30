@@ -1,0 +1,262 @@
+/* Built-in Newspaper Theme Pack. Product-owned and bundled with PuppyOne. */
+[data-po-theme-surface="application"][data-po-theme-id="builtin.pack.newspaper"] {
+    --po-surface-canvas: #eee9df;
+    --po-surface-chrome: #e4ded2;
+    --po-surface-panel: #faf7f0;
+    --po-surface-panel-raised: #fffdf8;
+    --po-surface-overlay: #fffdf9;
+    --po-surface-inset: #ddd5c7;
+    --po-canvas: #f3f2ee;
+    --po-header: #f3f2ee;
+    --po-sidebar: #f3f2ee;
+    --po-panel: #f3f2ee;
+    --po-panel-raised: #faf7f0;
+    --po-overlay: #fffdf9;
+    --po-inset: #e8e2d7;
+    --po-text: #342f29;
+    --po-text-muted: #6f665b;
+    --po-text-subtle: #91877a;
+    --po-border: rgba(76, 66, 53, 0.2);
+    --po-divider: rgba(76, 66, 53, 0.15);
+    --po-hover: rgba(105, 83, 52, 0.08);
+    --po-selected: rgba(105, 83, 52, 0.14);
+    --po-accent: #795f39;
+    --po-accent-text: #624a2b;
+    --po-focus-ring: #9a7a4a;
+    --po-shell-divider: #c8c0b3;
+    --po-sidebar-divider: #b8afa1;
+    --po-control: rgba(105, 83, 52, 0.08);
+    --po-control-hover: rgba(105, 83, 52, 0.14);
+    --po-shadow: rgba(71, 59, 43, 0.18);
+  }
+
+  [data-po-theme-surface="application"][data-po-theme-id="builtin.pack.newspaper"]:where(.dark), [data-po-theme-surface="application"][data-po-theme-id="builtin.pack.newspaper"]:where(.dark) {
+    --po-surface-canvas: #24221e;
+    --po-surface-chrome: #2b2924;
+    --po-surface-panel: #302e29;
+    --po-surface-panel-raised: #39362f;
+    --po-surface-overlay: #3d3932;
+    --po-surface-inset: #1f1d1a;
+    --po-canvas: #292722;
+    --po-header: #24221e;
+    --po-sidebar: #24221e;
+    --po-panel: #302e29;
+    --po-panel-raised: #39362f;
+    --po-overlay: #3d3932;
+    --po-inset: #1f1d1a;
+    --po-text: #e8e1d5;
+    --po-text-muted: #bdb3a3;
+    --po-text-subtle: #958b7d;
+    --po-border: rgba(226, 215, 197, 0.2);
+    --po-divider: rgba(226, 215, 197, 0.15);
+    --po-hover: rgba(194, 164, 117, 0.1);
+    --po-selected: rgba(194, 164, 117, 0.17);
+    --po-accent: #c2a475;
+    --po-accent-text: #d6bd95;
+    --po-focus-ring: #b69769;
+    --po-shell-divider: #4c473f;
+    --po-sidebar-divider: #5a544a;
+    --po-control: rgba(194, 164, 117, 0.1);
+    --po-control-hover: rgba(194, 164, 117, 0.16);
+    --po-shadow: rgba(0, 0, 0, 0.38);
+  }
+
+@font-face {
+    font-family: "PuppyOne PT Serif";
+    src: url("./fonts/pt-serif/PTSerif-Regular.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: "PuppyOne PT Serif";
+    src: url("./fonts/pt-serif/PTSerif-Italic.woff2") format("woff2");
+    font-style: italic;
+    font-weight: 400;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: "PuppyOne PT Serif";
+    src: url("./fonts/pt-serif/PTSerif-Bold.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: "PuppyOne PT Serif";
+    src: url("./fonts/pt-serif/PTSerif-BoldItalic.woff2") format("woff2");
+    font-style: italic;
+    font-weight: 700;
+    font-display: swap;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] {
+    --po-md-surface-background: #faf7f0;
+    --po-newspaper-paper-grain:
+      radial-gradient(circle at 17% 23%, rgba(76, 66, 53, 0.026) 0 0.45px, transparent 0.72px),
+      radial-gradient(circle at 71% 61%, rgba(255, 253, 248, 0.34) 0 0.38px, transparent 0.68px);
+    --po-md-content-color: #342f29;
+    --po-md-content-font: "PuppyOne PT Serif", "Songti SC", STSong, Georgia, serif;
+    --po-md-content-size: 15px;
+    --po-md-content-line-height: 1.82;
+    --po-md-block-gap: 20px;
+    --po-md-heading-gap-before: 34px;
+    --po-md-heading-gap-after: 18px;
+    --po-md-heading-weight: 650;
+    --po-md-h1-weight: 600;
+    --po-md-h2-weight: 720;
+    --po-md-h3-weight: 600;
+    --po-md-h1-size: 2.2em;
+    --po-md-h2-size: 1.55em;
+    --po-md-h3-size: 1.2em;
+    --po-md-rule-color: #b9ae9d;
+    --po-markdown-editor-text-width: 680px;
+    background-color: var(--po-md-surface-background);
+    background-image: var(--po-newspaper-paper-grain);
+    background-position: 0 0, 3px 5px;
+    background-size: 5px 7px, 11px 13px;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] p, [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] li, [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] blockquote {
+    text-align: justify;
+    text-wrap: pretty;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] .cm-md-heading-1, [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] h1 {
+    padding-bottom: 10px;
+    border-bottom: 3px double #6f665b;
+    color: #2f2a25;
+    text-align: center;
+    letter-spacing: 0.025em;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] .cm-md-heading-2, [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] h2 {
+    color: #302b26;
+    letter-spacing: -0.01em;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] .cm-md-heading-2 {
+    border-bottom: 1px solid #c4b9a8;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] .cm-md-heading-3, [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] h3 {
+    color: #6e5a3d;
+    font-variant-caps: small-caps;
+    letter-spacing: 0.08em;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] .cm-md-blockquote, [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] blockquote {
+    border-inline-start: 4px solid #9f917e;
+    background: transparent;
+    color: #655e55;
+    font-style: italic;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] .cm-md-blockquote {
+    padding-inline-start: 18px;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] blockquote {
+    padding-block: 4px;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] .cm-md-syntax-monospace, [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] :not(pre) > code {
+    border: 1px solid #ded6c9;
+    border-radius: 3px;
+    background: #eee9df;
+    color: #6e4f2a;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] :not(pre) > code {
+    padding: 1px 5px;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] .cm-md-code-block-line, [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] pre {
+    border-inline-start: 3px solid #a79b89;
+    background: #eee9df;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] table {
+    width: 100%;
+    border-collapse: collapse;
+    border-top: 2px solid #514a42;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] th, [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] td {
+    padding: 8px 12px;
+    border: 0;
+    text-align: start;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] th {
+    border-bottom: 1px solid #81776a;
+    background: transparent;
+    font-weight: 700;
+  }
+
+  [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] tbody tr:last-child td {
+    border-bottom: 2px solid #514a42;
+  }
+
+  :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] {
+    --po-md-surface-background: #292722;
+    --po-newspaper-paper-grain:
+      radial-gradient(circle at 17% 23%, rgba(232, 225, 213, 0.018) 0 0.42px, transparent 0.72px),
+      radial-gradient(circle at 71% 61%, rgba(0, 0, 0, 0.12) 0 0.36px, transparent 0.66px);
+    --po-md-content-color: #e6dfd2;
+    --po-md-rule-color: #665f54;
+  }
+
+  :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] .cm-md-heading-1, :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] h1, :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] .cm-md-heading-2, :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] h2 {
+    border-color: #8d8273;
+    color: #eee7db;
+  }
+
+  :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] .cm-md-heading-3, :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] h3 {
+    color: #cdb58e;
+  }
+
+  :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] .cm-md-blockquote, :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] blockquote {
+    border-inline-start-color: #887d6e;
+    color: #bdb4a6;
+  }
+
+  :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] .cm-md-syntax-monospace, :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] :not(pre) > code, :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] .cm-md-code-block-line, :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] pre {
+    border-color: #5d564c;
+    background: #211f1b;
+    color: #d0b583;
+  }
+
+  :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] table, :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] th, :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] tbody tr:last-child td {
+    border-color: #918677;
+  }
+
+[data-po-theme-surface="csv"][data-po-theme-id="builtin.pack.newspaper"] {
+    --po-csv-surface-background: #faf7f0;
+    --po-csv-surface-color: #342f29;
+    --po-editable-table-border: #aa9d82;
+    --po-editable-table-cell-border: #d7cfbd;
+    --po-editable-table-sticky-header-background: #e9e0cc;
+    --po-editable-table-header-background: #e9e0cc;
+    --po-editable-table-cell-hover-background: #f4eee2;
+    --po-editable-table-cell-focus-background: #f1e8d7;
+    --csv-table-record-index-background: #f0e9da;
+    --po-editable-table-cell-focus-ring: #80652f;
+    --po-editable-table-font-size: 13px;
+  }
+
+  :where(.dark) [data-po-theme-surface="csv"][data-po-theme-id="builtin.pack.newspaper"] {
+    --po-csv-surface-background: #292722;
+    --po-csv-surface-color: #e6dfd2;
+    --po-editable-table-border: #776f63;
+    --po-editable-table-cell-border: #514c44;
+    --po-editable-table-sticky-header-background: #39362f;
+    --po-editable-table-header-background: #39362f;
+    --po-editable-table-cell-hover-background: #34312b;
+    --po-editable-table-cell-focus-background: #40392f;
+    --csv-table-record-index-background: #302e29;
+    --po-editable-table-cell-focus-ring: #c2a475;
+  }

@@ -8,6 +8,10 @@
   background: var(--po-canvas);
 }
 
+.desktop-theme-bootstrap-surface {
+  display: contents;
+}
+
 /*
  * Give the native macOS window edge one continuous backing layer. Without
  * this, independently painted sidebar and content surfaces can make the

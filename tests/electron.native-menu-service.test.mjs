@@ -10,10 +10,15 @@ function createHarness({ platform = "darwin" } = {}) {
   const actions = {
     checkForUpdates: vi.fn(),
     newWindow: vi.fn(),
+    openThemesDirectory: vi.fn(),
+    selectTheme: vi.fn(),
   };
   const labels = {
     "native.menu.file": "File",
     "native.menu.checkForUpdates": "Check for Updates…",
+    "native.menu.theme": "Theme",
+    "native.menu.theme.pack": "Theme Pack",
+    "native.menu.theme.openFolder": "Open Themes Folder",
     "native.dock.newWindow": "New Window",
   };
   const service = createDesktopNativeMenuService({
@@ -23,6 +28,8 @@ function createHarness({ platform = "darwin" } = {}) {
     t: (messageId) => labels[messageId] ?? messageId,
     onCheckForUpdates: actions.checkForUpdates,
     onNewWindow: actions.newWindow,
+    onOpenThemesDirectory: actions.openThemesDirectory,
+    onSelectTheme: actions.selectTheme,
   });
   return { actions, app, Menu, service };
 }
@@ -41,6 +48,7 @@ describe("DesktopNativeMenuService", () => {
       "File",
       "editMenu",
       "viewMenu",
+      "Theme",
       "windowMenu",
       "help",
     ]);
@@ -77,6 +85,45 @@ describe("DesktopNativeMenuService", () => {
 
     expect(actions.newWindow).toHaveBeenCalledTimes(2);
     expect(actions.checkForUpdates).toHaveBeenCalledOnce();
+  });
+
+  it("builds one coordinated theme-pack group without Customize", async () => {
+    const { actions, service } = createHarness();
+    service.setThemeState({
+      pack: "builtin.pack.forest",
+      themes: [
+        { id: "default", name: "Default", targets: ["application", "markdown", "csv"] },
+        { id: "builtin.pack.forest", name: "Forest", targets: ["application", "markdown", "csv"] },
+        { id: "local.puppyone.custom-css", name: "My Custom CSS", targets: ["application", "markdown", "csv"] },
+        { id: "builtin.markdown.newspaper", name: "Newspaper", targets: ["markdown"] },
+        { id: "builtin.csv.ledger", name: "Ledger", targets: ["csv"] },
+      ],
+    });
+
+    const themeMenu = service.createApplicationMenuTemplate()
+      .find((item) => item.id === "themes");
+    expect(themeMenu.label).toBe("Theme");
+    expect(themeMenu.submenu.map((item) => item.label).filter(Boolean)).toEqual([
+      "Theme Pack",
+      "Open Themes Folder",
+    ]);
+    expect(themeMenu.submenu[0].submenu.find((item) => item.label === "Forest"))
+      .toMatchObject({ type: "radio", checked: true });
+    expect(themeMenu.submenu[0].submenu.find((item) => item.label === "My Custom CSS"))
+      .toBeUndefined();
+    expect(themeMenu.submenu[0].submenu.find((item) => item.label === "Newspaper"))
+      .toBeUndefined();
+    expect(themeMenu.submenu[0].submenu.find((item) => item.label === "Ledger"))
+      .toBeUndefined();
+
+    themeMenu.submenu[0].submenu.find((item) => item.label === "Default").click();
+    themeMenu.submenu.at(-1).click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(actions.selectTheme).toHaveBeenCalledWith({ kind: "pack", themeId: "default" });
+    expect(actions.selectTheme).toHaveBeenCalledTimes(1);
+    expect(actions.openThemesDirectory).toHaveBeenCalledOnce();
   });
 
   it("does not replace native menus outside macOS", () => {

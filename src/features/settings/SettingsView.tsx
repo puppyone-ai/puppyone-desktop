@@ -25,6 +25,7 @@ import { LocalProjectSettingsView } from "./main/LocalProjectSettingsView";
 import { PrivacySettingsView } from "./main/PrivacySettingsView";
 import { InterfacePaletteSettings } from "./main/InterfacePaletteSettings";
 import { InterfaceStyleSetting } from "./main/InterfaceStyleSetting";
+import { ThemeSettingsSection } from "./main/ThemeSettingsSection";
 import { CreateNewSettingsView } from "./main/CreateNewSettingsView";
 import { PulseGrid } from "../../components/loading";
 import { CloudHostingSettingsView, GitSettingsView } from "./main/RepositorySettingsViews";
@@ -52,6 +53,8 @@ export function SettingsView({
   typographyPreferences,
   pointerCursors,
   markdownPresentation,
+  surfaceThemePreferences,
+  themeCatalog,
   fileIconTheme,
   sidebarNavigationVisibilitySettings,
   filesVisibilitySettings,
@@ -71,8 +74,6 @@ export function SettingsView({
   updateState,
   onThemeModeChange,
   onInterfaceStyleChange,
-  onLightThemePresetChange,
-  onDarkThemePresetChange,
   onLoadingAnimationPresetChange,
   onLocalAgentsSettingsChange,
   onAgentFileActivityIndicatorsEnabledChange,
@@ -80,6 +81,8 @@ export function SettingsView({
   onTypographyPreferencesChange,
   onPointerCursorsChange,
   onMarkdownPresentationChange,
+  onSelectSettingsSection,
+  onThemePackChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
   onSidebarNavigationVisibilitySettingsChange,
@@ -236,11 +239,16 @@ export function SettingsView({
   }
 
   if (activeSection === "editor") {
+    const activeMarkdownTheme = themeCatalog.snapshot.themes.find(
+      (theme) => theme.id === themeCatalog.selection.markdown,
+    );
     return (
       <Suspense fallback={null}>
         <EditorSettingsView
           markdownPresentation={markdownPresentation}
           onMarkdownPresentationChange={onMarkdownPresentationChange}
+          activeMarkdownThemeName={activeMarkdownTheme?.name ?? themeCatalog.selection.markdown}
+          onManageThemes={() => onSelectSettingsSection("appearance")}
         />
       </Suspense>
     );
@@ -269,8 +277,11 @@ export function SettingsView({
                 lightThemePreset={lightThemePreset}
                 darkThemePreset={darkThemePreset}
                 onThemeModeChange={onThemeModeChange}
-                onLightThemePresetChange={onLightThemePresetChange}
-                onDarkThemePresetChange={onDarkThemePresetChange}
+              />
+              <ThemeSettingsSection
+                catalog={themeCatalog}
+                preferences={surfaceThemePreferences}
+                onThemePackChange={onThemePackChange}
               />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.textSize.title")}</span>

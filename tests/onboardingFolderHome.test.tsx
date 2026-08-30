@@ -44,6 +44,26 @@ afterEach(() => {
 });
 
 describe("project folder home", () => {
+  it("applies the effective application pack on the real onboarding theme root", () => {
+    const styles = document.createElement("style");
+    styles.textContent = `
+      .onboarding-shell.dark { --po-surface-canvas: #161413; }
+      [data-po-theme-surface="application"][data-po-theme-id="builtin.pack.forest"].dark {
+        --po-surface-canvas: #092d30;
+      }
+    `;
+    document.head.append(styles);
+
+    const container = renderHome({ applicationThemeId: "builtin.pack.forest" });
+    const surface = requireSurface(container);
+
+    expect(surface.dataset.poThemeSurface).toBe("application");
+    expect(surface.dataset.poThemeId).toBe("builtin.pack.forest");
+    expect(getComputedStyle(surface).getPropertyValue("--po-surface-canvas").trim())
+      .toBe("#092d30");
+    styles.remove();
+  });
+
   it("plays the reveal whenever project home mounts empty", async () => {
     vi.useFakeTimers();
     const container = renderHome();
@@ -597,6 +617,7 @@ function renderHome(overrides: Partial<MinimalOnboardingProps> = {}) {
     pointerCursors: false,
     diffMarkers: "color",
     resolvedTheme: "dark",
+    applicationThemeId: "default",
     ...overrides,
   };
   act(() => renderWithTestLocalization(root, React.createElement(MinimalOnboarding, props)));

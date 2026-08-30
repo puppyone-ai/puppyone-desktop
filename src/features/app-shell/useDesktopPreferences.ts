@@ -12,6 +12,12 @@ import {
 } from "../appearance/appearancePreferences";
 import { resolveAppearance } from "../appearance/resolveAppearance";
 import {
+  parseSurfaceThemePreferences,
+  selectThemePack,
+  serializeSurfaceThemePreferences,
+  SURFACE_THEME_PREFERENCES_STORAGE_KEY,
+} from "../themes/themePreferences";
+import {
   AI_EDIT_ASSIST_STORAGE_KEY,
   AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY,
   CREATE_NEW_MENU_STORAGE_KEY,
@@ -87,10 +93,8 @@ import {
   readInitialSidebarNavigationLayout,
   readInitialSidebarNavigationVisibilitySettings,
   readInitialTitlebarActionsSettings,
-  readInitialDarkThemePreset,
   readInitialDiffMarkers,
   readInitialMarkdownPresentationSettings,
-  readInitialLightThemePreset,
   readInitialLoadingAnimationPreset,
   readInitialLocalAgentsSettings,
   readInitialPointerCursors,
@@ -113,8 +117,8 @@ export function useDesktopPreferences() {
     {
       activeStyle: readInitialInterfaceStyle(),
       themeMode: readInitialThemeMode(),
-      lightThemePreset: readInitialLightThemePreset(),
-      darkThemePreset: readInitialDarkThemePreset(),
+      lightThemePreset: "neutral",
+      darkThemePreset: "default",
       textSize: readInitialTextSize(),
       typography: readInitialTypographyPreferences(),
       pointerCursors: readInitialPointerCursors(),
@@ -126,8 +130,8 @@ export function useDesktopPreferences() {
   const initialAppearance = initialAppearanceRead.preferences;
   const [themeMode, setThemeMode] = useState<ThemeMode>(initialAppearance.shared.themeMode);
   const [interfaceStyle, setInterfaceStyle] = useState<InterfaceStyle>(initialAppearance.activeStyle);
-  const [lightThemePreset, setLightThemePreset] = useState(initialAppearance.shared.lightThemePreset);
-  const [darkThemePreset, setDarkThemePreset] = useState(initialAppearance.shared.darkThemePreset);
+  const lightThemePreset = "neutral" as const;
+  const darkThemePreset = "default" as const;
   const [textSize, setTextSize] = useState<TextSize>(initialAppearance.shared.textSize);
   const [typographyPreferences, setTypographyPreferences] = useState<TypographyPreferences>(
     initialAppearance.shared.typography,
@@ -195,6 +199,11 @@ export function useDesktopPreferences() {
   const setAgentPreferredModel = useCallback((modelId: string | null) => {
     setAgentPreferredRoute({ modelId: modelId ?? undefined });
   }, [setAgentPreferredRoute]);
+  const [surfaceThemePreferences, setSurfaceThemePreferences] = useState(() => (
+    parseSurfaceThemePreferences(
+      window.localStorage.getItem(SURFACE_THEME_PREFERENCES_STORAGE_KEY),
+    )
+  ));
   const [systemDark, setSystemDark] = useState(() => readSystemDarkMode());
   const resolvedAppearance = useMemo(() => resolveAppearance({
     interfaceStyle,
@@ -476,6 +485,24 @@ export function useDesktopPreferences() {
   }, [agentRoutingPreferences]);
 
   useEffect(() => {
+    window.localStorage.setItem(
+      SURFACE_THEME_PREFERENCES_STORAGE_KEY,
+      serializeSurfaceThemePreferences(surfaceThemePreferences),
+    );
+  }, [surfaceThemePreferences]);
+
+  useEffect(() => {
+    const syncSurfaceThemesAcrossWindows = (event: StorageEvent) => {
+      if (event.key !== SURFACE_THEME_PREFERENCES_STORAGE_KEY && event.key !== null) return;
+      setSurfaceThemePreferences(parseSurfaceThemePreferences(
+        event.key === null ? null : event.newValue,
+      ));
+    };
+    window.addEventListener("storage", syncSurfaceThemesAcrossWindows);
+    return () => window.removeEventListener("storage", syncSurfaceThemesAcrossWindows);
+  }, []);
+
+  useEffect(() => {
     const query = window.matchMedia("(prefers-color-scheme: dark)");
     const sync = () => setSystemDark(query.matches);
     sync();
@@ -486,6 +513,9 @@ export function useDesktopPreferences() {
   const sidebarNavigationPlacement = resolvedAppearance.sidebarNavigationPlacement;
   const sidebarNavigationOrientation = resolvedAppearance.sidebarNavigationOrientation;
   const terminalToolEnabled = rightSidebarToolsSettings.enabled.terminal;
+  const setThemePack = (themeId: string) => {
+    setSurfaceThemePreferences((current) => selectThemePack(current, themeId));
+  };
 
   return {
     aiEditAssistEnabled,
@@ -517,6 +547,7 @@ export function useDesktopPreferences() {
     sidebarNavigationOrientation,
     sidebarNavigationPlacement,
     sidebarNavigationVisibilitySettings,
+    surfaceThemePreferences,
     terminalToolEnabled,
     titlebarActionsSettings,
     darkThemePreset,
@@ -528,7 +559,6 @@ export function useDesktopPreferences() {
     typographyPreferences,
     pointerCursors,
     setAiEditAssistEnabled,
-    setDarkThemePreset,
     setDiffMarkers,
     setMarkdownPresentation,
     setExplorerWidth,
@@ -550,8 +580,8 @@ export function useDesktopPreferences() {
     setSidebarCollapsed,
     setSidebarNavigationLayout,
     setSidebarNavigationVisibilitySettings,
+    setThemePack,
     setTitlebarActionsSettings,
-    setLightThemePreset,
     setLoadingAnimationPreset,
     setLocalAgentsSettings,
     setPointerCursors,

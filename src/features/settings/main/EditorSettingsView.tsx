@@ -5,7 +5,7 @@ import {
   MARKDOWN_HEADING_SCALE_OPTIONS,
   MARKDOWN_STRONG_COLOR_OPTIONS,
   MARKDOWN_STRONG_WEIGHT_OPTIONS,
-  resolveMarkdownPresentationStyle,
+  DEFAULT_MARKDOWN_PRESENTATION_SETTINGS,
   type MarkdownPresentationSettings,
 } from "../../markdown/markdownPresentation";
 import { SettingsSectionHeader, SettingsSubsection } from "../components";
@@ -13,9 +13,13 @@ import { SettingsSectionHeader, SettingsSubsection } from "../components";
 export function EditorSettingsView({
   markdownPresentation,
   onMarkdownPresentationChange,
+  activeMarkdownThemeName,
+  onManageThemes,
 }: {
   markdownPresentation: MarkdownPresentationSettings;
   onMarkdownPresentationChange: (settings: MarkdownPresentationSettings) => void;
+  activeMarkdownThemeName: string;
+  onManageThemes: () => void;
 }) {
   const { t } = useLocalization();
   const updatePresentation = (patch: Partial<MarkdownPresentationSettings>) => {
@@ -35,8 +39,35 @@ export function EditorSettingsView({
           <SettingsSectionHeader title={t("settings.editor.title")} detail={t("settings.editor.detail")} />
           <div className="desktop-settings-list">
             <SettingsSubsection title={t("settings.editor.markdownPresentation.title")}>
+              <div className="desktop-markdown-theme-summary" data-active-markdown-theme>
+                <div>
+                  <span>{t("settings.editor.markdownPresentation.activeTheme")}</span>
+                  <strong>{activeMarkdownThemeName}</strong>
+                  <small>{t("settings.editor.markdownPresentation.themeDetail")}</small>
+                </div>
+                <button
+                  type="button"
+                  className="desktop-settings-action"
+                  data-manage-themes
+                  onClick={onManageThemes}
+                >
+                  {t("settings.editor.markdownPresentation.manageThemes")}
+                </button>
+              </div>
               <div className="desktop-markdown-presentation-layout">
                 <div className="desktop-markdown-presentation-controls">
+                  <div className="desktop-markdown-presentation-toolbar">
+                    <span>{t("settings.editor.markdownPresentation.overrides")}</span>
+                    <button
+                      type="button"
+                      className="desktop-settings-action"
+                      data-reset-markdown-overrides
+                      disabled={isFollowingTheme(markdownPresentation)}
+                      onClick={() => onMarkdownPresentationChange(DEFAULT_MARKDOWN_PRESENTATION_SETTINGS)}
+                    >
+                      {t("settings.editor.markdownPresentation.reset")}
+                    </button>
+                  </div>
                   <PresentationSettingRow
                     label={t("settings.editor.markdownPresentation.headingScale.title")}
                     detail={t("settings.editor.markdownPresentation.headingScale.detail")}
@@ -75,7 +106,6 @@ export function EditorSettingsView({
                 <MarkdownPresentationPreview
                   ariaLabel={t("settings.editor.markdownPresentation.preview.ariaLabel")}
                   value={previewValue}
-                  style={resolveMarkdownPresentationStyle(markdownPresentation)}
                 />
               </div>
             </SettingsSubsection>
@@ -84,6 +114,12 @@ export function EditorSettingsView({
       </div>
     </section>
   );
+}
+
+function isFollowingTheme(settings: MarkdownPresentationSettings): boolean {
+  return settings.headingScale === "theme"
+    && settings.strongColor === "theme"
+    && settings.strongWeight === "theme";
 }
 
 function PresentationSettingRow<T extends string>({

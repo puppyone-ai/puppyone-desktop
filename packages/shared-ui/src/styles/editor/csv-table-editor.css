@@ -1,6 +1,8 @@
 .csv-table-editor {
   /* CSV is a data view, not a document card. Its viewport may fill the pane,
      while the table keeps stable, content-owned tracks like a Notion view. */
+  --po-csv-surface-background: var(--po-editor-bg);
+  --po-csv-surface-color: var(--po-text);
   --po-editable-table-cell-max-width: 560px;
   --po-editable-table-row-min-height: 31px;
   --po-editable-table-radius: 0px;
@@ -24,8 +26,8 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  background: var(--po-editor-bg);
-  color: var(--po-text);
+  background: var(--po-csv-surface-background);
+  color: var(--po-csv-surface-color);
 }
 
 /* The compact view control occupies the scrollable content inset. It leaves

@@ -79,6 +79,7 @@ function renderLibrary(overrides: Partial<MinimalOnboardingProps> = {}) {
     pointerCursors: false,
     diffMarkers: "color",
     resolvedTheme: "dark",
+    applicationThemeId: "default",
     ...overrides,
   };
 

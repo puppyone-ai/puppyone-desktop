@@ -26,6 +26,30 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
       themeSource: request?.themeSource,
     });
   },
+  themes: {
+    list: () => ipcRenderer.invoke("theme:list"),
+    openDirectory: () => ipcRenderer.invoke("theme:open-directory"),
+    syncNativeMenu: (request) => ipcRenderer.invoke("theme:sync-native-menu", {
+      pack: request?.pack,
+      themes: Array.isArray(request?.themes) ? request.themes.map((theme) => ({
+        id: theme?.id,
+        name: theme?.name,
+        targets: theme?.targets,
+      })) : [],
+    }),
+    onSelectionRequested: (callback) => {
+      if (typeof callback !== "function") return () => {};
+      const listener = (_event, request) => {
+        const kind = request?.kind;
+        const themeId = request?.themeId;
+        if (kind === "pack" && typeof themeId === "string") {
+          callback({ kind, themeId });
+        }
+      };
+      ipcRenderer.on("theme:selection-requested", listener);
+      return () => ipcRenderer.removeListener("theme:selection-requested", listener);
+    },
+  },
   setWindowMinimumWidth: (request) => (
     ipcRenderer.invoke("window-layout:set-minimum-width", request)
   ),
