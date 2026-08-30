@@ -1,9 +1,20 @@
 // @vitest-environment happy-dom
 
 import { act } from "react";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../src/styles/github.css?raw", () => ({
+  default: [
+    '[data-po-theme-surface="application"][data-po-theme-id="builtin.pack.github"] {}',
+    '[data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.github"] {}',
+    '[data-po-theme-surface="csv"][data-po-theme-id="builtin.pack.github"] {}',
+  ].join("\n"),
+}));
+vi.mock("../src/styles/newspaper.css?raw", () => ({
+  default: '[data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] {}',
+}));
 import { ThemeStyleHost } from "../src/features/themes/ThemeStyleHost";
 import {
   BUILTIN_SURFACE_THEMES,
@@ -29,21 +40,40 @@ afterEach(() => {
 });
 
 describe("renderer CSS theme style host", () => {
-  it("keeps coordinated starter packs out of the renderer bundle", () => {
-    const packs = ["github", "forest", "night", "rose"];
-    for (const pack of packs) {
-      const id = `builtin.pack.${pack}`;
-      const definition = BUILTIN_SURFACE_THEMES.find((theme) => theme.id === id);
-      expect(definition).toBeUndefined();
-      expect(existsSync(
-        `${process.cwd()}/packages/shared-ui/src/styles/editor/theme-packs/${pack}.css`,
-      )).toBe(false);
+  it("registers exactly three complete built-in theme packs", () => {
+    expect(BUILTIN_SURFACE_THEMES.map(({ id, name, targets, source }) => ({
+      id,
+      name,
+      targets,
+      source,
+    }))).toEqual([
+      {
+        id: "default",
+        name: "Default",
+        targets: ["application", "markdown", "csv"],
+        source: "builtin",
+      },
+      {
+        id: "builtin.pack.github",
+        name: "GitHub",
+        targets: ["application", "markdown", "csv"],
+        source: "builtin",
+      },
+      {
+        id: "builtin.pack.newspaper",
+        name: "Newspaper",
+        targets: ["application", "markdown", "csv"],
+        source: "builtin",
+      },
+    ]);
+
+    expect(BUILTIN_SURFACE_THEMES[0]?.compiledCss).toEqual({});
+    for (const id of ["builtin.pack.github", "builtin.pack.newspaper"]) {
+      const theme = BUILTIN_SURFACE_THEMES.find((candidate) => candidate.id === id);
+      expect(theme?.compiledCss.application).toContain(`data-po-theme-id="${id}"`);
+      expect(theme?.compiledCss.markdown).toBeUndefined();
+      expect(theme?.compiledCss.csv).toBeUndefined();
     }
-    const editorCss = readFileSync(
-      `${process.cwd()}/packages/shared-ui/src/styles/editor.css`,
-      "utf8",
-    );
-    expect(editorCss).not.toContain("theme-packs.css");
   });
 
   it("lets scoped built-in theme tokens override editor defaults", () => {
@@ -52,7 +82,7 @@ describe("renderer CSS theme style host", () => {
       "utf8",
     );
     const themeCss = readFileSync(
-      `${process.cwd()}/packages/shared-ui/src/styles/editor/content-themes.css`,
+      `${process.cwd()}/src/styles/newspaper.css`,
       "utf8",
     );
     const styles = document.createElement("style");
@@ -64,13 +94,38 @@ describe("renderer CSS theme style host", () => {
       <div
         className="markdown-codemirror-editor"
         data-po-theme-surface="markdown"
-        data-po-theme-id="builtin.markdown.newsprint"
+        data-po-theme-id="builtin.pack.newspaper"
       />,
     ));
 
     expect(getComputedStyle(container.firstElementChild as Element)
       .getPropertyValue("--po-md-content-color").trim()).toBe("#342f29");
     styles.remove();
+  });
+
+  it("injects one unlayered stylesheet for the selected built-in pack", () => {
+    const snapshot = createThemeCatalogSnapshot({ themes: [], diagnostics: [] });
+
+    act(() => root.render(
+      <ThemeStyleHost
+        snapshot={snapshot}
+        selection={selection({
+          application: "builtin.pack.github",
+          markdown: "builtin.pack.github",
+          csv: "builtin.pack.github",
+        })}
+        markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS}
+      />,
+    ));
+
+    const styles = [...document.head.querySelectorAll<HTMLStyleElement>(
+      'style[data-po-theme-id="builtin.pack.github"]',
+    )];
+    expect(styles).toHaveLength(1);
+    expect(styles[0]?.dataset.poThemeTarget).toBe("application");
+    expect(styles[0]?.textContent).toContain('data-po-theme-surface="application"');
+    expect(styles[0]?.textContent).toContain('data-po-theme-surface="markdown"');
+    expect(styles[0]?.textContent).toContain('data-po-theme-surface="csv"');
   });
 
   it("merges built-ins with installed themes and injects one style per compiled target", () => {
@@ -92,7 +147,7 @@ describe("renderer CSS theme style host", () => {
       />,
     ));
 
-    expect(snapshot.themes.some((theme) => theme.id === "builtin.markdown.newsprint")).toBe(true);
+    expect(snapshot.themes.some((theme) => theme.id === "builtin.pack.newspaper")).toBe(true);
     const styles = [...document.head.querySelectorAll<HTMLStyleElement>("style[data-po-theme-style]")];
     expect(styles).toHaveLength(2);
     expect(styles.map((style) => style.dataset.poThemeTarget)).toEqual(["markdown", "csv"]);

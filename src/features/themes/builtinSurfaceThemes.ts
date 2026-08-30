@@ -1,4 +1,6 @@
 import type { DesktopThemeSnapshot } from "../../types/electron";
+import githubThemeCss from "../../styles/github.css?raw";
+import newspaperThemeCss from "../../styles/newspaper.css?raw";
 import type { ThemeCatalogSnapshot, ThemeDefinition } from "./themeTypes";
 import { LEGACY_CUSTOM_CSS_THEME_ID } from "./themePreferences";
 
@@ -11,24 +13,16 @@ export const BUILTIN_SURFACE_THEMES: readonly ThemeDefinition[] = Object.freeze(
     targets: ["application", "markdown", "csv"],
   }),
   defineBuiltin({
-    id: "builtin.markdown.newsprint",
-    name: "Newsprint",
-    targets: ["markdown"],
+    id: "builtin.pack.github",
+    name: "GitHub",
+    targets: ["application", "markdown", "csv"],
+    css: githubThemeCss,
   }),
   defineBuiltin({
-    id: "builtin.markdown.focus",
-    name: "Focus",
-    targets: ["markdown"],
-  }),
-  defineBuiltin({
-    id: "builtin.csv.spreadsheet",
-    name: "Spreadsheet",
-    targets: ["csv"],
-  }),
-  defineBuiltin({
-    id: "builtin.csv.ledger",
-    name: "Ledger",
-    targets: ["csv"],
+    id: "builtin.pack.newspaper",
+    name: "Newspaper",
+    targets: ["application", "markdown", "csv"],
+    css: newspaperThemeCss,
   }),
 ]);
 
@@ -67,10 +61,12 @@ function defineBuiltin({
   id,
   name,
   targets,
+  css,
 }: {
   id: string;
   name: string;
   targets: ThemeDefinition["targets"];
+  css?: string;
 }): ThemeDefinition {
   return Object.freeze({
     id,
@@ -79,6 +75,6 @@ function defineBuiltin({
     modes: Object.freeze(["light", "dark"] as const),
     targets: Object.freeze([...targets]),
     source: "builtin",
-    compiledCss: Object.freeze({}),
+    compiledCss: Object.freeze(css ? { application: css } : {}),
   });
 }

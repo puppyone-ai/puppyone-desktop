@@ -4,19 +4,19 @@ _Portable CSS themes for PuppyOne Desktop · PuppyOne Desktop 可移植 CSS 主�
 
 ---
 
-This folder is the editable theme library used by PuppyOne Desktop. A theme can coordinate the application interface, Markdown editor, and CSV table view while remaining a normal CSS file that can be copied, versioned, and shared.
+This folder is the editable theme library used by PuppyOne Desktop. Each theme can be a self-contained folder whose `theme.css`, fonts, images, and license notices are copied, versioned, and shared together.
 
-这个文件夹是 PuppyOne Desktop 使用的可编辑主题库。每个主题都可以同时控制应用界面、Markdown 编辑器和 CSV 表格视图，并且仍然是一个可以复制、版本管理和分享的普通 CSS 文件。
+这个文件夹是 PuppyOne Desktop 使用的可编辑主题库。每个主题可以是一个独立文件夹，其中的 `theme.css`、字体、图片和许可证可以作为整体复制、版本管理和分享。
 
 ## 🚀 Quick start / 快速开始
 
 1. Open **Settings → Appearance → Theme**.
 2. Select **Open Themes Folder**. This is the safest way to locate the correct folder on every operating system and in development builds.
-3. Copy a theme such as `paper-blue.css` into the opened folder.
+3. Copy a complete theme folder such as `paper-blue/` into the opened folder.
 4. Return to PuppyOne. The theme catalog refreshes automatically when the app regains focus.
 5. Choose the theme from **Theme Pack**. A pack always applies its Application, Markdown, and CSV styles together.
 
-中文步骤：打开 **设置 → 外观 → 主题**，点击 **打开主题文件夹**，将 `.css` 文件复制进去，然后返回 PuppyOne。应用重新获得焦点时会自动刷新主题列表，最后从 **主题包** 中选择它。
+中文步骤：打开 **设置 → 外观 → 主题**，点击 **打开主题文件夹**，将完整主题文件夹复制进去，然后返回 PuppyOne。应用重新获得焦点时会自动刷新主题列表，最后从 **主题包** 中选择它。
 
 > 📌 **Important / 重要：** Do not put user themes inside the application installation directory or source-code checkout. Application upgrades may replace those locations. 不要把用户主题放进应用安装目录或源码目录，这些位置可能在升级时被替换。
 
@@ -40,24 +40,38 @@ Development and preview builds may use a channel-specific directory such as `pup
 
 开发版和预览版可能使用类似 `puppyone-development/themes` 的独立目录，所以建议始终通过应用内的 **打开主题文件夹** 按钮定位。
 
-## 📦 Getting themes / 获取主题
+## 📦 Built-in and installed themes / 内建与安装主题
 
-PuppyOne Desktop provides the theme engine and this authoring guide, but it does not bundle downloadable theme CSS in the application repository. Theme collections can be maintained and shared independently without coupling their release cycle to the desktop application.
+Default, GitHub, and Newspaper are built into PuppyOne Desktop. They ship with the application and must not be copied into this folder. Every theme found in this folder is an installed extension owned by the user, regardless of its author.
 
-PuppyOne Desktop 提供主题引擎和这份编写指南，但应用仓库不再附带可分发的主题 CSS。主题集合可以在独立仓库中维护和分享，不必与桌面应用使用相同的发布周期。
+Default、GitHub 和 Newspaper 内建在 PuppyOne Desktop 中，随应用发布，不应复制到这个文件夹。这个文件夹中的主题全部属于用户安装的扩展，与作者是否为 PuppyOne 无关。
+
+Extension theme collections are maintained independently so their release cycle does not need to match the desktop application.
 
 To install a theme obtained from a theme author or collection:
 
-1. Download the `.css` file without changing its extension.
+1. Download the complete theme directory without separating its assets.
 2. Open the authoritative Themes Folder from Appearance.
-3. Copy the file into that folder.
+3. Copy the theme directory into that folder.
 4. Return to PuppyOne, review any diagnostics after the automatic refresh, and choose the theme.
 
-从主题作者或主题集合获取 `.css` 文件后，将它复制到 Appearance 打开的主题目录。返回 PuppyOne 后主题会自动刷新，确认没有诊断错误后即可选择使用。
+从主题作者或主题集合获取完整主题文件夹后，将它复制到 Appearance 打开的主题目录。返回 PuppyOne 后主题会自动刷新，确认没有诊断错误后即可选择使用。
 
-## ✍️ Single-file theme format / 单文件主题格式
+## ✍️ Theme folder format / 主题文件夹格式
 
-The recommended shareable format is one CSS file containing metadata plus all three scoped targets:
+The recommended shareable format keeps one coordinated CSS file and all optional assets inside one directory:
+
+```text
+paper-blue/
+├── theme.css
+├── fonts/
+│   ├── MyFont-Regular.woff2
+│   └── OFL.txt
+└── images/                 # optional
+    └── background.webp
+```
+
+`theme.css` contains metadata plus all three scoped targets:
 
 ```css
 @puppyone-theme {
@@ -177,21 +191,21 @@ For heading size, bold color, and bold weight, prefer these public variables ove
 - `application` accepts public PuppyOne color tokens only; themes cannot restructure the application UI.
 - `markdown` and `csv` selectors are automatically scoped to their own surfaces.
 - Ordinary themes must not use `!important`; PuppyOne manages Theme and Editor preference precedence deterministically.
-- Relative local CSS imports, images, and fonts are supported when they remain inside the Themes Folder.
+- Relative local CSS imports, images, and fonts are supported when they remain inside the same theme directory.
 - Network URLs, `file:` URLs, escaping paths, fixed positioning, and unsupported executable CSS values are rejected.
 - Invalid themes are isolated and reported in Appearance without preventing other themes from loading.
 
 主题 ID 必须稳定且唯一。主题 CSS 会经过解析、作用域隔离和安全检查；无效主题会显示诊断信息，但不会影响其他主题。
 
-## 🔧 Typora-style and advanced packages / Typora 与高级目录包
+## 🔧 Compatibility formats / 兼容格式
 
 A top-level `.css` file without `@puppyone-theme` can still be parsed as a Markdown-only Typora-style source for compatibility. PuppyOne recognizes `:root`, `html`, `body`, and `#write` as Markdown-surface aliases, but a Markdown-only file is not a complete Theme Pack and will not appear in the pack selector. Add PuppyOne metadata plus `application`, `markdown`, and `csv` blocks when converting it into a selectable pack.
 
 不含 `@puppyone-theme` 的顶层 CSS 文件仍可按仅 Markdown 的 Typora 风格源码解析，以便兼容旧文件。PuppyOne 支持常见正文选择器，但这种文件不是完整主题套装，不会出现在套装选择器中；需要补充元数据以及 `application`、`markdown`、`csv` 三个目标块后才能作为套装选择。
 
-Use a directory package with `theme.json` only when a theme needs multiple CSS files or local assets. For themes without assets, prefer the single-file format because it is easier to download and share.
+Top-level coordinated `.css` files remain supported for backward compatibility. New themes should use `<theme-name>/theme.css`, with relative fonts and images inside that same directory. Use a `theme.json` package only when a theme deliberately splits targets across multiple CSS entrypoints.
 
-只有在需要多个 CSS 文件、字体或图片资源时才建议使用带 `theme.json` 的目录包；普通主题优先使用单 CSS 文件，更方便传播。
+顶层协调式 `.css` 仍然兼容，但新主题建议使用 `<主题名>/theme.css`，并将字体和图片放进同一目录。只有明确需要把多个目标拆成不同 CSS 入口时，才使用带 `theme.json` 的高级目录包。
 
 ## 🔄 Editing and troubleshooting / 编辑与排错
 
@@ -207,14 +221,14 @@ Use a directory package with `theme.json` only when a theme needs multiple CSS f
 
 To share a theme:
 
-1. Keep it as one `.css` file whenever possible.
+1. Share the complete theme directory and keep its styling in one `theme.css` whenever possible.
 2. Use a unique ID, clear name, semantic version, and author metadata.
 3. Test both Light and Dark modes.
 4. Test Application, Markdown, and CSV when declaring all three targets.
 5. Include the license and attribution required by any fonts, images, or source material you redistribute.
 6. Do not bundle assets unless you have permission to redistribute them.
 
-分享主题时，请优先保持单文件结构，填写唯一 ID、名称、版本和作者，测试亮色与暗色模式，并遵守字体、图片和参考素材的许可证要求。
+分享主题时，请分享完整主题文件夹，并优先将样式保持在一个 `theme.css` 中；同时填写唯一 ID、名称、版本和作者，测试亮色与暗色模式，并遵守字体、图片和参考素材的许可证要求。
 
 Project repository: [puppyone-ai/puppyone-desktop](https://github.com/puppyone-ai/puppyone-desktop)
 

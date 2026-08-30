@@ -6,7 +6,7 @@ Selecting a Theme Pack applies its Application, Markdown, and CSV styles togethe
 
 The visual precedence is Interface Style → resolved System/Light/Dark mode and base palette → Theme Pack → Editor Markdown property overrides. Appearance continues to own navigation, file icons, motion, pointer behavior, and other interface preferences; theme CSS cannot change those product settings.
 
-Default is the only coordinated Theme Pack bundled into the renderer. Distributable theme CSS is maintained outside the desktop application repository so theme collections can be released and shared independently. On first access to the theme catalog, PuppyOne installs a bilingual `README.md` with installation, authoring, and sharing guidance into the platform-specific Themes Folder:
+Default, GitHub, and Newspaper are the three coordinated Theme Packs bundled into the renderer. They are product-owned CSS in the desktop repository and never belong in a user Themes Folder. All other distributable theme CSS is maintained outside the desktop application repository so extension collections can be released and shared independently. On first access to the theme catalog, PuppyOne installs a bilingual `README.md` with installation, authoring, and sharing guidance into the platform-specific Themes Folder:
 
 ```text
 ${app.getPath("userData")}/themes/

@@ -19,7 +19,7 @@ describe("host-owned CSS theme service", () => {
     for (const [filename, name] of [
       ["alto", "Alto"],
       ["jade", "Jade"],
-      ["newsprint", "Newsprint"],
+      ["newspaper", "Newspaper"],
       ["rainbow", "Rainbow"],
       ["github", "GitHub"],
       ["forest", "Forest"],
@@ -175,6 +175,97 @@ describe("host-owned CSS theme service", () => {
     expect(snapshot.themes[0].compiledCss.application).toContain('data-po-theme-surface="application"');
     expect(snapshot.themes[0].compiledCss.markdown).toContain('data-po-theme-surface="markdown"');
     expect(snapshot.themes[0].compiledCss.csv).toContain('data-po-theme-surface="csv"');
+  });
+
+  it("loads a coordinated theme.css directory package with package-local assets", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const packagePath = path.join(userDataPath, "themes", "reader");
+    await mkdir(path.join(packagePath, "fonts"), { recursive: true });
+    await writeFile(path.join(packagePath, "fonts", "reader.woff2"), Buffer.from("font-data"));
+    await writeFile(path.join(packagePath, "theme.css"), `
+      @puppyone-theme {
+        id: com.example.reader;
+        name: Reader;
+        version: 1.0.0;
+        author: Example Studio;
+        modes: light dark;
+      }
+      @puppyone application {
+        .theme-root { --po-accent: #2f6f52; }
+      }
+      @puppyone markdown {
+        @font-face {
+          font-family: Reader;
+          src: url("./fonts/reader.woff2") format("woff2");
+        }
+        body { color: #27352f; font-family: Reader; }
+      }
+      @puppyone csv {
+        .theme-root { --po-csv-surface-color: #27352f; }
+      }
+    `, "utf8");
+
+    const snapshot = await createThemeService({ userDataPath, shell: createShell() }).listThemes();
+
+    expect(snapshot.diagnostics).toEqual([]);
+    expect(snapshot.themes).toHaveLength(1);
+    expect(snapshot.themes[0]).toMatchObject({
+      id: "com.example.reader",
+      name: "Reader",
+      author: "Example Studio",
+      source: "local-package",
+      targets: ["application", "markdown", "csv"],
+    });
+    expect(snapshot.themes[0].compiledCss.markdown).toContain("data:font/woff2;base64,");
+    expect(snapshot.themes[0].compiledCss.markdown).not.toContain(userDataPath);
+  });
+
+  it("requires coordinated metadata in a directory theme.css", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const packagePath = path.join(userDataPath, "themes", "reader");
+    await mkdir(packagePath, { recursive: true });
+    await writeFile(path.join(packagePath, "theme.css"), "body { color: #27352f }", "utf8");
+
+    const snapshot = await createThemeService({ userDataPath, shell: createShell() }).listThemes();
+
+    expect(snapshot.themes).toEqual([]);
+    expect(snapshot.diagnostics).toContainEqual({
+      source: "reader",
+      message: "A directory theme.css must contain @puppyone-theme metadata.",
+    });
+  });
+
+  it("rejects a directory theme.css symlink that escapes its package", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const packagePath = path.join(userDataPath, "themes", "reader");
+    await mkdir(packagePath, { recursive: true });
+    const outsideCss = path.join(userDataPath, "outside-theme.css");
+    await createSingleFilePack(userDataPath, "outside-theme.css", "com.example.reader", "Reader");
+    await symlink(outsideCss, path.join(packagePath, "theme.css"));
+
+    const snapshot = await createThemeService({ userDataPath, shell: createShell() }).listThemes();
+
+    expect(snapshot.themes).toEqual([]);
+    expect(snapshot.diagnostics[0]).toMatchObject({ source: "reader" });
+    expect(snapshot.diagnostics[0].message).toContain("escapes its package");
+  });
+
+  it("prefers theme.json when a directory also contains theme.css", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const themeRoot = path.join(userDataPath, "themes");
+    const packagePath = path.join(themeRoot, "reader");
+    await createPackage(themeRoot, "reader", "com.example.manifest-reader", "Manifest Reader");
+    await createSingleFilePack(packagePath, "theme.css", "com.example.css-reader", "CSS Reader");
+
+    const snapshot = await createThemeService({ userDataPath, shell: createShell() }).listThemes();
+
+    expect(snapshot.diagnostics).toEqual([]);
+    expect(snapshot.themes).toHaveLength(1);
+    expect(snapshot.themes[0]).toMatchObject({
+      id: "com.example.manifest-reader",
+      name: "Manifest Reader",
+      source: "local-package",
+    });
   });
 
   it("resolves package-local imports and assets without exposing file paths", async () => {

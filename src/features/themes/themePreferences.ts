@@ -20,6 +20,11 @@ export const DEFAULT_SURFACE_THEME_PREFERENCES: SurfaceThemePreferences = Object
 });
 
 const themeIdPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$/;
+const RETIRED_THEME_ID_ALIASES: Readonly<Record<string, string>> = Object.freeze({
+  "builtin.markdown.newsprint": "builtin.pack.newspaper",
+  "builtin.markdown.newspaper": "builtin.pack.newspaper",
+  "builtin.pack.newsprint": "builtin.pack.newspaper",
+});
 
 export function isThemeId(value: unknown): value is string {
   return value === "default" || (typeof value === "string" && themeIdPattern.test(value));
@@ -37,7 +42,7 @@ export function parseSurfaceThemePreferences(value: string | null | undefined): 
     if (parsed.version !== 5 || !isThemeId(parsed.pack)) {
       return DEFAULT_SURFACE_THEME_PREFERENCES;
     }
-    return Object.freeze({ version: 5, pack: parsed.pack });
+    return Object.freeze({ version: 5, pack: normalizeThemeId(parsed.pack) });
   } catch {
     return DEFAULT_SURFACE_THEME_PREFERENCES;
   }
@@ -77,7 +82,9 @@ export function resolveSurfaceThemeSelection(
 
 function migrateVersionOne(parsed: Record<string, unknown>): SurfaceThemePreferences {
   const selection = [parsed.application, parsed.markdown, parsed.csv]
-    .map((value) => isThemeId(value) && value !== LEGACY_CUSTOM_CSS_THEME_ID ? value : "default");
+    .map((value) => isThemeId(value) && value !== LEGACY_CUSTOM_CSS_THEME_ID
+      ? normalizeThemeId(value)
+      : "default");
   const pack = selection.every((value) => value === selection[0]) ? selection[0] : "default";
   return Object.freeze({ version: 5, pack });
 }
@@ -86,7 +93,11 @@ function migratePackPreference(parsed: Record<string, unknown>): SurfaceThemePre
   if (!isThemeId(parsed.pack) || parsed.pack === LEGACY_CUSTOM_CSS_THEME_ID) {
     return DEFAULT_SURFACE_THEME_PREFERENCES;
   }
-  return Object.freeze({ version: 5, pack: parsed.pack });
+  return Object.freeze({ version: 5, pack: normalizeThemeId(parsed.pack) });
+}
+
+function normalizeThemeId(themeId: string): string {
+  return RETIRED_THEME_ID_ALIASES[themeId] ?? themeId;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

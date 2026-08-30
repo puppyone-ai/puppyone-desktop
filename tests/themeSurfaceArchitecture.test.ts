@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -36,7 +36,6 @@ describe("scoped content theme surfaces", () => {
   it("publishes semantic tokens and scoped built-in themes", () => {
     const markdownCss = source("packages/shared-ui/src/styles/editor/markdown-content.css");
     const csvCss = source("packages/shared-ui/src/styles/editor/csv-table-editor.css");
-    const themesCss = source("packages/shared-ui/src/styles/editor/content-themes.css");
     const styles = source("src/styles.css");
     const editorStyles = source("packages/shared-ui/src/styles/editor.css");
 
@@ -44,11 +43,44 @@ describe("scoped content theme surfaces", () => {
     expect(markdownCss).toContain("background: var(--po-md-surface-background)");
     expect(csvCss).toContain("--po-csv-surface-background");
     expect(csvCss).toContain("background: var(--po-csv-surface-background)");
-    expect(themesCss).toContain('[data-po-theme-id="builtin.markdown.newsprint"]');
-    expect(themesCss).toContain('[data-po-theme-id="builtin.markdown.focus"]');
-    expect(themesCss).toContain('[data-po-theme-id="builtin.csv.spreadsheet"]');
-    expect(themesCss).toContain('[data-po-theme-id="builtin.csv.ledger"]');
     expect(styles).not.toContain("surface-themes.css");
-    expect(editorStyles).toContain('@import "./editor/content-themes.css"');
+    expect(editorStyles).not.toContain("content-themes.css");
+  });
+
+  it("loads the three product-owned Theme Pack CSS files through the runtime theme host", () => {
+    const styles = source("src/styles.css");
+    const registry = source("src/features/themes/builtinSurfaceThemes.ts");
+    const themeFiles = ["default", "github", "newspaper"]
+      .map((name) => `src/styles/${name}.css`);
+
+    expect(themeFiles.map((path) => existsSync(new URL(`../${path}`, import.meta.url))))
+      .toEqual([true, true, true]);
+
+    for (const name of ["default", "github", "newspaper"]) {
+      expect(styles).not.toContain(`./styles/${name}.css`);
+    }
+    expect(registry).toContain("../../styles/github.css?raw");
+    expect(registry).toContain("../../styles/newspaper.css?raw");
+
+    const expectedIds = {
+      default: "default",
+      github: "builtin.pack.github",
+      newspaper: "builtin.pack.newspaper",
+    } as const;
+    for (const [name, id] of Object.entries(expectedIds)) {
+      const css = source(`src/styles/${name}.css`);
+      expect(css).toContain(`data-po-theme-id="${id}"`);
+      expect(css).not.toContain("@puppyone");
+    }
+  });
+
+  it("keeps built-in theme font assets relative to the packaged renderer document", () => {
+    const githubCss = source("src/styles/github.css");
+    const newspaperCss = source("src/styles/newspaper.css");
+
+    for (const css of [githubCss, newspaperCss]) {
+      expect(css).not.toContain('url("/fonts/');
+      expect(css).toContain('url("./fonts/');
+    }
   });
 });

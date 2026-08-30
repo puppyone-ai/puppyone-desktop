@@ -20,6 +20,32 @@ describe("surface theme preferences", () => {
       .toEqual(preferences);
   });
 
+  it("migrates the retired Newsprint ids to Newspaper", () => {
+    expect(parseSurfaceThemePreferences(JSON.stringify({
+      version: 5,
+      pack: "builtin.pack.newsprint",
+    }))).toEqual({
+      version: 5,
+      pack: "builtin.pack.newspaper",
+    });
+
+    expect(parseSurfaceThemePreferences(JSON.stringify({
+      version: 5,
+      pack: "builtin.markdown.newsprint",
+    }))).toEqual({
+      version: 5,
+      pack: "builtin.pack.newspaper",
+    });
+
+    expect(parseSurfaceThemePreferences(JSON.stringify({
+      version: 5,
+      pack: "builtin.markdown.newspaper",
+    }))).toEqual({
+      version: 5,
+      pack: "builtin.pack.newspaper",
+    });
+  });
+
   it("migrates a shared version 1 selection into one theme pack", () => {
     expect(parseSurfaceThemePreferences(JSON.stringify({
       version: 1,

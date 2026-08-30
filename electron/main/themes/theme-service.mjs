@@ -88,7 +88,7 @@ export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
         const theme = entry.isFile() && entry.name.toLowerCase().endsWith(".css")
           ? await loadStandaloneCssTheme(canonicalThemeRoot, entry.name)
           : entry.isDirectory()
-            ? await loadPackageTheme(entryPath)
+            ? await loadDirectoryTheme(entryPath)
             : null;
         if (!theme) continue;
         if (ids.has(theme.id)) {
@@ -120,6 +120,20 @@ export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
   };
 
   return Object.freeze({ listThemes, openDirectory });
+}
+
+async function loadDirectoryTheme(packageRoot) {
+  if (await pathEntryExists(path.join(packageRoot, "theme.json"))) {
+    return loadPackageTheme(packageRoot);
+  }
+  if (await pathEntryExists(path.join(packageRoot, "theme.css"))) {
+    const entrypoint = await resolvePackageFile(packageRoot, ".", "theme.css");
+    return loadStandaloneCssTheme(packageRoot, entrypoint.relativePath, {
+      requireMetadata: true,
+      source: "local-package",
+    });
+  }
+  return loadPackageTheme(packageRoot);
 }
 
 async function installThemeGuide({ bundledThemesPath, themeRoot }) {
@@ -161,7 +175,11 @@ async function writeFileAtomic(directory, filename, content) {
   }
 }
 
-async function loadStandaloneCssTheme(themeRoot, filename) {
+async function loadStandaloneCssTheme(
+  themeRoot,
+  filename,
+  { requireMetadata = false, source = "local-css" } = {},
+) {
   const css = await readBoundedText(path.join(themeRoot, filename), MAX_CSS_BYTES, "Theme CSS");
   const descriptor = parseSingleFileThemeCss(css, { sourcePath: filename });
   if (descriptor) {
@@ -188,9 +206,13 @@ async function loadStandaloneCssTheme(themeRoot, filename) {
       ...(descriptor.author ? { author: descriptor.author } : {}),
       modes: descriptor.modes,
       targets: descriptor.targets,
-      source: "local-css",
+      source,
       compiledCss,
     });
+  }
+
+  if (requireMetadata) {
+    throw new TypeError("A directory theme.css must contain @puppyone-theme metadata.");
   }
 
   const slug = createSlug(path.basename(filename, path.extname(filename)));

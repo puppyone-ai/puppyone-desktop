@@ -70,7 +70,11 @@ describe("renderer theme catalog", () => {
 
     expect(latest?.status).toBe("ready");
     expect(latest?.error).toBeNull();
-    expect(latest?.snapshot.themes.some((theme) => theme.id === "builtin.csv.ledger")).toBe(true);
+    expect(latest?.snapshot.themes.map((theme) => theme.id)).toEqual([
+      "default",
+      "builtin.pack.github",
+      "builtin.pack.newspaper",
+    ]);
   });
 
   it("surfaces failures while opening the themes directory", async () => {
