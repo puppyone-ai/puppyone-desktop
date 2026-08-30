@@ -666,11 +666,13 @@ function createServiceHarness({
       discover: vi.fn(async () => ({
         provider: "codex",
         status: "ready",
+        code: "READY",
         version: "0.144.1",
         minimumVersion: "0.144.1",
         executablePath: "/usr/local/bin/codex",
         environment: {},
         message: "ready",
+        selectable: true,
       })),
     },
     adapterFactory: (options) => {

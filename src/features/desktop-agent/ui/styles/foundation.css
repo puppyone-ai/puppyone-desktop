@@ -5,17 +5,18 @@
   --agent-dock-padding-top: 12px;
   --agent-dock-padding-bottom: 12px;
   --agent-control-size: 30px;
-  --agent-radius-message: var(--desktop-sidebar-row-radius, 6px);
-  --agent-radius-composer: var(--desktop-sidebar-row-radius, 6px);
+  --agent-radius-composer: 12px;
+  --agent-radius-message: var(--agent-radius-composer);
   --agent-message-content-inset: 12px;
   --agent-message-turn-gap: 24px;
   --agent-work-handoff-gap: 8px;
   --agent-composer-line-height: 20px;
   --agent-composer-input-padding: 12px;
-  --agent-composer-text-min-height: 40px;
+  --agent-composer-text-min-height: 44px;
   --agent-composer-text-max-height: 120px;
-  --agent-composer-input-min-height: 64px;
+  --agent-composer-input-min-height: 70px;
   --agent-composer-toolbar-height: 38px;
+  --agent-reference-card-height: 52px;
   --agent-font-size: var(--desktop-sidebar-font-size, var(--po-text-size-sidebar, 13px));
   --agent-font-size-meta: var(--desktop-sidebar-font-size-meta, var(--po-text-size-meta, 12px));
   --agent-font-size-caption: var(--po-text-size-caption, 11px);
@@ -31,7 +32,8 @@
     color-mix(in srgb, var(--po-selected) 88%, transparent) calc(100% - 36px),
     color-mix(in srgb, var(--po-selected) 62%, transparent) 100%
   );
-  --agent-composer-surface: var(--agent-row-hover-surface);
+  --agent-composer-surface: var(--po-active);
+  --agent-user-message-surface: color-mix(in srgb, var(--agent-composer-surface) 48%, var(--agent-canvas));
   --agent-control-surface: color-mix(in srgb, var(--po-header) 82%, var(--po-panel-raised));
   --agent-border: var(--po-border-strong);
   --agent-border-subtle: var(--po-divider);
@@ -42,6 +44,7 @@
   --agent-text: var(--po-text);
   --agent-text-muted: var(--po-text-muted);
   --agent-text-subtle: var(--po-text-subtle);
+  --agent-tool-foreground: var(--agent-text-subtle);
   --agent-accent: var(--po-accent);
   --agent-accent-soft: color-mix(in srgb, var(--po-accent) 16%, transparent);
   color: var(--agent-text);
@@ -110,6 +113,12 @@
     color-mix(in srgb, rgba(211, 208, 197, 0.14) 88%, transparent) calc(100% - 36px),
     color-mix(in srgb, rgba(211, 208, 197, 0.14) 62%, transparent) 100%
   );
+}
+
+/* Agent Chat is document-like in a workbench tab, but becomes part of the
+ * application chrome when hosted by the auxiliary sidebar. */
+.desktop-right-sidebar .desktop-agent-boundary {
+  --agent-canvas: var(--po-terminal-bg);
 }
 
 .desktop-agent-panel {
@@ -395,6 +404,11 @@
   margin-top: 6px;
   color: var(--po-text-subtle);
   font-size: var(--agent-font-size-meta);
+}
+
+.desktop-agent-readiness-code {
+  font-family: var(--po-font-mono);
+  letter-spacing: 0.015em;
 }
 
 .desktop-agent-readiness button {

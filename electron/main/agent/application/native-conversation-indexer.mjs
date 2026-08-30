@@ -49,6 +49,7 @@ export function createNativeConversationIndexer({ runtimeRegistry, sessionReposi
             updatedAt: locator.updatedAt,
             selectedProviderId: locator.selectedProviderId,
             selectedModel: locator.selectedModel,
+            selectedEffort: locator.selectedEffort,
             selectedMode: locator.selectedMode,
             terminalState: "idle",
             lastSequence: 0,
@@ -85,6 +86,7 @@ function normalizeLocators(value, limit) {
       updatedAt,
       selectedProviderId: safeId(entry?.selectedProviderId),
       selectedModel: bounded(entry?.selectedModel, 512),
+      selectedEffort: bounded(entry?.selectedEffort, 160),
       selectedMode: bounded(entry?.selectedMode, 160),
     }];
   });

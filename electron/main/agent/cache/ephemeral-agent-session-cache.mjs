@@ -127,6 +127,7 @@ function normalizeRecord(record) {
     archivedAt: record?.archivedAt ? normalizeDate(record.archivedAt) : null,
     terminalState: normalizeText(record?.terminalState, 40) || "idle",
     selectedModel: normalizeText(record?.selectedModel, 300) || null,
+    selectedEffort: normalizeText(record?.selectedEffort, 160) || null,
     selectedMode: normalizeText(record?.selectedMode, 160) || null,
     lastSequence: normalizeSequence(record?.lastSequence),
     partial: candidateEvents.length < sourceEvents.length || Boolean(record?.partial),

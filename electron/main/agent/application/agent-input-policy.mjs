@@ -2,9 +2,15 @@ const MAX_REFERENCE_SNAPSHOT_URL_LENGTH = Math.ceil(512 * 1024 * 4 / 3) + 256;
 
 export function readinessWithAccountState(readiness, accountState, runtimeName = "Agent runtime") {
   if (readiness.status === "ready" && requiresRuntimeSetup(accountState)) {
+    const code = accountState?.setupReason === "authentication-expired"
+      ? "AUTHENTICATION_EXPIRED"
+      : accountState?.requiresOpenaiAuth || accountState?.setupReason === "authentication-required"
+        ? "AUTHENTICATION_REQUIRED"
+        : "RUNTIME_SETUP_REQUIRED";
     return {
       ...readiness,
       status: "installed-not-authenticated",
+      code,
       selectable: false,
       message: accountState?.error || (
         readiness.message && readiness.message !== `${runtimeName} is ready.`
@@ -183,6 +189,7 @@ export function unavailableReadiness(message) {
     runtimeId: "unknown",
     provider: "unknown",
     status: "error",
+    code: "RUNTIME_DISCOVERY_FAILED",
     version: null,
     minimumVersion: null,
     message,

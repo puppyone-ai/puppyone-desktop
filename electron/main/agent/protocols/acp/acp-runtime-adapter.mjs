@@ -7,6 +7,7 @@ import {
   resolveAcpEfforts,
   resolveAcpModels,
   resolveAcpModes,
+  resolveRequestedAcpEffort,
   resolveRequestedAcpMode,
 } from "./acp-session-config.mjs";
 import { createAcpWorkspaceFileSystem } from "../../security/acp-workspace-files.mjs";
@@ -146,7 +147,10 @@ export class AcpRuntimeAdapter {
           } : null,
           requiresOpenaiAuth: false,
           requiresRuntimeSetup: !accountReady,
-          ...(!accountReady ? { error: `${this.runtimeDescriptor.displayName} has no authenticated model available.` } : {}),
+          ...(!accountReady ? {
+            setupReason: "runtime-setup-required",
+            error: `${this.runtimeDescriptor.displayName} has no authenticated model available.`,
+          } : {}),
         },
         providers: publicProviders(models),
         models,
@@ -166,18 +170,19 @@ export class AcpRuntimeAdapter {
     }
   }
 
-  async createSession({ model = null, mode = null } = {}) {
+  async createSession({ model = null, effort = null, mode = null } = {}) {
     this.#assertIdle();
     await this.#connect("session");
     const response = await this.client.newSession({ cwd: this.workspaceRoot, mcpServers: [] });
     this.sessionId = requiredId(response?.sessionId, `${this.runtimeDescriptor.displayName} ACP session id`);
     this.#syncSession(response);
-    await this.#applySelection({ model, mode });
+    await this.#applySelection({ model, effort, mode });
     const now = new Date().toISOString();
     return {
       providerSessionId: this.sessionId,
       title: this.sessionTitles.created,
       model: this.sessionConfig.models.currentId ?? model,
+      effort: this.sessionConfig.efforts.currentId ?? effort,
       mode: this.sessionConfig.modes.currentId ?? mode,
       createdAt: now,
       updatedAt: now,
@@ -213,7 +218,7 @@ export class AcpRuntimeAdapter {
     }
   }
 
-  async resumeSession({ threadId, model = null, mode = null } = {}) {
+  async resumeSession({ threadId, model = null, effort = null, mode = null } = {}) {
     this.#assertIdle();
     await this.#connect("session");
     this.historyCollector = new AcpHistoryCollector();
@@ -231,12 +236,13 @@ export class AcpRuntimeAdapter {
     }
     this.sessionId = requiredId(response?.sessionId ?? threadId, `${this.runtimeDescriptor.displayName} ACP session id`);
     this.#syncSession(response);
-    await this.#applySelection({ model, mode });
+    await this.#applySelection({ model, effort, mode });
     const now = new Date().toISOString();
     return {
       providerSessionId: this.sessionId,
       title: this.sessionTitles.resumed,
       model: this.sessionConfig.models.currentId ?? model,
+      effort: this.sessionConfig.efforts.currentId ?? effort,
       mode: this.sessionConfig.modes.currentId ?? mode,
       createdAt: now,
       updatedAt: now,
@@ -270,11 +276,11 @@ export class AcpRuntimeAdapter {
     await this.client.deleteSession({ sessionId: requiredId(threadId, `${this.runtimeDescriptor.displayName} ACP session id`) });
   }
 
-  async startTurn({ prompt, model = null, mode = null, references: allReferences = [], attachments = [], contextReferences = [] }) {
+  async startTurn({ prompt, model = null, effort = null, mode = null, references: allReferences = [], attachments = [], contextReferences = [] }) {
     this.#assertUsable();
     if (!this.client || !this.sessionId) throw new Error(`${this.runtimeDescriptor.displayName} ACP session is not connected.`);
     if (this.activeTurn) throw new Error(`A ${this.runtimeDescriptor.displayName} turn is already running.`);
-    await this.#applySelection({ model, mode });
+    await this.#applySelection({ model, effort, mode });
     const turnId = `${this.runtimeDescriptor.id}:${randomUUID()}`;
     const normalizer = new AcpEventNormalizer({ turnId });
     const instructions = await this.projectInstructionLoader(this.workspaceRoot);
@@ -480,7 +486,7 @@ export class AcpRuntimeAdapter {
     };
   }
 
-  async #applySelection({ model, mode }) {
+  async #applySelection({ model, effort, mode }) {
     if (!this.client || !this.sessionId) return;
     const requestedModel = text(model, 512);
     if (requestedModel && requestedModel !== this.sessionConfig.models.currentId) {
@@ -494,6 +500,21 @@ export class AcpRuntimeAdapter {
         sessionId: this.sessionId,
         type: "select",
         value: requestedModel,
+      });
+      this.#syncConfigOptions(response?.configOptions);
+    }
+    const requestedEffort = resolveRequestedAcpEffort(effort, this.sessionConfig.efforts);
+    if (effort && !requestedEffort) {
+      throw new Error(`The selected ${this.runtimeDescriptor.displayName} reasoning effort is no longer available.`);
+    }
+    if (requestedEffort && requestedEffort !== this.sessionConfig.efforts.currentId) {
+      const configId = this.sessionConfig.efforts.configId;
+      if (!configId) throw new Error(`This ${this.runtimeDescriptor.displayName} ACP runtime does not support changing reasoning effort.`);
+      const response = await this.client.setConfigOption({
+        configId,
+        sessionId: this.sessionId,
+        type: "select",
+        value: requestedEffort,
       });
       this.#syncConfigOptions(response?.configOptions);
     }

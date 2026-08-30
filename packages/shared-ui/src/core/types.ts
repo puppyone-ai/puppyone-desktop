@@ -38,11 +38,21 @@ export type Workspace = {
   markdownDialect?: "puppy-gfm" | "openknowledge-mdx";
 };
 
-/** Resource-scoped invalidation signal; null path means a genuine bulk refresh. */
+export type WorkspaceContentChangeEntry = Readonly<{
+  sequence: number;
+  rootUri: ResourceUri | null;
+  /** null means the mutation source could not enumerate the affected resources. */
+  paths: readonly string[] | null;
+}>;
+
+/**
+ * Bounded mutation journal consumed by renderers since their last observed
+ * sequence. Keeping entries, rather than only the latest event, prevents React
+ * batching from dropping near-simultaneous changes from different Folders.
+ */
 export type WorkspaceContentChange = Readonly<{
   sequence: number;
-  /** null means the watcher could not enumerate the affected resources. */
-  paths: readonly string[] | null;
+  entries: readonly WorkspaceContentChangeEntry[];
 }>;
 
 export type DataNode = {

@@ -41,6 +41,32 @@ export type TerminalTabMoveDropIntent =
   | TerminalGroupMoveDropIntent
   | TerminalGroupMergeDropIntent;
 
+export type TerminalContentDropIntent =
+  | TerminalTabSplitDropIntent
+  | TerminalGroupMoveDropIntent;
+
+export type TerminalTabBarDropIntent =
+  | TerminalTabInsertDropIntent
+  | TerminalGroupMergeDropIntent;
+
+export function partitionTerminalGroupDropIntent(
+  intent: TerminalTabMoveDropIntent | null,
+  groupId: string,
+): Readonly<{
+  content: TerminalContentDropIntent | null;
+  tabBar: TerminalTabBarDropIntent | null;
+}> {
+  const target = intent?.targetGroupId === groupId ? intent : null;
+  return Object.freeze({
+    content: target?.kind === "split" || target?.kind === "move-group"
+      ? target
+      : null,
+    tabBar: target?.kind === "insert" || target?.kind === "merge-group"
+      ? target
+      : null,
+  });
+}
+
 export const TERMINAL_TAB_DROP_PLACEHOLDER_ID = "terminal-tab-drop-placeholder";
 
 export function sameTerminalTabMoveDropIntent(

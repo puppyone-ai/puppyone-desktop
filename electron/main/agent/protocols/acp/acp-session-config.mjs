@@ -64,6 +64,12 @@ export function resolveRequestedAcpMode(requested, state) {
   return semantic?.id ?? state.currentId ?? state.available[0]?.id ?? null;
 }
 
+export function resolveRequestedAcpEffort(requested, state) {
+  const value = text(requested).toLowerCase();
+  if (!value) return state.currentId ?? state.available[0]?.id ?? null;
+  return state.available.find((entry) => entry.id.toLowerCase() === value)?.id ?? null;
+}
+
 function selectConfig(value, category) {
   const comparable = String(category).toLowerCase();
   const candidates = array(value).filter((entry) => entry?.type === "select");
@@ -84,4 +90,3 @@ function text(value) {
 function array(value) {
   return Array.isArray(value) ? value : [];
 }
-

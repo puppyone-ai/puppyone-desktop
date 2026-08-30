@@ -5,6 +5,7 @@ import type { AgentRuntimeCatalogEntry } from "../domain/agent-contract";
 import { isSelectableAgentBackend } from "../domain/agent-backend-routing";
 import { AgentBrandMark } from "./AgentBrandMark";
 import { AgentPickerPopover, type AgentPickerGroup, type AgentPickerOption } from "./AgentPickerPopover";
+import { presentRuntimeReadiness } from "./agentPanelPresentation";
 
 export type AgentRuntimePickerProps = {
   agentRuntimes: AgentRuntimeCatalogEntry[];
@@ -35,7 +36,6 @@ export const AgentRuntimePicker = memo(function AgentRuntimePicker({
       // A non-ready runtime remains inspectable/selectable; execution is gated by readiness.
       selectable: true,
       selected: entry.descriptor.id === selectedRuntimeId,
-      kind: "agent",
       icon: <AgentBrandMark kind="agent" iconKey={entry.descriptor.iconKey} label={entry.descriptor.displayName} />,
     };
   });
@@ -55,7 +55,7 @@ export const AgentRuntimePicker = memo(function AgentRuntimePicker({
       triggerDescription={t("agent.runtime.switchStartsNewChat")}
       groups={groups}
       disabled={disabled || availableRuntimes.length === 0}
-      className="is-agent is-header"
+      placement="header"
       onSelect={onSelectRuntime}
     />
   );
@@ -69,11 +69,10 @@ function distributionLabel(value: string | null | undefined, t: MessageFormatter
 }
 
 function readinessWarning(entry: AgentRuntimeCatalogEntry, t: MessageFormatter) {
-  const detail = entry.readiness.message || entry.descriptor.description;
-  const detailValue = bidiIsolate(detail || t("agent.runtime.notReady"));
-  if (entry.readiness.status === "unsupported-version") return t("agent.runtime.warning.update", { detail: detailValue });
-  if (entry.readiness.status === "installed-not-authenticated") return t("agent.runtime.warning.setup", { detail: detailValue });
-  if (entry.readiness.status === "protocol-unavailable") return t("agent.runtime.warning.integration", { detail: detailValue });
-  if (entry.readiness.status === "not-installed") return t("agent.runtime.warning.notInstalled", { detail: detailValue });
-  return detail || t("agent.runtime.notReady");
+  const presentation = presentRuntimeReadiness(entry.readiness, entry.descriptor.displayName, t);
+  const detail = entry.readiness.message || entry.descriptor.description || t("agent.runtime.notReady");
+  return t("agent.runtime.warning.reason", {
+    reason: bidiIsolate(presentation.heading),
+    detail: bidiIsolate(detail),
+  });
 }

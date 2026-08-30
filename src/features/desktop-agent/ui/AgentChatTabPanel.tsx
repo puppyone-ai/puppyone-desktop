@@ -17,6 +17,7 @@ import { AgentTranscript } from "./AgentTranscript";
 import { useAgentConversationHistory } from "./useAgentConversationHistory";
 import { readinessStatusCode, sessionStatusCode } from "./agentPanelPresentation";
 import { useAgentReferenceIngestion } from "./useAgentReferenceIngestion";
+import type { AgentWorkspaceReferenceResolver } from "./useAgentReferenceIngestion";
 import { useAgentRoutingPreferences } from "./useAgentRoutingPreferences";
 import { useAgentSessionPreparation } from "./useAgentSessionPreparation";
 
@@ -38,6 +39,7 @@ type AgentChatTabPanelProps = {
   onPreferredModelChange?: (model: string) => void;
   enabledRuntimeIds: readonly string[] | null;
   openSessionIds: readonly string[];
+  resolveWorkspaceReference?: AgentWorkspaceReferenceResolver;
 };
 
 export function AgentChatTabPanel({
@@ -57,13 +59,19 @@ export function AgentChatTabPanel({
   onPreferredModelChange,
   enabledRuntimeIds,
   openSessionIds,
+  resolveWorkspaceReference,
 }: AgentChatTabPanelProps) {
   const presented = presentedProp ?? active;
   const commandTarget = commandTargetProp ?? active;
   const { t } = useLocalization();
   const [historyOpen, setHistoryOpen] = useState(false);
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
-  const referenceIngestion = useAgentReferenceIngestion({ controller, workspaceId, capabilities: state.inspection?.capabilities?.referenceInputs });
+  const referenceIngestion = useAgentReferenceIngestion({
+    controller,
+    workspaceId,
+    capabilities: state.inspection?.capabilities?.referenceInputs,
+    resolveWorkspaceReference,
+  });
   const inspection = state.inspection;
   const readiness = inspection?.readiness;
   const runtime = state.session?.runtime
@@ -87,15 +95,20 @@ export function AgentChatTabPanel({
   // A direct creation recipe remains bound even when its runtime needs setup.
   // Only the chooser filters not-installed runtimes from subsequent selection.
   const agentRuntimeSelected = selectedRuntimeRegistered;
+  const runtimeIconKey = state.selectedRuntimeId
+    ? runtime?.iconKey || state.selectedRuntimeId
+    : null;
   const runtimeModels = agentRuntimeSelected ? inspection?.models ?? [] : [];
   const routingPreferences = useAgentRoutingPreferences({
     active: commandTarget, controller, state, runtimeModels, preferredRuntimeId, preferredRoute, preferredModel,
     onPreferredRuntimeChange, onPreferredRouteChange, onPreferredModelChange,
   });
+  const selectedModelProfile = runtimeModels.find((model) => model.model === state.selectedModel);
+  const runtimeEfforts = selectedModelProfile?.variants ?? [];
   const modelSelectionAvailable = Boolean(capabilities?.modelSelection);
   const routingReady = Boolean(agentRuntimeSelected && (!modelSelectionAvailable || (
     state.selectedModel && runtimeModels.some((model) => model.model === state.selectedModel)
-  )));
+  )) && routingPreferences.preferencesReady);
   const preparingSession = state.sessionPreparation === "preparing";
   const submissionPending = state.submitting || Boolean(state.pendingPrompt);
   const submissionStage: AgentSubmissionStage = state.pendingPrompt && !state.projection.runningTurnId
@@ -112,7 +125,7 @@ export function AgentChatTabPanel({
           ? t("agent.composer.placeholder.followUp")
           : t(DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID);
   const sessionStatus = state.session?.terminalState;
-  const statusCode = state.session ? sessionStatusCode(sessionStatus) : readinessStatusCode(readiness?.status);
+  const statusCode = state.session ? sessionStatusCode(sessionStatus) : readinessStatusCode(readiness);
   const title = state.session?.title || (agentRuntimeSelected ? runtimeLabel : t("agent.header.newChat"));
   const hasStatus = unavailable || failed || Boolean(state.error);
   const history = useAgentConversationHistory({
@@ -127,11 +140,12 @@ export function AgentChatTabPanel({
     onPresentationChange({
       title,
       runtimeLabel: agentRuntimeSelected ? runtimeLabel : null,
+      runtimeIconKey,
       sessionId: state.session?.id ?? null,
       statusCode,
       running: Boolean(state.projection.runningTurnId),
     });
-  }, [agentRuntimeSelected, onPresentationChange, runtimeLabel, state.projection.runningTurnId, state.session?.id, statusCode, title]);
+  }, [agentRuntimeSelected, onPresentationChange, runtimeIconKey, runtimeLabel, state.projection.runningTurnId, state.session?.id, statusCode, title]);
 
   const handleViewportChange = useCallback((scrollTop: number, measurements: Record<string, number>, pinned: boolean) => {
     controller.rememberViewport(scrollTop, measurements, pinned);
@@ -207,8 +221,12 @@ export function AgentChatTabPanel({
         placeholder={composerPlaceholder} runtimeLabel={runtimeLabel}
         configurationDisabled={loading || preparingSession || submissionPending}
         models={capabilities?.modelSelection ? runtimeModels : []} selectedModel={state.selectedModel}
-        onSelectModel={routingPreferences.selectModel} commands={capabilities?.slashCommands ? inspection?.commands ?? [] : []}
-        references={state.references} referenceCapabilities={capabilities?.referenceInputs}
+        onSelectModel={routingPreferences.selectModel}
+        efforts={runtimeEfforts} selectedEffort={state.selectedEffort}
+        onSelectEffort={routingPreferences.selectEffort}
+        commands={capabilities?.slashCommands ? inspection?.commands ?? [] : []}
+        references={state.references} getReferencePreviewUrl={controller.getReferencePreviewUrl}
+        referenceCapabilities={capabilities?.referenceInputs}
         steerAvailable={Boolean(capabilities?.steer)} queueAvailable={Boolean(capabilities?.queue)}
         onRemoveReference={(id) => controller.removeReference(id)} onRetryReference={(id) => controller.retryReference(id)}
         onAddExternalFiles={referenceIngestion.addExternalFiles} onPaste={referenceIngestion.onPaste}

@@ -7,7 +7,6 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
-  closestWorkbenchSplitDropEdge,
   type WorkbenchSplitDropEdge,
 } from "@puppyone/shared-ui";
 import {
@@ -29,6 +28,7 @@ import {
   moveTerminalTabMovePreview,
 } from "./terminalTabMovePreview";
 import { resolveTerminalTabBarDropTarget } from "./terminalTabBarDropTarget";
+import { resolveTerminalContentDropTarget } from "./terminalContentDropTarget";
 
 export type TerminalTabMoveGestureResult = "press" | "drag" | "ignored";
 export type TerminalDragSubject =
@@ -308,17 +308,16 @@ export function useTerminalTabMoveDrag({
       }
       return;
     }
-    const target = element?.closest<HTMLElement>("[data-terminal-content-drop-group-id]");
-    const targetGroupId = target?.dataset.terminalContentDropGroupId;
-    if (!target || !targetGroupId) {
-      publishDropIntent(null);
-      return;
-    }
-    const edge = closestWorkbenchSplitDropEdge(
-      target.getBoundingClientRect(),
+    const contentTarget = resolveTerminalContentDropTarget(
+      element ?? null,
       event.clientX,
       event.clientY,
     );
+    if (!contentTarget) {
+      publishDropIntent(null);
+      return;
+    }
+    const { edge, groupId: targetGroupId, surface } = contentTarget;
     if (session.subject.kind === "group") {
       publishDropIntent({
         kind: "move-group",
@@ -329,7 +328,7 @@ export function useTerminalTabMoveDrag({
           session.subject.groupId,
           targetGroupId,
           edge,
-          target,
+          surface,
         ),
       });
     } else {
@@ -342,7 +341,7 @@ export function useTerminalTabMoveDrag({
           session.subject.sessionId,
           targetGroupId,
           edge,
-          target,
+          surface,
         ),
       });
     }

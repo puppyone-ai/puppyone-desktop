@@ -15,7 +15,7 @@ import {
   type ViewerExtensionHostAdapter,
   type Workspace,
   type WorkspaceContentChange,
-  workspaceContentChangeMatchesPath,
+  workspaceContentChangeMatchesResource,
 } from "@puppyone/shared-ui";
 import { useEditorPaneSource } from "./useEditorPaneSource";
 
@@ -207,7 +207,11 @@ function sameDocumentRefresh(
   if (isContextMapDocumentDescriptor(null, resource)) {
     return previous?.sequence === next?.sequence;
   }
-  return !workspaceContentChangeMatchesPath(next, resource);
+  return !workspaceContentChangeMatchesResource(
+    next,
+    resource,
+    previous?.sequence ?? Number.NEGATIVE_INFINITY,
+  );
 }
 
 function isContextMapDocumentDescriptor(node: DataNode | null, resource: string | null): boolean {

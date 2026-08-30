@@ -10,7 +10,12 @@ type AgentModelPickerProps = {
   onSelectModel: (model: string) => void;
 };
 
-export const AgentModelPicker = memo(function AgentModelPicker({ models, selectedModel, disabled = false, onSelectModel }: AgentModelPickerProps) {
+export const AgentModelPicker = memo(function AgentModelPicker({
+  models,
+  selectedModel,
+  disabled = false,
+  onSelectModel,
+}: AgentModelPickerProps) {
   const { t } = useLocalization();
   const selected = models.find((model) => model.model === selectedModel) ?? null;
   const groups: AgentPickerGroup[] = [{
@@ -23,7 +28,6 @@ export const AgentModelPicker = memo(function AgentModelPicker({ models, selecte
       keywords: `${model.id} ${model.model} ${(model.variants || []).join(" ")}`,
       selectable: true,
       selected: model.model === selectedModel,
-      kind: "model",
       icon: null,
     })),
   }];
@@ -34,7 +38,7 @@ export const AgentModelPicker = memo(function AgentModelPicker({ models, selecte
       valueLabel={selected?.displayName}
       groups={groups}
       disabled={disabled}
-      className="is-model"
+      width="medium"
       onSelect={onSelectModel}
     />
   );

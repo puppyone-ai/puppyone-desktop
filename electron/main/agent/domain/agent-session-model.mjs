@@ -12,6 +12,7 @@ export function createAgentSessionRecord({
   runtimeId,
   runtime,
   model,
+  effort,
   mode,
   events = [],
   sequence = 0,
@@ -51,6 +52,7 @@ export function createAgentSessionRecord({
     commands: [],
     capabilities: null,
     selectedModel: model,
+    selectedEffort: effort,
     selectedMode: mode,
     title: title || `${runtime?.displayName || "Agent"} session`,
     createdAt: createdAt || new Date().toISOString(),
@@ -83,6 +85,7 @@ export function persistedRecordFromSession(session) {
     updatedAt: session.updatedAt,
     terminalState: session.terminalState,
     selectedModel: session.selectedModel,
+    selectedEffort: session.selectedEffort,
     selectedMode: session.selectedMode,
     lastSequence: session.sequence,
     events: session.events,
@@ -101,6 +104,7 @@ export function applyProviderSession(session, providerSession) {
   session.providerSessionId = providerSession.providerSessionId;
   session.title = providerSession.title || session.title;
   session.selectedModel = providerSession.model || session.selectedModel;
+  session.selectedEffort = providerSession.effort || session.selectedEffort;
   session.selectedMode = providerSession.mode || session.selectedMode;
   session.createdAt = providerSession.createdAt || session.createdAt;
   session.updatedAt = providerSession.updatedAt || new Date().toISOString();
@@ -127,6 +131,13 @@ export function applyInspection(session, inspection) {
       session.selectedModel = providerModels.find((model) => model.isDefault)?.model ?? providerModels[0]?.model ?? null;
     }
   }
+  const selectedModel = session.models.find((model) => model.model === session.selectedModel);
+  const efforts = selectedModel?.variants ?? [];
+  if (!session.selectedEffort || !efforts.includes(session.selectedEffort)) {
+    session.selectedEffort = selectedModel?.defaultVariant && efforts.includes(selectedModel.defaultVariant)
+      ? selectedModel.defaultVariant
+      : efforts.includes("medium") ? "medium" : efforts[0] ?? null;
+  }
   if (!session.selectedMode) {
     session.selectedMode = session.modes.find((mode) => mode.isDefault)?.id ?? session.modes[0]?.id ?? null;
   }
@@ -150,6 +161,7 @@ export function publicSessionRecord(record) {
     archivedAt: record.archivedAt ?? null,
     terminalState: record.terminalState || "idle",
     selectedModel: record.selectedModel ?? null,
+    selectedEffort: record.selectedEffort ?? null,
     selectedMode: record.selectedMode ?? null,
     lastSequence: normalizeSequence(record.lastSequence),
     partial: Boolean(record.partial),
@@ -170,6 +182,7 @@ export function sessionMetadata(session) {
     updatedAt: session.updatedAt,
     terminalState: session.terminalState,
     selectedModel: session.selectedModel,
+    selectedEffort: session.selectedEffort,
     selectedMode: session.selectedMode,
     activeTurnId: session.activeTurnId,
     lastSequence: session.sequence,

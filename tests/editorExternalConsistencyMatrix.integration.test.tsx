@@ -6,14 +6,16 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type {
-  DataNode,
-  DataPort,
-  DocumentPersistenceRequest,
-  EditorDocument,
-  FileContent,
+import {
+  createWorkspaceContentChange,
+  EMPTY_MARKDOWN_WORKSPACE_ENVIRONMENT,
+  type DataNode,
+  type DataPort,
+  type DocumentPersistenceRequest,
+  type EditorDocument,
+  type FileContent,
+  type WorkspaceContentChange,
 } from "@puppyone/shared-ui";
-import { EMPTY_MARKDOWN_WORKSPACE_ENVIRONMENT } from "@puppyone/shared-ui";
 import { closeAllDocumentWorkingCopies } from "../packages/shared-ui/src/editor/document-session/documentWorkingCopies";
 import { EditorDocumentHost } from "../packages/shared-ui/src/editor/host/EditorDocumentHost";
 import { preloadPresetViewer } from "../packages/shared-ui/src/editor/host/PresetViewerRenderer";
@@ -179,18 +181,18 @@ describe("P0 editor external-consistency matrix", () => {
     async (formatCase) => {
       const harness = createRuntimeHarness(formatCase);
 
-      await harness.render({ sequence: 0, paths: null });
+      await harness.render(refresh(0, null));
       await waitForMarker(formatCase.readRuntimeMarker, harness.container, "alpha");
 
       harness.setStorage(formatCase.external, "v2");
-      await harness.render({ sequence: 1, paths: [formatCase.path] });
+      await harness.render(refresh(1, [formatCase.path]));
       await waitForMarker(formatCase.readRuntimeMarker, harness.container, "agent");
 
       expect(harness.readFile).toHaveBeenCalledTimes(2);
       expect(harness.persist).not.toHaveBeenCalled();
       expect(harness.container.querySelector(".editor-inline-error")).toBeNull();
 
-      await harness.render({ sequence: 2, paths: ["unrelated/other.md"] });
+      await harness.render(refresh(2, ["unrelated/other.md"]));
       await settleReact();
       expect(harness.readFile).toHaveBeenCalledTimes(2);
     },
@@ -201,12 +203,12 @@ describe("P0 editor external-consistency matrix", () => {
     async (formatCase) => {
       const harness = createRuntimeHarness(formatCase);
 
-      await harness.render({ sequence: 0, paths: null });
+      await harness.render(refresh(0, null));
       await waitForMarker(formatCase.readRuntimeMarker, harness.container, "alpha");
       await harness.hide();
 
       harness.setStorage(formatCase.external, "v2");
-      await harness.render({ sequence: 1, paths: [formatCase.path] });
+      await harness.render(refresh(1, [formatCase.path]));
       await waitForMarker(formatCase.readRuntimeMarker, harness.container, "agent");
 
       expect(harness.persist).not.toHaveBeenCalled();
@@ -296,10 +298,10 @@ describe("P0 editor external-consistency matrix", () => {
 
     await act(async () => {
       firstRoot.render(withTestLocalization(
-        runtimeElement(markdown, dataPort, { sequence: 0, paths: null }),
+        runtimeElement(markdown, dataPort, refresh(0, null)),
       ));
       secondRoot.render(withTestLocalization(
-        runtimeElement(csv, dataPort, { sequence: 0, paths: null }),
+        runtimeElement(csv, dataPort, refresh(0, null)),
       ));
     });
     await waitForMarker(markdown.readRuntimeMarker, firstContainer, "alpha");
@@ -307,7 +309,7 @@ describe("P0 editor external-consistency matrix", () => {
 
     storage.set(markdown.path, fileContent(markdown, markdown.external, "v2"));
     storage.set(csv.path, fileContent(csv, csv.external, "v2"));
-    const batch = { sequence: 1, paths: [markdown.path, csv.path] } as const;
+    const batch = refresh(1, [markdown.path, csv.path]);
     await act(async () => {
       firstRoot.render(withTestLocalization(runtimeElement(markdown, dataPort, batch)));
       secondRoot.render(withTestLocalization(runtimeElement(csv, dataPort, batch)));
@@ -327,7 +329,7 @@ describe("P0 editor external-consistency matrix", () => {
   it("discards an obsolete read that resolves after a newer matching watcher event", async () => {
     const markdown = FORMAT_CASES.find(({ label }) => label === "Markdown")!;
     const harness = createRuntimeHarness(markdown);
-    await harness.render({ sequence: 0, paths: null });
+    await harness.render(refresh(0, null));
     await waitForMarker(markdown.readRuntimeMarker, harness.container, "alpha");
 
     const obsoleteRead = deferred<FileContent>();
@@ -336,8 +338,8 @@ describe("P0 editor external-consistency matrix", () => {
       .mockImplementationOnce(() => obsoleteRead.promise)
       .mockImplementationOnce(() => newestRead.promise);
 
-    await harness.render({ sequence: 1, paths: [markdown.path] });
-    await harness.render({ sequence: 2, paths: [markdown.path] });
+    await harness.render(refresh(1, [markdown.path]));
+    await harness.render(refresh(2, [markdown.path]));
     newestRead.resolve(fileContent(markdown, markdown.external, "v3"));
     await waitForMarker(markdown.readRuntimeMarker, harness.container, "agent");
 
@@ -351,11 +353,11 @@ describe("P0 editor external-consistency matrix", () => {
   it("keeps the last stable editor model when an external refresh read fails", async () => {
     const markdown = FORMAT_CASES.find(({ label }) => label === "Markdown")!;
     const harness = createRuntimeHarness(markdown);
-    await harness.render({ sequence: 0, paths: null });
+    await harness.render(refresh(0, null));
     await waitForMarker(markdown.readRuntimeMarker, harness.container, "alpha");
 
     harness.readFile.mockRejectedValueOnce(new Error("temporary read failure"));
-    await harness.render({ sequence: 1, paths: [markdown.path] });
+    await harness.render(refresh(1, [markdown.path]));
     await waitFor(() => harness.readFile.mock.calls.length === 2);
     await settleReact();
 
@@ -366,11 +368,11 @@ describe("P0 editor external-consistency matrix", () => {
   it("treats a null path list as an intentional bulk refresh", async () => {
     const markdown = FORMAT_CASES.find(({ label }) => label === "Markdown")!;
     const harness = createRuntimeHarness(markdown);
-    await harness.render({ sequence: 0, paths: null });
+    await harness.render(refresh(0, null));
     await waitForMarker(markdown.readRuntimeMarker, harness.container, "alpha");
 
     harness.setStorage(markdown.external, "v2");
-    await harness.render({ sequence: 1, paths: null });
+    await harness.render(refresh(1, null));
     await waitForMarker(markdown.readRuntimeMarker, harness.container, "agent");
 
     expect(harness.readFile).toHaveBeenCalledTimes(2);
@@ -448,7 +450,7 @@ function createRuntimeHarness(formatCase: FormatCase) {
     setStorage(content: string, version: string) {
       storage = fileContent(formatCase, content, version);
     },
-    async render(refreshKey: { sequence: number; paths: readonly string[] | null }) {
+    async render(refreshKey: WorkspaceContentChange) {
       await act(async () => root.render(withTestLocalization(
         runtimeElement(formatCase, dataPort, refreshKey),
       )));
@@ -504,7 +506,7 @@ async function createEditorHarness(formatCase: FormatCase) {
 function runtimeElement(
   formatCase: FormatCase,
   dataPort: DataPort,
-  refreshKey: { sequence: number; paths: readonly string[] | null },
+  refreshKey: WorkspaceContentChange,
 ) {
   const node = dataNode(formatCase);
   return (
@@ -525,6 +527,13 @@ function runtimeElement(
       markdownDialect="puppy-gfm"
     />
   );
+}
+
+function refresh(
+  sequence: number,
+  paths: readonly string[] | null,
+): WorkspaceContentChange {
+  return createWorkspaceContentChange({ sequence, rootUri: null, paths });
 }
 
 function dataNode(formatCase: FormatCase): DataNode {

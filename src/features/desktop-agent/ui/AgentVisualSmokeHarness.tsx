@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { RENDERER_ASSET_PATHS, resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { DesktopOverlayPortal } from "../../app-shell/DesktopOverlayPortal";
@@ -46,12 +47,14 @@ const referenceCapabilities: AgentReferenceInputCapabilities = {
 
 const smokeReferences: AgentDraftReference[] = [
   {
-    id: "workspace-src",
+    id: "workspace-security",
     kind: "workspace-entry",
-    entryType: "directory",
-    path: "src",
-    relativePath: "src",
-    displayName: "src",
+    entryType: "file",
+    path: "SECURITY.md",
+    relativePath: "SECURITY.md",
+    displayName: "SECURITY.md",
+    mime: "text/markdown",
+    size: 2_048,
     status: "ready",
   },
   {
@@ -79,6 +82,7 @@ export function AgentVisualSmokeHarness() {
   const [draft, setDraft] = useState("");
   const [runtimeId, setRuntimeId] = useState(agentRuntimes[0].descriptor.id);
   const [selectedModel, setSelectedModel] = useState(modelsByRuntime[runtimeId][0].model);
+  const [selectedEffort, setSelectedEffort] = useState("medium");
   const [references, setReferences] = useState(smokeReferences);
   const theme = new URLSearchParams(window.location.search).get("theme") === "light" ? "light" : "dark";
   const startupLoading = new URLSearchParams(window.location.search).get("state") === "loading";
@@ -263,6 +267,7 @@ export function AgentVisualSmokeHarness() {
               onSelectRuntime={(nextRuntimeId) => {
                 setRuntimeId(nextRuntimeId);
                 setSelectedModel(modelsByRuntime[nextRuntimeId][0].model);
+                setSelectedEffort("medium");
               }}
             />}
           />}
@@ -282,8 +287,14 @@ export function AgentVisualSmokeHarness() {
               models={models}
               selectedModel={selectedModel}
               onSelectModel={setSelectedModel}
+              efforts={models.find((entry) => entry.model === selectedModel)?.variants ?? []}
+              selectedEffort={selectedEffort}
+              onSelectEffort={setSelectedEffort}
               commands={[]}
               references={references}
+              getReferencePreviewUrl={(id) => id === "attachment-capture"
+                ? resolveRendererPublicAssetUrl(RENDERER_ASSET_PATHS.icons.agents.codexLight)
+                : null}
               referenceCapabilities={referenceCapabilities}
               onRemoveReference={(id) => setReferences((current) => current.filter((reference) => reference.id !== id))}
               onRetryReference={() => {}}
@@ -303,10 +314,18 @@ export function AgentVisualSmokeHarness() {
 function runtimeEntry(id: string, displayName: string, iconKey: string): AgentRuntimeCatalogEntry {
   return {
     descriptor: { id, displayName, iconKey, distribution: "user-installed" },
-    readiness: { runtimeId: id, provider: id, status: "ready", version: "1.0.0", minimumVersion: null, message: "Ready", selectable: true },
+    readiness: { runtimeId: id, provider: id, status: "ready", code: "READY", version: "1.0.0", minimumVersion: null, message: "Ready", selectable: true },
   };
 }
 
 function model(id: string, displayName: string, isDefault = false): AgentModel {
-  return { id, model: id, displayName, description: "Native coding Agent model", isDefault };
+  return {
+    id,
+    model: id,
+    displayName,
+    description: "Native coding Agent model",
+    isDefault,
+    variants: ["low", "medium", "high"],
+    defaultVariant: "medium",
+  };
 }

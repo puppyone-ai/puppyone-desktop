@@ -5,8 +5,10 @@ import {
   closeDocumentWorkingCopiesUnderResource,
   createWorkspaceResourceUri,
   flushActiveDocumentSessions,
+  isDataResourceUri,
   isDocumentDataNode,
   type DataNode,
+  type WorkspaceContentChange,
   type WorkspaceFolder,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
@@ -81,6 +83,8 @@ import { createExplorerDataPort } from "./features/data-workspace/explorer";
 import { createWorkbenchDataService } from "./features/data-workspace/workbenchDataPort";
 import { useDataNodeActions } from "./features/data-workspace/useDataNodeActions";
 import { useAiEditReviewRequest } from "./features/data-workspace/useAiEditReviewRequest";
+import { useWorkbenchWorkspaceContentWatch } from "./features/data-workspace/useWorkbenchWorkspaceContentWatch";
+import { appendWorkbenchWorkspaceContentChange } from "./features/data-workspace/workbenchWorkspaceContentChange";
 import {
   BranchSwitchConflictDialog,
   GitOperationErrorDialog,
@@ -99,6 +103,7 @@ import type { AuxiliaryWorkbenchContribution } from "./features/app-shell/auxili
 import { AGENT_CHAT_CREATION_RECIPES } from "./features/app-shell/auxiliary-workbench/agentChatCreationRecipes";
 
 const AgentChatWorkbenchItem = lazy(loadAgentChatWorkbenchItem);
+const EMPTY_WORKSPACE_FOLDERS: readonly WorkspaceFolder[] = Object.freeze([]);
 
 export function App() {
   return <AppContent />;
@@ -229,9 +234,9 @@ function AppContent() {
   });
   const Homepage = assetLibraryHomeEnabled ? AssetLibraryHome : MinimalOnboarding;
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("general");
-  const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState({
+  const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState<WorkspaceContentChange>({
     sequence: 0,
-    paths: null as readonly string[] | null,
+    entries: [],
   });
   const workbenchDataService = useMemo(
     () => (workbenchWorkspace ? createWorkbenchDataService(workbenchWorkspace) : null),
@@ -257,6 +262,32 @@ function AppContent() {
   const resolveWorkspaceResource = useCallback((path: string | null) => (
     workbenchDataService?.resolveResource(path) ?? null
   ), [workbenchDataService]);
+  const resolveAgentWorkspaceReference = useCallback(async (resource: string) => {
+    if (!workbenchDataService || !isDataResourceUri(resource)) return null;
+    try {
+      const resolved = workbenchDataService.resolveResource(resource);
+      const loadVisualPreview = resolved.providerPath
+        && isPreviewableAgentImagePath(resolved.providerPath)
+        && workbenchDataService.dataPort.getFileUrl
+        ? async () => {
+            const url = await workbenchDataService.dataPort.getFileUrl!(resource, { purpose: "file-preview" });
+            return {
+              url,
+              release: () => {
+                void Promise.resolve(workbenchDataService.dataPort.revokeFileUrl?.(url)).catch(() => undefined);
+              },
+            };
+          }
+        : undefined;
+      return {
+        workspaceRoot: resolved.folder.workspace.path,
+        referencePath: resolved.providerPath ?? ".",
+        ...(loadVisualPreview ? { loadVisualPreview } : {}),
+      };
+    } catch {
+      return null;
+    }
+  }, [workbenchDataService]);
   const editorWorkbench = useDesktopEditorWorkbench(
     workspace,
     dataPort?.resolveNode ?? null,
@@ -331,17 +362,32 @@ function AppContent() {
     setRightSidebarOpen,
     setRightSidebarSurface,
   ]);
-  const refreshWorkspaceContent = useCallback((paths: readonly string[] | string | null = null) => {
-    setWorkspaceRefreshToken((current) => ({
-      sequence: current.sequence + 1,
-      paths: typeof paths === "string" ? [paths] : paths,
-    }));
-  }, []);
+  const refreshWorkspaceContent = useCallback((
+    paths: readonly string[] | string | null = null,
+    workspaceFolderId: string | null = null,
+  ) => {
+    setWorkspaceRefreshToken((current) => appendWorkbenchWorkspaceContentChange(
+      current,
+      workbenchWorkspace,
+      { paths, workspaceFolderId },
+    ));
+  }, [workbenchWorkspace]);
   const git = useDesktopGitController({
     workspace: focusedWorkspace,
     gitViewActive: activeView === "git",
     onWorkspaceContentChanged: refreshWorkspaceContent,
     onEnterGitView: () => setActiveView("git"),
+  });
+  const invalidateGitStatus = git.invalidateGitStatus;
+  const handleWorkspaceActivity = useCallback((folder: WorkspaceFolder) => {
+    if (folder.workspace.path === focusedWorkspace?.path) {
+      invalidateGitStatus("working-tree");
+    }
+  }, [focusedWorkspace?.path, invalidateGitStatus]);
+  useWorkbenchWorkspaceContentWatch({
+    folders: workbenchWorkspace?.folders ?? EMPTY_WORKSPACE_FOLDERS,
+    onWorkspaceContentChanged: refreshWorkspaceContent,
+    onWorkspaceActivity: handleWorkspaceActivity,
   });
   const {
     activeGitStatus,
@@ -891,6 +937,7 @@ function AppContent() {
         title: t("agent.header.newChat"),
         accessibleLabel: `${t("agent.header.newChat")} — ${t("agent.name")}`,
         detail: t("agent.name"),
+        iconKey: null,
         status: "starting",
         running: false,
         resourceId: null,
@@ -913,6 +960,7 @@ function AppContent() {
             onPreferredModelChange={setAgentPreferredModel}
             onViewChanges={handleAgentViewChanges}
             onOpenFile={handleAgentOpenFile}
+            resolveWorkspaceReference={resolveAgentWorkspaceReference}
           />
         </Suspense>
       ),
@@ -925,6 +973,7 @@ function AppContent() {
     desktopAgentChatEnabled,
     handleAgentOpenFile,
     handleAgentViewChanges,
+    resolveAgentWorkspaceReference,
     setAgentPreferredModel,
     setAgentPreferredRoute,
     setAgentPreferredRuntime,
@@ -1278,6 +1327,10 @@ function AppContent() {
       </DesktopOverlayPortal>
     </div>
   );
+}
+
+function isPreviewableAgentImagePath(path: string) {
+  return /\.(?:png|jpe?g|gif|webp|avif)$/i.test(path);
 }
 
 function hasSameActiveDataNodeIdentity(left: DataNode | null, right: DataNode | null): boolean {

@@ -1,13 +1,15 @@
 import {
   useCallback,
   useMemo,
-  useRef,
   type CSSProperties,
   type ReactNode,
 } from "react";
 import { isWorkbenchSplit, type WorkbenchSplitDropEdge } from "@puppyone/shared-ui";
 import type { TerminalTabMoveDragController } from "../interactions/useTerminalTabMoveDrag";
-import type { TerminalTabMoveDropIntent } from "../model/terminalTabMove";
+import {
+  partitionTerminalGroupDropIntent,
+  type TerminalTabMoveDropIntent,
+} from "../model/terminalTabMove";
 import {
   terminalLeafMinimumSize,
   terminalSplitChildMinimumSizes,
@@ -26,12 +28,12 @@ import {
   terminalTabId,
 } from "../ui/session-header/terminalSessionHeaderIds";
 import { TerminalGroupMoveHandle } from "./TerminalGroupMoveHandle";
+import { TerminalGroupPane } from "./TerminalGroupPane";
 import { TerminalSplitResizeHandle } from "./TerminalSplitResizeHandle";
 import { TerminalSessionHostSlot } from "./session-host/TerminalSessionHostSlot";
 import type {
   PersistentTerminalSessionHosts,
 } from "./session-host/usePersistentTerminalSessionHosts";
-import { useTerminalGroupHandleReveal } from "./useTerminalGroupHandleReveal";
 
 export type TerminalGroupViewportProps = Readonly<{
   activeGroupId: string | null;
@@ -150,35 +152,21 @@ function TerminalTabGroupLeaf({
   onCreateSession,
   onMoveByKeyboard,
 }: TerminalLayoutNodeProps & { group: DesktopTerminalGroup }) {
-  const groupRef = useRef<HTMLElement>(null);
   const sessions = group.sessionIds
     .map((sessionId) => sessionById.get(sessionId))
     .filter((session): session is DesktopTerminalSession => Boolean(session));
-  const intent = dropIntent?.targetGroupId === group.id ? dropIntent : null;
-  const edgeIntent = intent?.kind === "split" || intent?.kind === "move-group"
-    ? intent
-    : null;
-  const insertIntent = intent?.kind === "insert" || intent?.kind === "merge-group"
-    ? intent
-    : null;
+  const dropZones = partitionTerminalGroupDropIntent(dropIntent, group.id);
   const activeSession = sessionById.get(group.activeSessionId);
   const host = hosts.get(group.activeSessionId);
-  const handleReveal = useTerminalGroupHandleReveal(groupRef, Boolean(intent));
 
   return (
-    <section
-      ref={groupRef}
-      className="desktop-terminal-tab-group"
-      data-terminal-group-pane-id={group.id}
-      data-focused={activeGroupId === group.id ? "true" : undefined}
-      data-handle-hot={handleReveal.revealed ? "true" : undefined}
-      data-drop-target={edgeIntent?.edge}
-      onPointerMove={handleReveal.onPointerMove}
-      onPointerLeave={handleReveal.onPointerLeave}
-    >
-      <TerminalSessionHeader
+    <TerminalGroupPane
+      contentDropIntent={dropZones.content}
+      focused={activeGroupId === group.id}
+      groupId={group.id}
+      header={<TerminalSessionHeader
         activeSessionId={group.activeSessionId}
-        dropInsertion={insertIntent}
+        dropInsertion={dropZones.tabBar}
         groupId={group.id}
         onActivate={onActivateSession}
         onClose={onCloseSession}
@@ -189,8 +177,8 @@ function TerminalTabGroupLeaf({
         sessions={sessions}
         tabMove={sessionMove}
         workspacePath={workspacePath}
-      />
-      {activeSession && (
+      />}
+      moveHandle={activeSession ? (
         <TerminalGroupMoveHandle
           groupId={group.id}
           session={activeSession}
@@ -198,32 +186,18 @@ function TerminalTabGroupLeaf({
           sessionMove={sessionMove}
           onActivate={onActivateSession}
         />
-      )}
-      <div
-        className="desktop-terminal-tab-group-content"
-        data-terminal-content-drop-group-id={group.id}
-      >
-        {activeSession && host && (
-          <TerminalSessionHostSlot
-            focused={activeGroupId === group.id}
-            host={host}
-            labelledBy={terminalTabId(activeSession.id)}
-            panelId={terminalPanelId(activeSession.id)}
-            sessionId={activeSession.id}
-          />
-        )}
-      </div>
-      {edgeIntent && (
-        <div
-          className="desktop-terminal-drop-preview"
-          data-edge={edgeIntent.edge}
-          data-allowed={edgeIntent.allowed ? "true" : "false"}
-          data-operation={edgeIntent.kind}
-          aria-hidden="true"
+      ) : null}
+    >
+      {activeSession && host && (
+        <TerminalSessionHostSlot
+          focused={activeGroupId === group.id}
+          host={host}
+          labelledBy={terminalTabId(activeSession.id)}
+          panelId={terminalPanelId(activeSession.id)}
+          sessionId={activeSession.id}
         />
       )}
-      <div className="desktop-terminal-pane-interaction-frame" aria-hidden="true" />
-    </section>
+    </TerminalGroupPane>
   );
 }
 

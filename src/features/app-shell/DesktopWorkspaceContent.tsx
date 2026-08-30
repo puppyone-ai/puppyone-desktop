@@ -9,6 +9,7 @@ import {
   type DataNode,
   type EditorInteractionPreferences,
   type Workspace,
+  type WorkspaceContentChange,
   type WorkspaceFolder,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
@@ -81,7 +82,7 @@ type DesktopWorkspaceContentProps = {
   resolveWorkspaceResource: (path: string | null) => ResolvedWorkbenchDataResource | null;
   workspaceSurfaceError?: string | null;
   workspaceKey: string;
-  workspaceRefreshToken: Readonly<{ sequence: number; paths: readonly string[] | null }>;
+  workspaceRefreshToken: WorkspaceContentChange;
   sidebarCreateMenuOpen: boolean;
 };
 

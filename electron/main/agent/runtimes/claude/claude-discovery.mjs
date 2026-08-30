@@ -47,6 +47,7 @@ export async function discoverClaudeRuntime({
       runtimeId: "claude",
       provider: "claude",
       status: "error",
+      code: "RUNTIME_DISCOVERY_FAILED",
       version: null,
       minimumVersion: CLAUDE_CODE_TESTED_BASELINE,
       sdkVersion: CLAUDE_AGENT_SDK_VERSION,
@@ -114,6 +115,7 @@ export async function discoverClaudeRuntime({
         compatible = {
           ...local,
           status: "protocol-unavailable",
+          code: "PROTOCOL_UNAVAILABLE",
           message: "Claude Code is installed, but this build does not expose the secure streaming controls required by the official Agent SDK.",
           diagnostic: "Required native capabilities: streaming JSON input/output and setting-source isolation.",
         };
@@ -122,6 +124,7 @@ export async function discoverClaudeRuntime({
       compatible = {
         ...local,
         status: "protocol-unavailable",
+        code: "PROTOCOL_PROBE_FAILED",
         message: "Claude Code is installed, but its official Agent SDK capabilities could not be verified.",
         diagnostic: error instanceof Error ? error.message : String(error),
       };

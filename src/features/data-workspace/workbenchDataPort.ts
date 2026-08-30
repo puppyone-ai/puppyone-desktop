@@ -52,6 +52,7 @@ export function createWorkbenchDataService(
     folder.id,
     options.createProvider?.(folder) ?? createLocalDataPort(folder.workspace.path),
   ]));
+  const fileUrlOwners = new Map<string, DataPort>();
   const copyBetweenRoots = options.copyBetweenRoots ?? copyWorkspaceEntryBetweenRoots;
   const resolveResource = (path: string | null): ResolvedWorkbenchDataResource => {
     const resourceIsUri = isDataResourceUri(path);
@@ -155,9 +156,15 @@ export function createWorkbenchDataService(
       if (target.providerPath === null) throw new Error("A Workspace Folder root has no file URL.");
       const provider = requireProvider(target.folder);
       if (!provider.getFileUrl) throw new Error("The selected file provider cannot create a file URL.");
-      return provider.getFileUrl(target.providerPath, options);
+      const url = await provider.getFileUrl(target.providerPath, options);
+      fileUrlOwners.set(url, provider);
+      return url;
     },
-    revokeFileUrl: (url) => requireProvider(workbench.folders[0]!).revokeFileUrl?.(url),
+    revokeFileUrl: async (url) => {
+      const provider = fileUrlOwners.get(url);
+      fileUrlOwners.delete(url);
+      await provider?.revokeFileUrl?.(url);
+    },
     openExternalFile: async (path) => {
       const target = resolveResource(path);
       if (target.providerPath === null) throw new Error("A Workspace Folder root is already open.");

@@ -1,4 +1,8 @@
-import { AGENT_RUNTIME_CAPABILITIES } from "./constants.mjs";
+import {
+  AGENT_READINESS_CODES,
+  AGENT_READINESS_CODE_STATUS,
+  AGENT_RUNTIME_CAPABILITIES,
+} from "./constants.mjs";
 import {
   assertArray,
   assertRecord,
@@ -211,12 +215,18 @@ function isObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function assertReadiness(value) {
+export function assertAgentRuntimeReadiness(value) {
   const readiness = assertRecord(value, "runtime readiness");
   assertRuntimeId(readiness.runtimeId ?? readiness.provider, "runtime readiness.runtimeId");
   enumValue(readiness.status, "runtime readiness.status", ["not-installed", "installed-not-authenticated", "unsupported-version", "protocol-unavailable", "ready", "error"]);
+  const code = enumValue(readiness.code, "runtime readiness.code", AGENT_READINESS_CODES);
+  if (AGENT_READINESS_CODE_STATUS[code] !== readiness.status) {
+    throw new TypeError(`runtime readiness.code ${code} is incompatible with status ${readiness.status}.`);
+  }
   return value;
 }
+
+const assertReadiness = assertAgentRuntimeReadiness;
 
 export function assertAgentModel(value) {
   const model = assertRecord(value, "Agent model");

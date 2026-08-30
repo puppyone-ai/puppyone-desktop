@@ -4,6 +4,7 @@ import { useLocalization } from "@puppyone/localization/react";
 import type { AgentRuntimeReadiness } from "../domain/agent-contract";
 import type { AgentErrorDescriptor } from "../application/agent-error";
 import { presentAgentError } from "./agentErrorPresentation";
+import { presentRuntimeReadiness } from "./agentPanelPresentation";
 
 type AgentPanelStatusProps = {
   unavailable: boolean;
@@ -24,9 +25,8 @@ export function AgentPanelStatus({
 }: AgentPanelStatusProps) {
   const { t } = useLocalization();
   const errorPresentation = presentAgentError(error, t);
-  const detail = failed
-    ? errorPresentation?.detail
-    : readiness?.message || errorPresentation?.detail;
+  const readinessPresentation = presentRuntimeReadiness(readiness, runtimeLabel, t);
+  const detail = failed ? errorPresentation?.detail : readinessPresentation.detail;
   return (
     <>
       {(unavailable || failed) && (
@@ -35,11 +35,15 @@ export function AgentPanelStatus({
           <div>
             <strong>{failed
               ? t("agent.readiness.sessionAttention", { agent: bidiIsolate(runtimeLabel) })
-              : readinessHeading(readiness?.status, runtimeLabel, t)}</strong>
+              : readinessPresentation.heading}</strong>
             <p>{failed
               ? errorPresentation?.summary || t("agent.readiness.sessionRecovery")
-              : readinessMessage(readiness?.status, runtimeLabel, t)}</p>
-            {detail && <small dir="auto">{detail}</small>}
+              : detail}</p>
+            {!failed && <small className="desktop-agent-readiness-code">{t("agent.readiness.statusCode", { code: readinessPresentation.code })}</small>}
+            {!failed && readinessPresentation.diagnostic && (
+              <small dir="auto">{t("agent.readiness.diagnostic", { detail: bidiIsolate(readinessPresentation.diagnostic) })}</small>
+            )}
+            {failed && detail && <small dir="auto">{detail}</small>}
           </div>
           <button type="button" aria-label={t("agent.readiness.retryAria")} onClick={onRetry}><RefreshCw size={14} /> {t("common.action.retry")}</button>
         </div>
@@ -53,17 +57,4 @@ export function AgentPanelStatus({
       )}
     </>
   );
-}
-
-function readinessHeading(status: string | undefined, runtimeLabel: string, t: ReturnType<typeof useLocalization>["t"]) {
-  if (status === "installed-not-authenticated") return t("agent.readiness.connect", { agent: bidiIsolate(runtimeLabel) });
-  return t("agent.readiness.needsAttention", { agent: bidiIsolate(runtimeLabel) });
-}
-
-function readinessMessage(status: string | undefined, runtimeLabel: string, t: ReturnType<typeof useLocalization>["t"]) {
-  if (status === "installed-not-authenticated") return t("agent.readiness.setupRequired");
-  if (status === "not-installed") return t("agent.readiness.notInstalled");
-  if (status === "unsupported-version") return t("agent.readiness.updateRequired");
-  if (status === "protocol-unavailable") return t("agent.readiness.integrationUnavailable");
-  return t("agent.readiness.inspectFailed", { agent: bidiIsolate(runtimeLabel) });
 }

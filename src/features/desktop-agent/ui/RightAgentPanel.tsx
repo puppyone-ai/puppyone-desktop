@@ -9,6 +9,7 @@ import type { AgentChatTabPresentation } from "../domain/agent-chat-tabs";
 import type { AgentRoutePreference } from "../domain/agent-route-preference";
 import { getElectronAgentClient } from "../infrastructure/electron/electronAgentClient";
 import { AgentChatTabPanel } from "./AgentChatTabPanel";
+import { scheduleAgentStreamFrame } from "./agent-stream-frame-scheduler";
 import { AgentSessionTabs, agentPanelId, agentTabId } from "./AgentSessionTabs";
 import { useAgentChatTabs } from "./useAgentChatTabs";
 import "./desktop-agent.css";
@@ -121,7 +122,7 @@ function AgentTabHost({
   ...panelProps
 }: AgentTabHostProps) {
   const controller = useMemo(
-    () => getAgentSessionController(workspace.path, getElectronAgentClient, tabId),
+    () => getAgentSessionController(workspace.path, getElectronAgentClient, tabId, scheduleAgentStreamFrame),
     [tabId, workspace.path],
   );
   const present = useCallback((presentation: AgentChatTabPresentation) => {

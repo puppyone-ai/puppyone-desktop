@@ -61,6 +61,7 @@ export async function discoverUserOpenCodeExecutable({
         readiness = {
           ...result,
           status: "protocol-unavailable",
+          code: "PROTOCOL_UNAVAILABLE",
           message: "This OpenCode installation does not expose a usable Agent Client Protocol endpoint.",
           diagnostic: `${probe.stdout}\n${probe.stderr}`.trim().slice(0, 4_000),
         };
@@ -69,6 +70,7 @@ export async function discoverUserOpenCodeExecutable({
       readiness = {
         ...result,
         status: "protocol-unavailable",
+        code: "PROTOCOL_PROBE_FAILED",
         message: "This OpenCode installation could not start its Agent Client Protocol endpoint.",
         diagnostic: error instanceof Error ? error.message : String(error),
       };

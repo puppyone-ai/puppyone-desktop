@@ -11,10 +11,53 @@ describe("Cursor ACP runtime", () => {
     });
     expect(readiness).toMatchObject({
       status: "ready",
+      code: "READY",
       executablePath: "/tools/agent",
       compatibility: "acp-v1",
       selectable: true,
     });
+  });
+
+  it.each([
+    ["signed-out", "installed-not-authenticated", "AUTHENTICATION_REQUIRED"],
+    ["expired", "installed-not-authenticated", "AUTHENTICATION_EXPIRED"],
+    ["error", "error", "AUTHENTICATION_PROBE_FAILED"],
+    ["unknown", "error", "AUTHENTICATION_STATUS_UNKNOWN"],
+  ])("keeps Cursor authentication state %s distinct", async (authentication, status, code) => {
+    const readiness = await discoverCursorBackend({
+      resolveCandidate: async () => ({ executablePath: "/tools/agent", argsPrefix: [], source: "path-installation" }),
+      probe: async () => ({
+        installation: "detected",
+        version: "2026.08.1",
+        authentication,
+        authenticationDiagnostic: authentication === "error" ? "Cursor status probe ended with exit code 139." : undefined,
+        source: "path-installation",
+      }),
+    });
+    expect(readiness).toMatchObject({ status, code, selectable: false });
+    if (["error", "unknown"].includes(authentication)) {
+      expect(readiness.inspectionFallback).toBe("runtime-handshake");
+    } else {
+      expect(readiness).not.toHaveProperty("inspectionFallback");
+    }
+  });
+
+  it.each([
+    ["crashed", "AUTHENTICATION_PROBE_CRASHED"],
+    ["timed-out", "AUTHENTICATION_PROBE_TIMED_OUT"],
+  ])("preserves the Cursor authentication probe failure mode %s", async (authenticationFailure, code) => {
+    const readiness = await discoverCursorBackend({
+      resolveCandidate: async () => ({ executablePath: "/tools/agent", argsPrefix: [], source: "path-installation" }),
+      probe: async () => ({
+        installation: "detected",
+        version: "2026.08.1",
+        authentication: "error",
+        authenticationFailure,
+        authenticationDiagnostic: "bounded probe diagnostic",
+        source: "path-installation",
+      }),
+    });
+    expect(readiness).toMatchObject({ status: "error", code, inspectionFallback: "runtime-handshake" });
   });
 
   it("uses agent acp with Cursor login, permissions, questions and streaming", async () => {

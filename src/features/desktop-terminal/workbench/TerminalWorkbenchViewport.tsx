@@ -1,6 +1,5 @@
 import {
   useMemo,
-  useRef,
   type CSSProperties,
   type ReactNode,
 } from "react";
@@ -14,10 +13,13 @@ import {
   type WorkbenchSplitMinimumSize,
 } from "@puppyone/shared-ui";
 import type { TerminalTabMoveDragController } from "../interactions/useTerminalTabMoveDrag";
-import type { TerminalTabMoveDropIntent } from "../model/terminalTabMove";
+import {
+  partitionTerminalGroupDropIntent,
+  type TerminalTabMoveDropIntent,
+} from "../model/terminalTabMove";
 import { TERMINAL_SPLIT_DIVIDER_SIZE } from "../model/terminalSplitConstraints";
+import { TerminalGroupPane } from "../layout/TerminalGroupPane";
 import { TerminalSplitResizeHandle } from "../layout/TerminalSplitResizeHandle";
-import { useTerminalGroupHandleReveal } from "../layout/useTerminalGroupHandleReveal";
 import { terminalPanelId, terminalTabId } from "../ui/session-header/terminalSessionHeaderIds";
 import type { TerminalWorkbenchHeaderItem } from "./TerminalWorkbenchHeader.types";
 import { TerminalWorkbenchGroupMoveHandle } from "./TerminalWorkbenchGroupMoveHandle";
@@ -91,35 +93,21 @@ function TerminalWorkbenchGroupLeaf({
   onCreateItem,
   onMoveByKeyboard,
 }: LayoutNodeProps & { group: AuxiliaryWorkbenchGroup }) {
-  const groupRef = useRef<HTMLElement>(null);
   const headerItems = group.itemIds
     .map((itemId) => headerItemById.get(itemId))
     .filter((item): item is TerminalWorkbenchHeaderItem => Boolean(item));
-  const intent = dropIntent?.targetGroupId === group.id ? dropIntent : null;
-  const edgeIntent = intent?.kind === "split" || intent?.kind === "move-group"
-    ? intent
-    : null;
-  const insertIntent = intent?.kind === "insert" || intent?.kind === "merge-group"
-    ? intent
-    : null;
+  const dropZones = partitionTerminalGroupDropIntent(dropIntent, group.id);
   const activeItem = headerItemById.get(group.activeItemId);
   const host = hosts.get(group.activeItemId);
-  const handleReveal = useTerminalGroupHandleReveal(groupRef, Boolean(intent));
 
   return (
-    <section
-      ref={groupRef}
-      className="desktop-terminal-tab-group"
-      data-terminal-group-pane-id={group.id}
-      data-focused={activeGroupId === group.id ? "true" : undefined}
-      data-handle-hot={handleReveal.revealed ? "true" : undefined}
-      data-drop-target={edgeIntent?.edge}
-      onPointerMove={handleReveal.onPointerMove}
-      onPointerLeave={handleReveal.onPointerLeave}
-    >
-      <TerminalWorkbenchHeader
+    <TerminalGroupPane
+      contentDropIntent={dropZones.content}
+      focused={activeGroupId === group.id}
+      groupId={group.id}
+      header={<TerminalWorkbenchHeader
         activeItemId={group.activeItemId}
-        dropInsertion={insertIntent}
+        dropInsertion={dropZones.tabBar}
         groupId={group.id}
         items={headerItems}
         onActivate={onActivateItem}
@@ -128,8 +116,8 @@ function TerminalWorkbenchGroupLeaf({
         onMoveByKeyboard={(itemId, edge) => onMoveByKeyboard(itemId, group.id, edge)}
         presentedItemIds={[group.activeItemId]}
         tabMove={itemMove}
-      />
-      {activeItem && (
+      />}
+      moveHandle={activeItem ? (
         <TerminalWorkbenchGroupMoveHandle
           groupId={group.id}
           itemId={activeItem.id}
@@ -138,32 +126,18 @@ function TerminalWorkbenchGroupLeaf({
           itemMove={itemMove}
           onActivate={onActivateItem}
         />
-      )}
-      <div
-        className="desktop-terminal-tab-group-content"
-        data-terminal-content-drop-group-id={group.id}
-      >
-        {activeItem && host && (
-          <TerminalWorkbenchItemHostSlot
-            focused={activeGroupId === group.id}
-            host={host}
-            labelledBy={terminalTabId(activeItem.id)}
-            panelId={terminalPanelId(activeItem.id)}
-            itemId={activeItem.id}
-          />
-        )}
-      </div>
-      {edgeIntent && (
-        <div
-          className="desktop-terminal-drop-preview"
-          data-edge={edgeIntent.edge}
-          data-allowed={edgeIntent.allowed ? "true" : "false"}
-          data-operation={edgeIntent.kind}
-          aria-hidden="true"
+      ) : null}
+    >
+      {activeItem && host && (
+        <TerminalWorkbenchItemHostSlot
+          focused={activeGroupId === group.id}
+          host={host}
+          labelledBy={terminalTabId(activeItem.id)}
+          panelId={terminalPanelId(activeItem.id)}
+          itemId={activeItem.id}
         />
       )}
-      <div className="desktop-terminal-pane-interaction-frame" aria-hidden="true" />
-    </section>
+    </TerminalGroupPane>
   );
 }
 

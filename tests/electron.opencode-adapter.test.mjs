@@ -68,12 +68,19 @@ describe("OpenCode ACP AgentRuntimePort adapter", () => {
     expect(connections[0].options.env.OPENCODE_DB).toBe(":memory:");
     expect(connections[0].disposed).toBe(true);
 
-    const session = await adapter.createSession({ model: "openai/gpt-5", mode: "build" });
-    expect(session).toMatchObject({ providerSessionId: "session-1", model: "openai/gpt-5", mode: "build" });
+    const session = await adapter.createSession({ model: "openai/gpt-5", effort: "low", mode: "build" });
+    expect(session).toMatchObject({ providerSessionId: "session-1", model: "openai/gpt-5", effort: "low", mode: "build" });
     const runtimeConnection = connections[1];
+    expect(runtimeConnection.request).toHaveBeenCalledWith("session/set_config_option", {
+      configId: "thought",
+      sessionId: "session-1",
+      type: "select",
+      value: "low",
+    }, { timeoutMs: 30_000 });
     const { turnId } = await adapter.startTurn({
       prompt: "Fix it",
       model: "openai/gpt-5",
+      effort: "low",
       mode: "build",
       contextReferences: [{ path: "/workspace/src/app.ts", name: "app.ts" }],
     });
@@ -131,7 +138,7 @@ describe("OpenCode ACP AgentRuntimePort adapter", () => {
       "turn.completed",
     ]));
 
-    await adapter.startTurn({ prompt: "Follow up", model: "openai/gpt-5", mode: "build" });
+    await adapter.startTurn({ prompt: "Follow up", model: "openai/gpt-5", effort: "low", mode: "build" });
     expect(connections).toHaveLength(2);
     expect(runtimeConnection.request.mock.calls.filter(([method]) => method === "session/new")).toHaveLength(1);
     expect(await adapter.readHistory()).toEqual([]);

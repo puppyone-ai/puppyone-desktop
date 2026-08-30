@@ -6,11 +6,11 @@ import {
   type RefObject,
 } from "react";
 
-/** Matches the Editor/Ghostty interaction: reveal chrome in the upper third. */
-export const TERMINAL_GROUP_HANDLE_REVEAL_RATIO = 1 / 3;
+/** Reveal chrome only from the leading third of the content viewport. */
+export const TERMINAL_PANE_CONTENT_HANDLE_REVEAL_RATIO = 1 / 3;
 
-export function useTerminalGroupHandleReveal(
-  groupRef: RefObject<HTMLElement | null>,
+export function useTerminalPaneContentHandleReveal(
+  contentRef: RefObject<HTMLElement | null>,
   forcedOpen: boolean,
 ) {
   const hotRef = useRef(false);
@@ -23,14 +23,14 @@ export function useTerminalGroupHandleReveal(
   }, []);
 
   const onPointerMove = useCallback((event: PointerEvent<HTMLElement>) => {
-    const group = groupRef.current;
-    if (!group) return;
-    setHotIfChanged(isPointInTerminalGroupHandleRevealZone(
-      group.getBoundingClientRect(),
+    const content = contentRef.current;
+    if (!content) return;
+    setHotIfChanged(isPointInTerminalPaneContentHandleRevealZone(
+      content.getBoundingClientRect(),
       event.clientX,
       event.clientY,
     ));
-  }, [groupRef, setHotIfChanged]);
+  }, [contentRef, setHotIfChanged]);
 
   const onPointerLeave = useCallback(() => setHotIfChanged(false), [setHotIfChanged]);
 
@@ -41,7 +41,7 @@ export function useTerminalGroupHandleReveal(
   } as const;
 }
 
-export function isPointInTerminalGroupHandleRevealZone(
+export function isPointInTerminalPaneContentHandleRevealZone(
   rect: Pick<DOMRect, "left" | "right" | "top" | "height">,
   clientX: number,
   clientY: number,
@@ -49,5 +49,5 @@ export function isPointInTerminalGroupHandleRevealZone(
   return clientX >= rect.left
     && clientX <= rect.right
     && clientY >= rect.top
-    && clientY < rect.top + rect.height * TERMINAL_GROUP_HANDLE_REVEAL_RATIO;
+    && clientY < rect.top + rect.height * TERMINAL_PANE_CONTENT_HANDLE_REVEAL_RATIO;
 }

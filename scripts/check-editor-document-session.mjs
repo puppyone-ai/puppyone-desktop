@@ -217,14 +217,66 @@ const paneSourceSource = readFileSync(paneSourcePath, "utf8");
 if (/\bsetContent\(null\)/.test(paneSourceSource)) {
   errors.push(`${relative(paneSourcePath)} destroys stable editable content during refresh`);
 }
-if (!/workspaceContentChangeMatchesPath\(refreshKey,\s*nodePath\)/.test(paneSourceSource)) {
-  errors.push(`${relative(paneSourcePath)} does not scope external refreshes by resource path`);
+if (!/workspaceContentChangeMatchesResource\(\s*refreshKey,\s*nodePath,\s*previousRefreshSequence\s*\)/.test(paneSourceSource)) {
+  errors.push(`${relative(paneSourcePath)} does not scope external refreshes by resource identity`);
 }
 
 const workspaceWatchPath = path.join(repoRoot, "electron/main/workspace-watch-service.mjs");
 const workspaceWatchSource = readFileSync(workspaceWatchPath, "utf8");
 if (!/pendingPaths:\s*new Set\(\)/.test(workspaceWatchSource) || !/paths:\s*visiblePaths/.test(workspaceWatchSource)) {
   errors.push(`${relative(workspaceWatchPath)} drops resource paths while debouncing workspace events`);
+}
+
+const workbenchWatchPath = path.join(
+  repoRoot,
+  "src/features/data-workspace/useWorkbenchWorkspaceContentWatch.ts",
+);
+const workbenchWatchSource = readFileSync(workbenchWatchPath, "utf8");
+if (
+  !/for \(const folder of folders\)/.test(workbenchWatchSource)
+  || !/bridge\.watchWorkspace\(folder\.workspace\.path/.test(workbenchWatchSource)
+  || !/onWorkspaceContentChanged\([^,]+,\s*folder\.id\)/s.test(workbenchWatchSource)
+) {
+  errors.push(`${relative(workbenchWatchPath)} does not centrally own every Workspace Folder watch with root identity`);
+}
+
+const gitLifecyclePath = path.join(
+  repoRoot,
+  "src/features/source-control/useGitRepositoryLifecycle.ts",
+);
+if (/\bwatchWorkspace\b/.test(readFileSync(gitLifecyclePath, "utf8"))) {
+  errors.push(`${relative(gitLifecyclePath)} reabsorbed filesystem watching into Git lifecycle`);
+}
+
+const workbenchChangeAdapterPath = path.join(
+  repoRoot,
+  "src/features/data-workspace/workbenchWorkspaceContentChange.ts",
+);
+const workbenchChangeAdapterSource = readFileSync(workbenchChangeAdapterPath, "utf8");
+if (
+  !/appendWorkspaceContentChange/.test(workbenchChangeAdapterSource)
+  || !/workspaceFolderId/.test(workbenchChangeAdapterSource)
+  || !/paths:\s*scoped\s*\?\s*mutation\.paths\s*:\s*null/.test(workbenchChangeAdapterSource)
+) {
+  errors.push(`${relative(workbenchChangeAdapterPath)} does not fail closed at the Folder-to-Resource identity boundary`);
+}
+
+for (const featureDirectory of ["desktop-agent", "desktop-terminal"]) {
+  const featureRoot = path.join(repoRoot, "src/features", featureDirectory);
+  for (const filePath of walkTypeScript(featureRoot)) {
+    const source = readFileSync(filePath, "utf8");
+    if (/\b(?:appendWorkspaceContentChange|createWorkspaceContentChange|workspaceRefreshToken)\b/.test(source)) {
+      errors.push(`${relative(filePath)} bypasses the filesystem-owned Workbench mutation pipeline`);
+    }
+  }
+}
+for (const runtimeDirectory of ["agent", "terminal-agent"]) {
+  const runtimeRoot = path.join(repoRoot, "electron/main", runtimeDirectory);
+  for (const filePath of walkSourceFiles(runtimeRoot)) {
+    if (/workspace:changed/.test(readFileSync(filePath, "utf8"))) {
+      errors.push(`${relative(filePath)} spoofs committed filesystem state from a provider/tool event`);
+    }
+  }
 }
 
 if (
@@ -388,10 +440,10 @@ if (!/"conflict"/.test(readFileSync(path.join(sharedEditorRoot, "document-sessio
 const resourceLeasePath = path.join(sharedEditorRoot, "resource/useFileResourceLease.ts");
 const paneSourceSourceForLease = readFileSync(paneSourcePath, "utf8");
 if (
-  !/workspaceContentChangeMatchesPath/.test(readFileSync(resourceLeasePath, "utf8"))
+  !/workspaceContentChangeMatchesResource/.test(readFileSync(resourceLeasePath, "utf8"))
   || !/useFileResourceLease/.test(paneSourceSourceForLease)
 ) {
-  errors.push("Editor resources do not use the shared path-scoped resource lease");
+  errors.push("Editor resources do not use the shared identity-scoped resource lease");
 }
 
 const desktopWorkspaceContentPath = path.join(repoRoot, "src/features/app-shell/DesktopWorkspaceContent.tsx");
@@ -551,6 +603,15 @@ function* walkTypeScript(directory) {
     const stats = statSync(filePath);
     if (stats.isDirectory()) yield* walkTypeScript(filePath);
     else if (/\.tsx?$/.test(filePath)) yield filePath;
+  }
+}
+
+function* walkSourceFiles(directory) {
+  for (const entry of readdirSync(directory)) {
+    const filePath = path.join(directory, entry);
+    const stats = statSync(filePath);
+    if (stats.isDirectory()) yield* walkSourceFiles(filePath);
+    else if (/\.(?:[cm]?js|tsx?)$/.test(filePath)) yield filePath;
   }
 }
 

@@ -1,5 +1,5 @@
 import { Check, Copy } from "lucide-react";
-import { Fragment, useDeferredValue, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 
 type SafeMarkdownProps = { text: string; streaming?: boolean };
@@ -15,14 +15,12 @@ const MAX_INITIAL_MARKDOWN_BLOCKS = 240;
 export function SafeMarkdown({ text, streaming = false }: SafeMarkdownProps) {
   const { locale, t } = useLocalization();
   const [expanded, setExpanded] = useState(false);
-  // External-store stream updates are synchronous. Deferring only the growing
-  // Markdown payload keeps typing and scrolling responsive while React catches
-  // up with the latest provider delta.
-  const deferredText = useDeferredValue(text);
-  const renderText = streaming ? deferredText : text;
-  const candidate = expanded ? renderText : initialMarkdownWindow(renderText);
-  const parsedBlocks = parseBlocks(candidate);
-  const initiallyTruncated = renderText.length > MAX_INITIAL_MARKDOWN_TEXT
+  // The event synchronizer already coalesces provider deltas to the browser's
+  // paint cadence. Rendering that latest snapshot directly avoids the uneven
+  // catch-up bursts that a second deferred queue introduces during streaming.
+  const candidate = expanded ? text : initialMarkdownWindow(text);
+  const parsedBlocks = useMemo(() => parseBlocks(candidate), [candidate]);
+  const initiallyTruncated = text.length > MAX_INITIAL_MARKDOWN_TEXT
     || parsedBlocks.length > MAX_INITIAL_MARKDOWN_BLOCKS;
   const blocks = expanded ? parsedBlocks : parsedBlocks.slice(0, MAX_INITIAL_MARKDOWN_BLOCKS);
   return (

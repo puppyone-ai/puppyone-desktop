@@ -19,6 +19,7 @@ type UseAuxiliaryWorkbenchContributionsOptions = Readonly<{
     contribution: AuxiliaryWorkbenchContribution,
     item: AuxiliaryWorkbenchItem,
     targetGroupId: string | null,
+    recipe: AuxiliaryWorkbenchCreationRecipe | null,
   ) => string;
 }>;
 
@@ -92,7 +93,12 @@ export function useAuxiliaryWorkbenchContributions({
         || countItemsOfKind(itemsRef.current, contribution.kind)
           >= (contribution.maximumItems ?? Number.POSITIVE_INFINITY)
       ) return null;
-      const itemId = onCommitRef.current(contribution, preparation.item, targetGroupId);
+      const itemId = onCommitRef.current(
+        contribution,
+        preparation.item,
+        targetGroupId,
+        recipe,
+      );
       committed = true;
       return itemId;
     } catch {

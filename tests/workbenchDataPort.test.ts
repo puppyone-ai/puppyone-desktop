@@ -98,6 +98,34 @@ describe("WorkbenchDataService", () => {
     });
   });
 
+  it("revokes each file URL through the Folder provider that minted it", async () => {
+    const workbench = createWorkbenchWorkspace([
+      workspace("a", "Alpha", "/alpha"),
+      workspace("b", "Beta", "/beta"),
+    ]);
+    const providers = new Map<string, DataPort>();
+    const service = createWorkbenchDataService(workbench, {
+      createProvider(folder) {
+        const result = {
+          ...provider(folder.name),
+          getFileUrl: vi.fn(async (path: string) => `blob:${folder.id}:${path}`),
+          revokeFileUrl: vi.fn(async () => undefined),
+        };
+        providers.set(folder.id, result);
+        return result;
+      },
+    });
+    const second = createWorkspaceResourceUri(workbench.folders[1]!.uri, "image.png");
+
+    const url = await service.dataPort.getFileUrl?.(second, { purpose: "file-preview" });
+    await service.dataPort.revokeFileUrl?.(url!);
+
+    expect(providers.get(workbench.folders[1]!.id)?.getFileUrl)
+      .toHaveBeenCalledWith("image.png", { purpose: "file-preview" });
+    expect(providers.get(workbench.folders[1]!.id)?.revokeFileUrl).toHaveBeenCalledWith(url);
+    expect(providers.get(workbench.folders[0]!.id)?.revokeFileUrl).not.toHaveBeenCalled();
+  });
+
   it("routes equal relative document writes to their owning Folder provider", async () => {
     const workbench = createWorkbenchWorkspace([
       workspace("a", "Alpha", "/alpha"),

@@ -69,6 +69,7 @@ export function createAgentEventJournal({ sessionCache, logger = console }) {
       updatedAt: session.updatedAt,
       terminalState: session.terminalState,
       selectedModel: session.selectedModel,
+      selectedEffort: session.selectedEffort,
       selectedMode: session.selectedMode,
       capabilityRevision: session.capabilities?.revision ?? null,
       lastSequence: session.sequence,

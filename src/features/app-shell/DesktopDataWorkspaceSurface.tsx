@@ -15,6 +15,7 @@ import {
   type AiEditRequest,
   type DataNode,
   type Workspace,
+  type WorkspaceContentChange,
   type WorkspaceFolder,
 } from "@puppyone/shared-ui";
 import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
@@ -115,7 +116,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
   workspaceFolders: readonly WorkspaceFolder[];
   resolveWorkspaceResource: (path: string | null) => ResolvedWorkbenchDataResource | null;
   workspaceKey: string;
-  workspaceRefreshToken: Readonly<{ sequence: number; paths: readonly string[] | null }>;
+  workspaceRefreshToken: WorkspaceContentChange;
   workspaceSurfaceError: string | null;
   sidebarCreateMenuOpen: boolean;
 };

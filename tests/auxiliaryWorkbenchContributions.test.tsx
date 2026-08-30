@@ -60,7 +60,7 @@ describe("Auxiliary Workbench contribution admission", () => {
       await expect(first!).resolves.toBe("chat-1");
     });
     expect(prepare).toHaveBeenCalledWith({ item: reservedItem, recipe });
-    expect(onCommit).toHaveBeenCalledWith(contribution, reservedItem, "group-1");
+    expect(onCommit).toHaveBeenCalledWith(contribution, reservedItem, "group-1", recipe);
   });
 
   it("reports preparation failure, disposes prepared state, and leaves topology empty", async () => {
@@ -135,6 +135,7 @@ function renderRegistry(
     contribution: AuxiliaryWorkbenchContribution,
     item: AuxiliaryWorkbenchItem,
     groupId: string | null,
+    recipe: AuxiliaryWorkbenchCreationRecipe | null,
   ) => string,
 ) {
   const container = document.createElement("div");
@@ -164,6 +165,7 @@ function Harness({
     contribution: AuxiliaryWorkbenchContribution,
     item: AuxiliaryWorkbenchItem,
     groupId: string | null,
+    recipe: AuxiliaryWorkbenchCreationRecipe | null,
   ) => string;
 }>) {
   latest = useAuxiliaryWorkbenchContributions({
@@ -194,6 +196,7 @@ function createContribution(
       title: "New chat",
       accessibleLabel: "New chat — Agent Chat",
       detail: "Agent Chat",
+      iconKey: null,
       status: "starting" as const,
       running: false,
       resourceId: null,

@@ -5,6 +5,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  createWorkspaceContentChange,
   PRESET_VIEWERS,
   resolveEditorViewer,
   useFileResourceLease,
@@ -87,16 +88,16 @@ describe("file resource lease", () => {
         });
       };
 
-      await render({ sequence: 0, paths: [] });
+      await render(change(0, []));
       await waitFor(() => getFileUrl.mock.calls.length === 1);
       const firstUrl = container.dataset.url;
       expect(firstUrl).toBe(`blob:${formatCase.path}:1`);
 
-      await render({ sequence: 1, paths: ["unrelated.txt"] });
+      await render(change(1, ["unrelated.txt"]));
       expect(getFileUrl).toHaveBeenCalledTimes(1);
       expect(container.dataset.url).toBe(firstUrl);
 
-      await render({ sequence: 2, paths: [formatCase.path] });
+      await render(change(2, [formatCase.path]));
       await waitFor(() => getFileUrl.mock.calls.length === 2 && container.dataset.url !== firstUrl);
       expect(container.dataset.url).toBe(`blob:${formatCase.path}:2`);
       expect(revokeFileUrl).toHaveBeenCalledWith(firstUrl);
@@ -114,12 +115,12 @@ describe("file resource lease", () => {
     root = createRoot(container);
 
     await act(async () => {
-      root?.render(<ResourceLeaseProbe dataPort={dataPort} path="photo.png" refresh={{ sequence: 0, paths: [] }} />);
+      root?.render(<ResourceLeaseProbe dataPort={dataPort} path="photo.png" refresh={change(0, [])} />);
       await Promise.resolve();
     });
     await waitFor(() => getFileUrl.mock.calls.length === 1);
     await act(async () => {
-      root?.render(<ResourceLeaseProbe dataPort={dataPort} path="photo.png" refresh={{ sequence: 1, paths: null }} />);
+      root?.render(<ResourceLeaseProbe dataPort={dataPort} path="photo.png" refresh={change(1, null)} />);
       await Promise.resolve();
     });
     await waitFor(() => getFileUrl.mock.calls.length === 2);
@@ -145,6 +146,10 @@ function ResourceLeaseProbe({
       }}
     />
   );
+}
+
+function change(sequence: number, paths: readonly string[] | null): WorkspaceContentChange {
+  return createWorkspaceContentChange({ sequence, rootUri: null, paths });
 }
 
 async function waitFor(assertion: () => boolean, attempts = 100): Promise<void> {

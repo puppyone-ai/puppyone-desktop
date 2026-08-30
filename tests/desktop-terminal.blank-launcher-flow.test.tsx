@@ -50,6 +50,9 @@ describe("Unified Workbench blank launcher flow", () => {
       expect(document.querySelector('[data-fake-chat="codex"]')).not.toBeNull();
     });
     expect(document.querySelectorAll('[role="tab"]')).toHaveLength(1);
+    expect(document.querySelector(
+      '[role="tab"] .desktop-terminal-launcher-icon.is-codex',
+    )).not.toBeNull();
 
     const plus = document.querySelector<HTMLButtonElement>('[aria-label="New terminal"]');
     expect(plus).not.toBeNull();
@@ -66,6 +69,9 @@ describe("Unified Workbench blank launcher flow", () => {
       expect(document.querySelector(".desktop-terminal-launcher")).toBeNull();
     });
     expect(document.querySelectorAll('[role="tab"]')).toHaveLength(2);
+    expect(document.querySelector(
+      '[aria-selected="true"] .desktop-terminal-launcher-icon.is-claude',
+    )).not.toBeNull();
     expect(document.querySelector('[role="menu"]')).toBeNull();
   });
 
@@ -118,6 +124,7 @@ function fakeChatContribution(
       title: "New chat",
       accessibleLabel: "New chat — Agent Chat",
       detail: "Agent Chat",
+      iconKey: null,
       status: "starting" as const,
       running: false,
       resourceId: null,
