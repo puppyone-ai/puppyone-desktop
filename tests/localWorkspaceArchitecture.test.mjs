@@ -36,6 +36,12 @@ describe("local path policy", () => {
     expect(resolveWorkspacePath("/tmp/project", "docs/readme.md")).toBe("/tmp/project/docs/readme.md");
     expect(() => normalizeRelativePath("../secret.txt")).toThrow(/outside the selected workspace/i);
     expect(() => normalizeRelativePath("/tmp/secret.txt")).toThrow(/outside the selected workspace/i);
+    expect(() => normalizeRelativePath(
+      "puppyone-local://workspace/folder-a/docs/guanqun.md",
+    )).toThrow(/provider-relative/i);
+    expect(() => normalizeRelativePath(
+      ".\\puppyone-local:\\workspace\\folder-a\\docs\\guanqun.md",
+    )).toThrow(/provider-relative/i);
   });
 });
 

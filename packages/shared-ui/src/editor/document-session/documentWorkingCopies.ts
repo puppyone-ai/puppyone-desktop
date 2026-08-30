@@ -82,7 +82,14 @@ export function getOrCreateDocumentWorkingCopy(options: Readonly<{
   return binding;
 }
 
-export async function closeDocumentWorkingCopy(identity: DocumentIdentity): Promise<void> {
+export async function closeDocumentWorkingCopy(input: Readonly<{
+  storageIdentity: DocumentIdentity["storageIdentity"];
+  resourcePath: string;
+}>): Promise<void> {
+  const identity = createDocumentIdentity(
+    { storageIdentity: input.storageIdentity },
+    input.resourcePath,
+  );
   const key = getDocumentIdentityKey(identity);
   const matches = [...allBindings].filter((binding) => getDocumentIdentityKey(binding.identity) === key);
   await flushAndRelease(matches, "document-close");

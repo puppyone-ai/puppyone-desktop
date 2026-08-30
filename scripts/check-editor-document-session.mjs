@@ -257,6 +257,73 @@ if (
 ) {
   errors.push("Document Working Copies are not keyed by stable storage identity and canonical resource path");
 }
+
+const documentIdentityPath = path.join(
+  sharedEditorRoot,
+  "document-session/documentIdentity.ts",
+);
+const documentIdentitySource = readFileSync(documentIdentityPath, "utf8");
+if (
+  !/CanonicalResourcePath\s*\|\s*ResourceUri/.test(documentIdentitySource)
+  || !/isDataResourceUri\(resourcePath\)[\s\S]*?canonicalizeResourceUri\(resourcePath\)[\s\S]*?canonicalizeResourcePath\(resourcePath\)/.test(
+    documentIdentitySource,
+  )
+) {
+  errors.push(`${relative(documentIdentityPath)} does not preserve URI identity before path canonicalization`);
+}
+
+const resourcePathPath = path.join(repoRoot, "packages/shared-ui/src/core/resourcePath.ts");
+const resourcePathSource = readFileSync(resourcePathPath, "utf8");
+if (!/if\s*\(looksLikeResourceUri\(path\)\)[\s\S]*?throw new TypeError/.test(resourcePathSource)) {
+  errors.push(`${relative(resourcePathPath)} does not fail closed when a Resource URI reaches a provider-path normalizer`);
+}
+
+const dataResourcePathPath = path.join(repoRoot, "packages/shared-ui/src/core/dataResourcePath.ts");
+const dataResourcePathSource = readFileSync(dataResourcePathPath, "utf8");
+if (
+  !/function assertValidDataResourceReference/.test(dataResourcePathSource)
+  || !/assertValidDataResourceReference\(value\)/.test(dataResourcePathSource)
+) {
+  errors.push(`${relative(dataResourcePathPath)} does not reject malformed Resource URIs at mixed data boundaries`);
+}
+
+const workbenchDataPortPath = path.join(
+  repoRoot,
+  "src/features/data-workspace/workbenchDataPort.ts",
+);
+const workbenchDataPortSource = readFileSync(workbenchDataPortPath, "utf8");
+if (!/if\s*\(!resourceIsUri\)\s*assertValidDataResourceReference\(path\)/.test(workbenchDataPortSource)) {
+  errors.push(`${relative(workbenchDataPortPath)} can route a malformed Resource URI through the legacy first-Folder fallback`);
+}
+
+const multiRootPersistenceTestPath = path.join(
+  repoRoot,
+  "tests/multiRootDocumentPersistence.integration.test.ts",
+);
+const multiRootPersistenceTestSource = readFileSync(multiRootPersistenceTestPath, "utf8");
+for (const requiredContract of [
+  "persists and reopens same-named documents in two real Workspace roots without crossing providers",
+  "docs with space/群群.md",
+  "getOrCreateDocumentWorkingCopy",
+  "createWorkbenchDataService",
+  "saveMode: \"auto\"",
+  "saveMode: \"manual\"",
+]) {
+  if (!multiRootPersistenceTestSource.includes(requiredContract)) {
+    errors.push(`${relative(multiRootPersistenceTestPath)} does not enforce: ${requiredContract}`);
+  }
+}
+const workbenchDataPortTestPath = path.join(repoRoot, "tests/workbenchDataPort.test.ts");
+if (!/rejects a malformed Resource URI before any Folder provider can write/.test(
+  readFileSync(workbenchDataPortTestPath, "utf8"),
+)) {
+  errors.push(`${relative(workbenchDataPortTestPath)} does not cover fail-closed malformed URI routing`);
+}
+const localFilesPath = path.join(repoRoot, "src/lib/localFiles.ts");
+const localFilesSource = readFileSync(localFilesPath, "utf8");
+if (!/documentPersistence:[\s\S]*?path:\s*canonicalizeResourcePath\(path\)/.test(localFilesSource)) {
+  errors.push(`${relative(localFilesPath)} does not validate provider-relative paths before local persistence IPC`);
+}
 if (!/"conflict"/.test(readFileSync(path.join(sharedEditorRoot, "document-session/types.ts"), "utf8"))) {
   errors.push("Document Session does not expose conflict as a first-class status");
 }

@@ -1,5 +1,6 @@
 import {
   ResourceUriIdentityService,
+  assertValidDataResourceReference,
   createWorkspaceResourceUri,
   getWorkspaceResourcePath,
   isDataResourceUri,
@@ -53,7 +54,9 @@ export function createWorkbenchDataService(
   ]));
   const copyBetweenRoots = options.copyBetweenRoots ?? copyWorkspaceEntryBetweenRoots;
   const resolveResource = (path: string | null): ResolvedWorkbenchDataResource => {
-    if (!path || !isDataResourceUri(path)) {
+    const resourceIsUri = isDataResourceUri(path);
+    if (!resourceIsUri) assertValidDataResourceReference(path);
+    if (!path || !resourceIsUri) {
       const folder = workbench.folders[0]!;
       return {
         folder,

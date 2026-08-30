@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canonicalizeResourcePath,
   collectDataResourceAncestors,
   createWorkspaceResourceUri,
   createWorkspaceRootUri,
@@ -57,5 +58,24 @@ describe("data Resource path operations", () => {
     expect(getDataResourceParent("src/App.tsx")).toBe("src");
     expect(joinDataResourcePath("src", "App.tsx")).toBe("src/App.tsx");
     expect(collectDataResourceAncestors("src/components/App.tsx")).toEqual(["src", "src/components"]);
+  });
+
+  it("fails closed when a Resource URI delimiter has been damaged", () => {
+    const malformed = "puppyone-local:/workspace/folder-a/docs/guanqun.md";
+
+    expect(() => normalizeDataResourcePath(malformed)).toThrow(/Malformed Resource URI/i);
+    expect(() => getDataResourceName(malformed)).toThrow(/Malformed Resource URI/i);
+    expect(() => normalizeDataResourcePath(
+      ".\\puppyone-local:\\workspace\\folder-a\\docs\\guanqun.md",
+    )).toThrow(/Malformed Resource URI/i);
+  });
+
+  it("refuses to normalize Resource URIs as provider-relative paths", () => {
+    expect(() => canonicalizeResourcePath(
+      "puppyone-local://workspace/folder-a/docs/guanqun.md",
+    )).toThrow(/provider-relative paths/i);
+    expect(() => canonicalizeResourcePath(
+      "puppyone-local:/workspace/folder-a/docs/guanqun.md",
+    )).toThrow(/provider-relative paths/i);
   });
 });

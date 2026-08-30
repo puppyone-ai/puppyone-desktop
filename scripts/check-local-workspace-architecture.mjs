@@ -113,6 +113,14 @@ if (!formatPolicy.includes("packages/shared-ui/src/core/fileFormats.json")) {
   errors.push("the local file-format policy must consume the canonical Shared UI registry");
 }
 
+const pathPolicy = read("local-api/files/path-policy.mjs");
+if (
+  !/RESOURCE_URI_LIKE_PATTERN/.test(pathPolicy)
+  || !/Workspace paths must be provider-relative, not Resource URIs/.test(pathPolicy)
+) {
+  errors.push("the local filesystem boundary must fail closed when it receives a Resource URI");
+}
+
 const contextualCloudData = read("src/features/cloud/data/useDesktopCloudData.ts");
 const contextualCloudRouter = read("src/features/cloud/routes/CloudRouter.tsx");
 const contextualCloudStates = read("src/features/cloud/initialization/CloudInitializationView.tsx");

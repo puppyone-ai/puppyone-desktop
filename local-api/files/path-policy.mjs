@@ -1,10 +1,19 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+const RESOURCE_URI_LIKE_PATTERN = /^[A-Za-z][A-Za-z0-9+.-]*:[/\\]/;
+
 export function normalizeRelativePath(value) {
   if (value == null || value === "") return "";
   if (typeof value !== "string") {
     throw new Error("Folder path must be a string.");
+  }
+  const uriCandidate = value
+    .trimStart()
+    .replaceAll("\\", "/")
+    .replace(/^\.\/+/, "");
+  if (RESOURCE_URI_LIKE_PATTERN.test(uriCandidate)) {
+    throw new Error("Workspace paths must be provider-relative, not Resource URIs.");
   }
   if (path.isAbsolute(value)) {
     throw new Error("Folder path is outside the selected workspace.");

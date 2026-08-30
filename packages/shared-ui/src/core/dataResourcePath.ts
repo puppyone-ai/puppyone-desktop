@@ -5,6 +5,7 @@ import {
   parseResourceUri,
   type ResourceUri,
 } from "./resourceUri";
+import { looksLikeResourceUri } from "./resourcePath";
 
 const resourceIdentity = new ResourceUriIdentityService();
 
@@ -23,11 +24,24 @@ export function isDataResourceUri(value: string | null | undefined): value is Re
   }
 }
 
+/**
+ * Mixed data boundaries may accept a legacy provider path or a Resource URI.
+ * A URI-shaped value must never fall back to provider-relative path routing
+ * merely because an earlier layer damaged its `://` delimiter.
+ */
+export function assertValidDataResourceReference(
+  value: string | null | undefined,
+): void {
+  if (!looksLikeResourceUri(value) || isDataResourceUri(value)) return;
+  throw new TypeError("Malformed Resource URI. Expected scheme://authority/path.");
+}
+
 export function normalizeDataResourcePath(
   value: string | null | undefined,
 ): string | null {
   if (value === null || value === undefined) return null;
   if (isDataResourceUri(value)) return canonicalizeResourceUri(value);
+  assertValidDataResourceReference(value);
 
   const normalized = value
     .replaceAll("\\", "/")

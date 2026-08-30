@@ -7,9 +7,12 @@ import {
   type CanonicalResourcePath,
 } from "../../core/resourcePath";
 import { isDataResourceUri } from "../../core/dataResourcePath";
-import { canonicalizeResourceUri } from "../../core/resourceUri";
+import {
+  canonicalizeResourceUri,
+  type ResourceUri,
+} from "../../core/resourceUri";
 
-export type CanonicalDocumentResourcePath = CanonicalResourcePath;
+export type CanonicalDocumentResourcePath = CanonicalResourcePath | ResourceUri;
 
 export type DocumentIdentity = Readonly<{
   storageIdentity: DocumentStorageIdentity;

@@ -2,6 +2,7 @@ export * from "./core/types";
 export { RENDERER_ASSET_PATHS } from "./core/rendererAssetCatalog";
 export { resolveRendererPublicAssetUrl } from "./core/rendererPublicAsset";
 export {
+  assertValidDataResourceReference,
   collectDataResourceAncestors,
   getDataResourceName,
   getDataResourceParent,

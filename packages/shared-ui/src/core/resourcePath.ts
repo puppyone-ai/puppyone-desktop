@@ -1,14 +1,35 @@
-export type CanonicalResourcePath = string;
+declare const canonicalResourcePathBrand: unique symbol;
+
+export type CanonicalResourcePath = string & {
+  readonly [canonicalResourcePathBrand]: true;
+};
+
+const RESOURCE_URI_LIKE_PATTERN = /^[A-Za-z][A-Za-z0-9+.-]*:[/\\]/;
+
+/** True for a URI-shaped or malformed URI-shaped value, never a provider-relative path. */
+export function looksLikeResourceUri(value: string | null | undefined): boolean {
+  if (typeof value !== "string") return false;
+  const candidate = value
+    .trimStart()
+    .replaceAll("\\", "/")
+    .replace(/^\.\/+/, "");
+  return RESOURCE_URI_LIKE_PATTERN.test(candidate);
+}
 
 /** Canonical comparison form for workspace-relative resource paths. */
 export function canonicalizeResourcePath(path: string): CanonicalResourcePath {
+  if (looksLikeResourceUri(path)) {
+    throw new TypeError(
+      "Resource URI-like values cannot be canonicalized as provider-relative paths.",
+    );
+  }
   const canonical = path
     .replaceAll("\\", "/")
     .replace(/^\.\/+/, "")
     .replace(/\/{2,}/g, "/")
     .replace(/\/$/, "");
   if (!canonical) throw new TypeError("Resource path must not be empty.");
-  return canonical;
+  return canonical as CanonicalResourcePath;
 }
 
 /** True when candidate is the resource itself or belongs to its subtree. */
@@ -29,7 +50,7 @@ export function rebaseResourcePath(
   const canonicalPrevious = canonicalizeResourcePath(previousResource);
   const canonicalNext = canonicalizeResourcePath(nextResource);
   if (canonicalCandidate === canonicalPrevious) return canonicalNext;
-  return canonicalCandidate.startsWith(`${canonicalPrevious}/`)
+  return (canonicalCandidate.startsWith(`${canonicalPrevious}/`)
     ? `${canonicalNext}${canonicalCandidate.slice(canonicalPrevious.length)}`
-    : canonicalCandidate;
+    : canonicalCandidate) as CanonicalResourcePath;
 }
