@@ -33,14 +33,20 @@ const modelsByRuntime: Record<string, AgentModel[]> = {
 };
 
 const referenceCapabilities: AgentReferenceInputCapabilities = {
-  workspaceFiles: true,
-  workspaceDirectories: true,
-  images: "local-snapshot",
-  genericFiles: "none",
-  acceptedMimeTypes: ["image/png", "image/jpeg", "image/gif", "image/webp"],
-  maxReferences: 32,
-  maxReferenceBytes: 25 * 1024 * 1024,
-  maxTotalReferenceBytes: 25 * 1024 * 1024,
+  schemaVersion: 1,
+  workspace: { files: true, directories: true },
+  attachments: {
+    image: { accepted: true, mimeTypes: ["image/png", "image/jpeg", "image/gif", "image/webp"] },
+    text: { accepted: false },
+    audio: { accepted: false },
+    video: { accepted: false },
+    binary: { accepted: false },
+  },
+  limits: {
+    maxCount: 32,
+    maxBytesPerReference: 25 * 1024 * 1024,
+    maxTotalBytes: 25 * 1024 * 1024,
+  },
   steer: false,
   attachmentOnly: false,
 };

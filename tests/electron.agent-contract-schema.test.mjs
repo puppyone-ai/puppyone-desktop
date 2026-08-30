@@ -176,9 +176,16 @@ describe("shared Agent contract", () => {
     expect(assertAgentRuntimeCapabilities({ resolveApproval: vi.fn() }, { manualApprovals: true }, "fixture").manualApprovals).toBe(true);
   });
 
-  it("fails unknown reference transports closed instead of projecting legacy attachment support", () => {
+  it("fails unknown legacy reference transports into the semantic attachment contract", () => {
     expect(normalizeReferenceInputCapabilities({ images: "future-transport" }, { attachments: true }))
-      .toMatchObject({ images: "none", genericFiles: "none" });
+      .toMatchObject({
+        schemaVersion: 1,
+        attachments: {
+          image: { accepted: false },
+          text: { accepted: false },
+          binary: { accepted: false },
+        },
+      });
   });
 });
 

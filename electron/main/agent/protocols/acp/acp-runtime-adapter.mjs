@@ -17,11 +17,32 @@ import {
 } from "../../security/authorized-project-instructions.mjs";
 import { boundRendererValue, redactSecrets, redactSecretText } from "../../agent-events.mjs";
 import { ACP_INLINE_IMAGE_MAX_BYTES } from "./acp-limits.mjs";
-import { buildAcpPromptBlocks, materializeAcpImageReferences } from "./acp-prompt-input.mjs";
+import {
+  ACP_NATIVE_IMAGE_MIME_TYPES,
+  buildAcpPromptBlocks,
+  materializeAcpReferences,
+} from "./acp-prompt-input.mjs";
 import { AcpHistoryCollector } from "./acp-history-collector.mjs";
 
 const METADATA_SETTLE_MS = 75;
 export { ACP_INLINE_IMAGE_MAX_BYTES } from "./acp-limits.mjs";
+
+const ACP_EMBEDDED_TEXT_MIME_TYPES = Object.freeze([
+  "text/*",
+  "application/json",
+  "application/javascript",
+  "application/xml",
+  "application/yaml",
+  "application/toml",
+  "image/svg+xml",
+]);
+const ACP_EMBEDDED_TEXT_EXTENSIONS = Object.freeze([
+  ".bash", ".c", ".cc", ".cfg", ".conf", ".cpp", ".cs", ".css", ".csv", ".env",
+  ".gql", ".go", ".graphql", ".h", ".hpp", ".htm", ".html", ".ini", ".java", ".js",
+  ".json", ".jsonl", ".jsx", ".kt", ".md", ".mdx", ".mjs", ".cjs", ".py", ".rb",
+  ".rs", ".sh", ".sql", ".svg", ".swift", ".toml", ".ts", ".tsv", ".tsx", ".txt",
+  ".xml", ".yaml", ".yml", ".zsh",
+]);
 
 export const BASE_ACP_CAPABILITIES = Object.freeze({
   streamingText: true,
@@ -46,13 +67,29 @@ export const BASE_ACP_CAPABILITIES = Object.freeze({
   skills: true,
   compaction: false,
   referenceInputs: Object.freeze({
-    workspaceFiles: true,
-    workspaceDirectories: true,
-    images: "none",
-    genericFiles: "none",
-    maxReferences: 32,
-    maxReferenceBytes: ACP_INLINE_IMAGE_MAX_BYTES,
-    maxTotalReferenceBytes: ACP_INLINE_IMAGE_MAX_BYTES,
+    schemaVersion: 1,
+    workspace: Object.freeze({ files: true, directories: true }),
+    attachments: Object.freeze({
+      image: Object.freeze({
+        accepted: false,
+        mimeTypes: ACP_NATIVE_IMAGE_MIME_TYPES,
+        maxBytes: ACP_INLINE_IMAGE_MAX_BYTES,
+      }),
+      text: Object.freeze({
+        accepted: false,
+        mimeTypes: ACP_EMBEDDED_TEXT_MIME_TYPES,
+        extensions: ACP_EMBEDDED_TEXT_EXTENSIONS,
+        maxBytes: ACP_INLINE_IMAGE_MAX_BYTES,
+      }),
+      audio: Object.freeze({ accepted: false }),
+      video: Object.freeze({ accepted: false }),
+      binary: Object.freeze({ accepted: false }),
+    }),
+    limits: Object.freeze({
+      maxCount: 32,
+      maxBytesPerReference: 25 * 1024 * 1024,
+      maxTotalBytes: 25 * 1024 * 1024,
+    }),
     steer: false,
     attachmentOnly: false,
   }),
@@ -78,6 +115,7 @@ export class AcpRuntimeAdapter {
     sessionTitles = {},
     authenticationMethodId = null,
     capabilityOverrides = {},
+    referenceInputProfile = {},
     questionMethods = [],
     eventSource = `${runtimeDescriptor?.id || "agent"}-acp`,
     onDispose = () => {},
@@ -103,6 +141,9 @@ export class AcpRuntimeAdapter {
     };
     this.authenticationMethodId = text(authenticationMethodId, 160) || null;
     this.capabilityOverrides = capabilityOverrides;
+    this.referenceInputProfile = Object.freeze({
+      embeddedText: referenceInputProfile?.embeddedText === true,
+    });
     this.questionMethods = new Set(array(questionMethods).map((method) => text(method, 160)).filter(Boolean));
     this.eventSource = eventSource;
     this.onDispose = onDispose;
@@ -284,13 +325,16 @@ export class AcpRuntimeAdapter {
     const turnId = `${this.runtimeDescriptor.id}:${randomUUID()}`;
     const normalizer = new AcpEventNormalizer({ turnId });
     const instructions = await this.projectInstructionLoader(this.workspaceRoot);
+    const referenceProfile = this.#nativeReferenceProfile();
     const blocks = buildAcpPromptBlocks({
       prompt,
       instructions: formatAuthorizedProjectInstructions(instructions),
-      references: await materializeAcpImageReferences(
+      references: await materializeAcpReferences(
         allReferences.length > 0 ? allReferences : [...contextReferences, ...attachments],
+        referenceProfile,
       ),
       workspaceRoot: this.workspaceRoot,
+      profile: referenceProfile,
     });
     const active = { turnId, normalizer, interrupted: false };
     this.activeTurn = active;
@@ -451,6 +495,9 @@ export class AcpRuntimeAdapter {
   #capabilities() {
     const native = this.client?.agentCapabilities ?? {};
     const acceptsImages = Boolean(native.promptCapabilities?.image);
+    const acceptsEmbeddedText = Boolean(
+      this.referenceInputProfile.embeddedText && native.promptCapabilities?.embeddedContext,
+    );
     return {
       ...BASE_ACP_CAPABILITIES,
       resume: native.loadSession === true || Boolean(native.sessionCapabilities?.resume),
@@ -458,8 +505,8 @@ export class AcpRuntimeAdapter {
       sessionHistory: Boolean(native.sessionCapabilities?.list),
       structuredQuestions: this.questionMethods.size > 0,
       mcp: Boolean(native.mcpCapabilities?.http || native.mcpCapabilities?.sse),
-      attachments: acceptsImages,
-      revision: `${this.runtimeDescriptor.id}-acp:${this.client?.protocolVersion ?? 1}`,
+      attachments: acceptsImages || acceptsEmbeddedText,
+      revision: `${this.runtimeDescriptor.id}-acp:${this.client?.protocolVersion ?? 1}:image${Number(acceptsImages)}:embedded${Number(acceptsEmbeddedText)}`,
       protocol: {
         name: "acp",
         version: this.client?.protocolVersion ?? 1,
@@ -470,10 +517,38 @@ export class AcpRuntimeAdapter {
       referenceInputs: {
         ...BASE_ACP_CAPABILITIES.referenceInputs,
         ...(this.capabilityOverrides.referenceInputs ?? {}),
-        images: acceptsImages ? "data-url" : "none",
-        acceptedMimeTypes: acceptsImages ? ["image/png", "image/jpeg", "image/gif", "image/webp"] : [],
+        workspace: {
+          ...BASE_ACP_CAPABILITIES.referenceInputs.workspace,
+          ...(this.capabilityOverrides.referenceInputs?.workspace ?? {}),
+        },
+        attachments: {
+          ...BASE_ACP_CAPABILITIES.referenceInputs.attachments,
+          ...(this.capabilityOverrides.referenceInputs?.attachments ?? {}),
+          image: {
+            ...BASE_ACP_CAPABILITIES.referenceInputs.attachments.image,
+            ...(this.capabilityOverrides.referenceInputs?.attachments?.image ?? {}),
+            accepted: acceptsImages,
+          },
+          text: {
+            ...BASE_ACP_CAPABILITIES.referenceInputs.attachments.text,
+            ...(this.capabilityOverrides.referenceInputs?.attachments?.text ?? {}),
+            accepted: acceptsEmbeddedText,
+          },
+        },
+        limits: {
+          ...BASE_ACP_CAPABILITIES.referenceInputs.limits,
+          ...(this.capabilityOverrides.referenceInputs?.limits ?? {}),
+        },
       },
     };
+  }
+
+  #nativeReferenceProfile() {
+    const promptCapabilities = this.client?.agentCapabilities?.promptCapabilities ?? {};
+    return Object.freeze({
+      image: promptCapabilities.image === true,
+      embeddedText: this.referenceInputProfile.embeddedText && promptCapabilities.embeddedContext === true,
+    });
   }
 
   #syncSession(response = {}) {

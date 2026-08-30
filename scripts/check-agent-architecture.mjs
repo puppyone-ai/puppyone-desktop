@@ -55,6 +55,7 @@ const legacyPresentationPaths = [
 const importPattern = /\b(?:import|export)\s+(?:type\s+)?(?:[^'";]*?\s+from\s+)?["']([^"']+)["']/g;
 const dynamicImportPattern = /\bimport\(\s*["']([^"']+)["']\s*\)/g;
 const providerNamePattern = /\b(?:opencode|codex|claude(?:\s+code)?|cursor\s+(?:cli|runtime))\b/i;
+const nativeReferenceTransportPattern = /\b(?:data-url|local-snapshot|snapshotUrl|resource_link|localImage|embeddedContext)\b/;
 const errors = [];
 
 const composerRootSource = readFileSync(path.join(rendererUiRoot, "AgentComposer.tsx"), "utf8");
@@ -149,6 +150,9 @@ for (const filePath of walkSourceFiles(mainRoot)) {
 
 for (const filePath of walkSourceFiles(rendererRoot)) {
   const source = readFileSync(filePath, "utf8");
+  if (nativeReferenceTransportPattern.test(stripComments(source))) {
+    errors.push(`${relative(filePath)} knows a native reference transport; Renderer must consume semantic admission capabilities only`);
+  }
   for (const specifier of collectSpecifiers(source)) {
     const target = resolveRelativeModule(filePath, specifier);
     if (isInside(filePath, rendererDomainRoot) && target && (
@@ -208,6 +212,16 @@ for (const filePath of walkSourceFiles(rendererRoot)) {
         errors.push(`${relative(filePath)} bypasses the typed Agent runtime-geometry bridge in a style prop`);
       }
     }
+  }
+}
+
+const sharedAgentTypesSource = readFileSync(path.join(sharedContractRoot, "types.ts"), "utf8");
+if (/\bAgentReferenceTransport\b|"(?:data-url|local-snapshot|resource)"/.test(stripComments(sharedAgentTypesSource))) {
+  errors.push("shared/agent-contract/types.ts exposes a native reference transport; wire mappings belong inside runtime adapters");
+}
+for (const requiredText of ["schemaVersion: 1", "attachments: Record<AgentAttachmentKind", "maxBytesPerReference"]) {
+  if (!sharedAgentTypesSource.includes(requiredText)) {
+    errors.push(`semantic Agent reference capability contract is missing: ${requiredText}`);
   }
 }
 

@@ -98,28 +98,82 @@ export function normalizeReferenceInputCapabilities(value, legacy = {}) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const legacyContext = legacy?.contextReferences === true;
   const legacyAttachments = legacy?.attachments === true;
-  const acceptedMimeTypes = Array.isArray(source.acceptedMimeTypes)
-    ? source.acceptedMimeTypes
-      .filter((entry) => typeof entry === "string" && entry.length > 0 && entry.length <= 160)
-      .slice(0, 64)
-    : undefined;
+  const workspace = record(source.workspace);
+  const attachments = record(source.attachments);
+  const limits = record(source.limits);
+  const legacyMimeTypes = stringList(source.acceptedMimeTypes, isMimePattern);
+  const legacyGenericAccepted = referenceTransportAccepted(source.genericFiles);
   return {
-    workspaceFiles: source.workspaceFiles === true || (source.workspaceFiles === undefined && legacyContext),
-    workspaceDirectories: source.workspaceDirectories === true || (source.workspaceDirectories === undefined && legacyContext),
-    images: referenceTransport(source.images, legacyAttachments ? "data-url" : "none"),
-    genericFiles: referenceTransport(source.genericFiles, "none"),
-    ...(acceptedMimeTypes?.length ? { acceptedMimeTypes } : {}),
-    maxReferences: boundedPositiveInteger(source.maxReferences, 32, 32),
-    maxReferenceBytes: boundedPositiveInteger(source.maxReferenceBytes, 25 * 1024 * 1024, 25 * 1024 * 1024),
-    maxTotalReferenceBytes: boundedPositiveInteger(source.maxTotalReferenceBytes, 25 * 1024 * 1024, 25 * 1024 * 1024),
+    schemaVersion: 1,
+    workspace: {
+      files: workspace.files === true
+        || (workspace.files === undefined && (source.workspaceFiles === true || (source.workspaceFiles === undefined && legacyContext))),
+      directories: workspace.directories === true
+        || (workspace.directories === undefined && (source.workspaceDirectories === true
+          || (source.workspaceDirectories === undefined && legacyContext))),
+    },
+    attachments: {
+      image: normalizeAttachmentCapability(attachments.image, {
+        accepted: referenceTransportAccepted(source.images) || (source.images === undefined && legacyAttachments),
+        mimeTypes: legacyMimeTypes,
+      }),
+      text: normalizeAttachmentCapability(attachments.text, { accepted: legacyGenericAccepted }),
+      audio: normalizeAttachmentCapability(attachments.audio),
+      video: normalizeAttachmentCapability(attachments.video),
+      binary: normalizeAttachmentCapability(attachments.binary, { accepted: legacyGenericAccepted }),
+    },
+    limits: {
+      maxCount: boundedPositiveInteger(limits.maxCount ?? source.maxReferences, 32, 32),
+      maxBytesPerReference: boundedPositiveInteger(
+        limits.maxBytesPerReference ?? source.maxReferenceBytes,
+        25 * 1024 * 1024,
+        25 * 1024 * 1024,
+      ),
+      maxTotalBytes: boundedPositiveInteger(
+        limits.maxTotalBytes ?? source.maxTotalReferenceBytes,
+        25 * 1024 * 1024,
+        25 * 1024 * 1024,
+      ),
+    },
     steer: source.steer === true,
     attachmentOnly: source.attachmentOnly === true,
   };
 }
 
-function referenceTransport(value, fallback) {
-  if (value === undefined || value === null) return fallback;
-  return ["none", "data-url", "local-snapshot", "resource"].includes(value) ? value : "none";
+function normalizeAttachmentCapability(value, fallback = {}) {
+  const source = record(value);
+  const mimeTypes = stringList(source.mimeTypes ?? fallback.mimeTypes, isMimePattern);
+  const extensions = stringList(source.extensions ?? fallback.extensions, (entry) => /^\.[a-z0-9][a-z0-9._+-]{0,31}$/i.test(entry));
+  return {
+    accepted: source.accepted === true || (source.accepted === undefined && fallback.accepted === true),
+    ...(mimeTypes.length > 0 ? { mimeTypes } : {}),
+    ...(extensions.length > 0 ? { extensions } : {}),
+    ...(Number.isSafeInteger(source.maxBytes) && source.maxBytes > 0 && source.maxBytes <= 25 * 1024 * 1024
+      ? { maxBytes: source.maxBytes }
+      : {}),
+  };
+}
+
+function referenceTransportAccepted(value) {
+  return ["data-url", "local-snapshot", "resource"].includes(value);
+}
+
+function isMimePattern(value) {
+  return /^[a-z0-9][a-z0-9!#$&^_.+-]{0,79}\/(?:\*|[a-z0-9][a-z0-9!#$&^_.+-]{0,79})$/i.test(value);
+}
+
+function stringList(value, predicate) {
+  return Array.isArray(value)
+    ? Array.from(new Set(value
+      .filter((entry) => typeof entry === "string" && entry.length > 0 && entry.length <= 160)
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(predicate)))
+      .slice(0, 64)
+    : [];
+}
+
+function record(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
 function boundedPositiveInteger(value, fallback, maximum) {

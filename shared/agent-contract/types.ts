@@ -91,17 +91,28 @@ export type AgentRuntimeCatalogEntry = {
   readiness: AgentRuntimeReadiness;
 };
 
-export type AgentReferenceTransport = "none" | "data-url" | "local-snapshot" | "resource";
+export type AgentAttachmentKind = "image" | "text" | "audio" | "video" | "binary";
+
+/** Renderer-safe admission policy. Native wire transports stay private to each runtime adapter. */
+export type AgentAttachmentInputCapability = {
+  accepted: boolean;
+  mimeTypes?: string[];
+  extensions?: string[];
+  maxBytes?: number;
+};
 
 export type AgentReferenceInputCapabilities = {
-  workspaceFiles: boolean;
-  workspaceDirectories: boolean;
-  images: AgentReferenceTransport;
-  genericFiles: AgentReferenceTransport;
-  acceptedMimeTypes?: string[];
-  maxReferences: number;
-  maxReferenceBytes: number;
-  maxTotalReferenceBytes: number;
+  schemaVersion: 1;
+  workspace: {
+    files: boolean;
+    directories: boolean;
+  };
+  attachments: Record<AgentAttachmentKind, AgentAttachmentInputCapability>;
+  limits: {
+    maxCount: number;
+    maxBytesPerReference: number;
+    maxTotalBytes: number;
+  };
   /** Whether the native steer operation accepts reference inputs. */
   steer: boolean;
   /** Whether an otherwise-empty prompt is accepted with references. */

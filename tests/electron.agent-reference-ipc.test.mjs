@@ -108,6 +108,36 @@ describe("Agent reference IPC authorization", () => {
     await store.close();
   });
 
+  it("keeps staged grants isolated when one window owns multiple workspaces", async () => {
+    const root = await temporaryRoot();
+    const workspaceA = path.join(root, "workspace-a");
+    const workspaceB = path.join(root, "workspace-b");
+    const source = path.join(root, "shared.md");
+    await Promise.all([
+      fs.promises.mkdir(workspaceA),
+      fs.promises.mkdir(workspaceB),
+      fs.promises.writeFile(source, "workspace-bound input"),
+    ]);
+    const store = createAgentAttachmentStore({ rootPath: path.join(root, "staging") });
+    const owner = { sender: { id: 17 } };
+    const handlersA = registerHandlers({ workspace: workspaceA, store, startTurn: vi.fn() });
+    const handlersB = registerHandlers({ workspace: workspaceB, store, startTurn: vi.fn() });
+    const [draft] = await handlersA.get("agent:reference-stage")(owner, {
+      rootPath: workspaceA,
+      epoch: "workspace-a-draft",
+      sourcePaths: [source],
+    });
+
+    await expect(handlersB.get("agent:turn-start")(owner, {
+      rootPath: workspaceB,
+      sessionId: "session-b",
+      prompt: "cross workspace",
+      referenceEpoch: "workspace-a-draft",
+      references: [draft],
+    })).rejects.toThrow(/invalid|belongs|workspace/i);
+    await store.close();
+  });
+
   it("releases a failed turn lease so the unchanged draft can retry", async () => {
     const root = await temporaryRoot();
     const workspace = path.join(root, "workspace");
@@ -144,13 +174,22 @@ function registerHandlers({ workspace, store, startTurn }) {
   registerAgentIpcHandlers({
     ipcMain: { handle: (channel, listener) => handlers.set(channel, listener) },
     agentService: { startTurn, getReferenceInputCapabilities: () => ({
-      workspaceFiles: true,
-      workspaceDirectories: true,
-      images: "local-snapshot",
-      genericFiles: "local-snapshot",
-      maxReferences: 32,
-      maxReferenceBytes: 25 * 1024 * 1024,
-      maxTotalReferenceBytes: 25 * 1024 * 1024,
+      schemaVersion: 1,
+      workspace: { files: true, directories: true },
+      attachments: {
+        image: { accepted: true },
+        text: { accepted: true },
+        audio: { accepted: true },
+        video: { accepted: true },
+        binary: { accepted: true },
+      },
+      limits: {
+        maxCount: 32,
+        maxBytesPerReference: 25 * 1024 * 1024,
+        maxTotalBytes: 25 * 1024 * 1024,
+      },
+      steer: false,
+      attachmentOnly: false,
     }) },
     localAgentInventory: {},
     attachmentStore: store,

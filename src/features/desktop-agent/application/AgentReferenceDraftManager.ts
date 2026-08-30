@@ -2,6 +2,10 @@ import type {
   AgentDraftReference,
   AgentReferenceInputCapabilities,
 } from "../domain/agent-contract";
+import {
+  acceptsAgentAttachment,
+  classifyAgentAttachment,
+} from "../domain/agent-reference-capabilities";
 import type { AgentClientPort, AgentClientProvider } from "./AgentClientPort";
 import type { AgentControllerState } from "./agent-controller-state";
 import { AgentKnownError, formatAgentError } from "./agent-error";
@@ -196,10 +200,10 @@ export class AgentReferenceDraftManager {
       if (reference.status !== "ready" || !capabilities) return reference;
       count += 1;
       bytes += reference.size ?? 0;
-      if (count > capabilities.maxReferences) {
+      if (count > capabilities.limits.maxCount) {
         return referenceCapabilityError(reference, "reference-limit", "This Agent's reference count limit was reached.");
       }
-      if (bytes > capabilities.maxTotalReferenceBytes) {
+      if (bytes > capabilities.limits.maxTotalBytes) {
         return referenceCapabilityError(reference, "reference-total-size", "This Agent's total reference size limit was reached.");
       }
       return reference;
@@ -301,26 +305,28 @@ function unsupportedReferenceFailure(
   capabilities: AgentReferenceInputCapabilities | undefined,
 ): { code: string; message: string } | null {
   if (!capabilities) return referenceFailure("capability-unreported", "The selected Agent has not reported reference input support.");
-  if ((reference.size ?? 0) > capabilities.maxReferenceBytes) {
+  if ((reference.size ?? 0) > capabilities.limits.maxBytesPerReference) {
     return referenceFailure("reference-size", "This reference exceeds the selected Agent's size limit.");
   }
   if (reference.kind === "workspace-entry") {
-    if (reference.entryType === "directory" && !capabilities.workspaceDirectories) {
+    if (reference.entryType === "directory" && !capabilities.workspace.directories) {
       return referenceFailure("workspace-directory-unsupported", "The selected Agent does not accept workspace directories.");
     }
-    if (reference.entryType === "file" && !capabilities.workspaceFiles) {
+    if (reference.entryType === "file" && !capabilities.workspace.files) {
       return referenceFailure("workspace-file-unsupported", "The selected Agent does not accept workspace files.");
     }
     return null;
   }
-  const image = reference.mime.startsWith("image/");
-  if ((image ? capabilities.images : capabilities.genericFiles) === "none") {
-    return image
+  const attachment = { mime: reference.mime, name: reference.displayName };
+  const kind = classifyAgentAttachment(attachment);
+  const kindLimit = capabilities.attachments[kind].maxBytes;
+  if (kindLimit && (reference.size ?? 0) > kindLimit) {
+    return referenceFailure("reference-size", "This reference exceeds the selected Agent's size limit.");
+  }
+  if (!acceptsAgentAttachment(capabilities, attachment)) {
+    return kind === "image"
       ? referenceFailure("image-unsupported", "The selected Agent does not accept image attachments.")
       : referenceFailure("file-unsupported", "The selected Agent does not accept this file type.");
-  }
-  if (capabilities.acceptedMimeTypes?.length && !capabilities.acceptedMimeTypes.includes(reference.mime)) {
-    return referenceFailure("mime-unsupported", "The selected Agent does not accept this attachment MIME type.");
   }
   return null;
 }

@@ -31,6 +31,7 @@ export class OpenCodeAcpAdapter extends AcpRuntimeAdapter {
         } : {}),
       }),
       eventSource: "opencode-acp",
+      referenceInputProfile: { embeddedText: true },
     });
   }
 }
