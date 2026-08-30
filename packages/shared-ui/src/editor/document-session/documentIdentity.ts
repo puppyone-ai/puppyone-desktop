@@ -6,8 +6,13 @@ import {
   canonicalizeResourcePath,
   type CanonicalResourcePath,
 } from "../../core/resourcePath";
+import { isDataResourceUri } from "../../core/dataResourcePath";
+import {
+  canonicalizeResourceUri,
+  type ResourceUri,
+} from "../../core/resourceUri";
 
-export type CanonicalDocumentResourcePath = CanonicalResourcePath;
+export type CanonicalDocumentResourcePath = CanonicalResourcePath | ResourceUri;
 
 export type DocumentIdentity = Readonly<{
   storageIdentity: DocumentStorageIdentity;
@@ -22,11 +27,17 @@ export function createDocumentIdentity(
   if (!storageIdentity) throw new TypeError("Document storage identity must not be empty.");
   return {
     storageIdentity,
-    resourcePath: canonicalizeResourcePath(resourcePath),
+    resourcePath: canonicalizeDocumentResourcePath(resourcePath),
   };
 }
 
-export const canonicalizeDocumentResourcePath = canonicalizeResourcePath;
+export function canonicalizeDocumentResourcePath(
+  resourcePath: string,
+): CanonicalDocumentResourcePath {
+  return isDataResourceUri(resourcePath)
+    ? canonicalizeResourceUri(resourcePath)
+    : canonicalizeResourcePath(resourcePath);
+}
 
 export function getDocumentIdentityKey(identity: DocumentIdentity): string {
   return JSON.stringify([identity.storageIdentity, identity.resourcePath]);

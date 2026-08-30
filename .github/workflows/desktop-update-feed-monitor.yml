@@ -31,15 +31,24 @@ jobs:
         id: update_feed
         run: node scripts/verify-desktop-stable-update-feed.mjs
 
+      - name: Verify Stable latest is the published history head
+        id: release_history
+        run: >-
+          node scripts/verify-desktop-release-version.mjs
+          --channel stable
+          --require-latest-history-head
+
       - name: Summarize update feed health
         if: ${{ always() }}
         env:
           VERIFY_OUTCOME: ${{ steps.update_feed.outcome }}
+          HISTORY_OUTCOME: ${{ steps.release_history.outcome }}
         run: |
           {
             echo "### Desktop Stable update feed"
             echo
             echo "- Result: ${VERIFY_OUTCOME}"
+            echo "- Monotonic release history: ${HISTORY_OUTCOME}"
             echo "- Machine update origin: https://updates.puppyone.ai/desktop/stable/mac/latest/stable-mac.yml"
             echo "- Public release pointer: https://downloads.puppyone.ai/desktop/stable/mac/latest/latest.json"
           } >> "${GITHUB_STEP_SUMMARY}"

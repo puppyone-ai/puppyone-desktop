@@ -98,6 +98,76 @@ describe("WorkbenchDataService", () => {
     });
   });
 
+  it("routes equal relative document writes to their owning Folder provider", async () => {
+    const workbench = createWorkbenchWorkspace([
+      workspace("a", "Alpha", "/alpha"),
+      workspace("b", "Beta", "/beta"),
+    ]);
+    const providers = new Map<string, DataPort>();
+    const service = createWorkbenchDataService(workbench, {
+      createProvider(folder) {
+        const result = provider(folder.name);
+        providers.set(folder.id, result);
+        return result;
+      },
+    });
+    const first = createWorkspaceResourceUri(workbench.folders[0]!.uri, "README.md");
+    const second = createWorkspaceResourceUri(workbench.folders[1]!.uri, "README.md");
+    const persistence = service.dataPort.documentPersistence!;
+
+    await persistence.persist({
+      path: first,
+      content: "alpha",
+      baseVersion: "a-v1",
+      reason: "manual",
+    });
+    await persistence.persist({
+      path: second,
+      content: "beta",
+      baseVersion: "b-v1",
+      reason: "manual",
+    });
+
+    expect(providers.get(workbench.folders[0]!.id)?.documentPersistence?.persist)
+      .toHaveBeenCalledWith(expect.objectContaining({
+        path: "README.md",
+        content: "alpha",
+        baseVersion: "a-v1",
+      }));
+    expect(providers.get(workbench.folders[1]!.id)?.documentPersistence?.persist)
+      .toHaveBeenCalledWith(expect.objectContaining({
+        path: "README.md",
+        content: "beta",
+        baseVersion: "b-v1",
+      }));
+  });
+
+  it("rejects a malformed Resource URI before any Folder provider can write", async () => {
+    const workbench = createWorkbenchWorkspace([
+      workspace("a", "Alpha", "/alpha"),
+      workspace("b", "Beta", "/beta"),
+    ]);
+    const providers = new Map<string, DataPort>();
+    const service = createWorkbenchDataService(workbench, {
+      createProvider(folder) {
+        const result = provider(folder.name);
+        providers.set(folder.id, result);
+        return result;
+      },
+    });
+
+    await expect(service.dataPort.documentPersistence?.persist({
+      path: "puppyone-local:/workspace/folder-a/README.md",
+      content: "must not write",
+      baseVersion: "v1",
+      reason: "manual",
+    })).rejects.toThrow(/Malformed Resource URI/i);
+
+    for (const candidate of providers.values()) {
+      expect(candidate.documentPersistence?.persist).not.toHaveBeenCalled();
+    }
+  });
+
   it("routes root-level creation explicitly and rejects ambiguous null targets", async () => {
     const workbench = createWorkbenchWorkspace([
       workspace("a", "Alpha", "/alpha"),

@@ -94,10 +94,10 @@ describe("titlebar typography architecture", () => {
     expect(branch).toContain("border-radius: var(--desktop-toolbar-action-radius);");
   });
 
-  it("gives the two right-sidebar tools a wider normal-titlebar target", () => {
+  it("gives the unified right-sidebar tool a wider normal-titlebar target", () => {
     const toolActions = readCssBlock(
       titlebarCss,
-      ".desktop-titlebar-actions .desktop-titlebar-terminal,\n.desktop-titlebar-actions .desktop-titlebar-agent-chat",
+      ".desktop-titlebar-actions .desktop-titlebar-terminal",
     );
 
     expect(toolActions).toContain("width: var(--desktop-titlebar-tool-action-width);");

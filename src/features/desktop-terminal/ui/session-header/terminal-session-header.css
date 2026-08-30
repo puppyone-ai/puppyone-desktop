@@ -201,6 +201,34 @@
   color: currentColor;
 }
 
+.desktop-terminal-chat-tab-status {
+  position: relative;
+}
+
+.desktop-terminal-chat-tab-status > i {
+  position: absolute;
+  inset-inline-end: -1px;
+  inset-block-end: -1px;
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--po-terminal-bg);
+  border-radius: 50%;
+  background: var(--po-accent);
+}
+
+.desktop-terminal-chat-tab-status.is-running > i {
+  animation: desktop-terminal-chat-running-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes desktop-terminal-chat-running-pulse {
+  0%, 100% { opacity: 0.48; transform: scale(0.82); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-terminal-chat-tab-status.is-running > i { animation: none; }
+}
+
 .desktop-terminal-tab[data-status="starting"] .desktop-terminal-tab-status {
   color: var(--po-accent);
 }

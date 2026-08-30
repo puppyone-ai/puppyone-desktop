@@ -17,7 +17,13 @@ import {
   MinimalOnboarding,
 } from "./components/MinimalOnboarding";
 import { AssetLibraryHome } from "./components/AssetLibraryHome";
-import { isDesktopAgentChatEnabled, loadRightAgentPanel } from "./features/desktop-agent/lazy";
+import {
+  closeAgentChatWorkbenchItem,
+  discardPreparedAgentChatWorkbenchItem,
+  isDesktopAgentChatEnabled,
+  loadAgentChatWorkbenchItem,
+  prepareAgentChatWorkbenchItem,
+} from "./features/desktop-agent/lazy";
 import {
   isDesktopTerminalEnabled,
   RightTerminalPanel,
@@ -89,8 +95,10 @@ import {
   useTypographyRuntime,
 } from "./features/typography";
 import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
+import type { AuxiliaryWorkbenchContribution } from "./features/app-shell/auxiliary-workbench/types";
+import { AGENT_CHAT_CREATION_RECIPES } from "./features/app-shell/auxiliary-workbench/agentChatCreationRecipes";
 
-const RightAgentPanel = lazy(loadRightAgentPanel);
+const AgentChatWorkbenchItem = lazy(loadAgentChatWorkbenchItem);
 
 export function App() {
   return <AppContent />;
@@ -311,13 +319,9 @@ function AppContent() {
       if (rightSidebarOpen) setRightSidebarOpen(false);
       return;
     }
-    if (rightSidebarSurface === "terminal" && !desktopTerminalEnabled) {
-      setRightSidebarSurface("chat");
-      return;
-    }
-    if (rightSidebarSurface === "chat" && !desktopAgentChatEnabled) {
-      setRightSidebarSurface("terminal");
-    }
+    // Legacy surface selection is retained only as a one-way migration key.
+    // The unified Workbench owns Item selection from this point onward.
+    if (rightSidebarSurface !== "terminal") setRightSidebarSurface("terminal");
   }, [
     desktopAgentChatEnabled,
     desktopRightSidebarEnabled,
@@ -869,6 +873,68 @@ function AppContent() {
     workspace,
   ]);
 
+  const handleAgentViewChanges = useCallback(() => {
+    setActiveView("git");
+    setSidebarCollapsed(false);
+  }, [setSidebarCollapsed]);
+  const handleAgentOpenFile = useCallback((path: string) => {
+    handleActiveDataPathChange(path);
+    navigateDesktopView("data");
+  }, [handleActiveDataPathChange, navigateDesktopView]);
+  const agentChatContribution = useMemo<AuxiliaryWorkbenchContribution | null>(() => {
+    if (!desktopAgentChatEnabled) return null;
+    return Object.freeze({
+      kind: "agent-chat",
+      label: t("agent.panel.chat", { agent: t("agent.name") }),
+      createLabel: t("agent.header.newChat"),
+      initialSnapshot: Object.freeze({
+        title: t("agent.header.newChat"),
+        accessibleLabel: `${t("agent.header.newChat")} — ${t("agent.name")}`,
+        detail: t("agent.name"),
+        status: "starting",
+        running: false,
+        resourceId: null,
+      }),
+      maximumItems: 8,
+      minimumSize: Object.freeze({ width: 280, height: 260 }),
+      creationRecipes: AGENT_CHAT_CREATION_RECIPES,
+      prepare: prepareAgentChatWorkbenchItem,
+      discardPreparedItem: discardPreparedAgentChatWorkbenchItem,
+      renderItem: (context) => (
+        <Suspense fallback={null}>
+          <AgentChatWorkbenchItem
+            {...context}
+            enabledRuntimeIds={null}
+            preferredRuntimeId={agentPreferredRuntime}
+            onPreferredRuntimeChange={setAgentPreferredRuntime}
+            preferredRoute={agentPreferredRoute}
+            onPreferredRouteChange={setAgentPreferredRoute}
+            preferredModel={agentPreferredModel}
+            onPreferredModelChange={setAgentPreferredModel}
+            onViewChanges={handleAgentViewChanges}
+            onOpenFile={handleAgentOpenFile}
+          />
+        </Suspense>
+      ),
+      requestClose: (item) => closeAgentChatWorkbenchItem(item.rootId, item.id),
+    });
+  }, [
+    agentPreferredModel,
+    agentPreferredRoute,
+    agentPreferredRuntime,
+    desktopAgentChatEnabled,
+    handleAgentOpenFile,
+    handleAgentViewChanges,
+    setAgentPreferredModel,
+    setAgentPreferredRoute,
+    setAgentPreferredRuntime,
+    t,
+  ]);
+  const auxiliaryWorkbenchContributions = useMemo(
+    () => agentChatContribution ? [agentChatContribution] : [],
+    [agentChatContribution],
+  );
+
   if (restoringWorkspace && !workspace) {
     return (
       <RestoringWorkspaceScreen
@@ -947,22 +1013,11 @@ function AppContent() {
   const chromeActionProps = {
     desktopUpdateState: desktopUpdates.state,
     titlebarActionsSettings,
-    terminalSidebarOpen: rightSidebarOpen && desktopTerminalEnabled && rightSidebarSurface === "terminal",
-    terminalToolEnabled: desktopTerminalEnabled,
-    agentChatEnabled: desktopAgentChatEnabled,
-    agentChatSidebarOpen: rightSidebarOpen && desktopAgentChatEnabled && rightSidebarSurface === "chat",
+    terminalSidebarOpen: rightSidebarOpen && desktopRightSidebarEnabled,
+    terminalToolEnabled: desktopRightSidebarEnabled,
     onUpdateNow: () => void desktopUpdates.updateNow(),
     onToggleTerminal: () => {
-      const terminalIsOpen = rightSidebarOpen && rightSidebarSurface === "terminal";
-      setRightSidebarSurface("terminal");
-      setRightSidebarOpen(!terminalIsOpen);
-      setSwitcherOpen(false);
-    },
-    onToggleAgentChat: () => {
-      if (!desktopAgentChatEnabled) return;
-      const chatIsOpen = rightSidebarOpen && rightSidebarSurface === "chat";
-      setRightSidebarSurface("chat");
-      setRightSidebarOpen(!chatIsOpen);
+      setRightSidebarOpen(!rightSidebarOpen);
       setSwitcherOpen(false);
     },
   };
@@ -1045,46 +1100,16 @@ function AppContent() {
           onRightSidebarOpenChange={setRightSidebarOpen}
           onRightSidebarWidthChange={setRightSidebarWidth}
           rightSidebar={desktopRightSidebarEnabled ? (
-          <div className="desktop-right-sidebar-stack" key={focusedWorkspace?.path ?? workspace.path}>
-            {desktopTerminalEnabled && (
-              <div
-                className={`desktop-right-sidebar-surface ${rightSidebarSurface === "terminal" ? "is-active" : ""}`}
-                aria-hidden={rightSidebarSurface !== "terminal"}
-              >
-                <RightTerminalPanel
-                  workspace={focusedWorkspace ?? workspace}
-                  active={rightSidebarOpen && rightSidebarSurface === "terminal"}
-                  hiddenAgentIds={localAgentsSettings.hiddenTerminalAgentIds}
-                />
-              </div>
-            )}
-            {desktopAgentChatEnabled && (
-              <div
-                className={`desktop-right-sidebar-surface ${rightSidebarSurface === "chat" ? "is-active" : ""}`}
-                aria-hidden={rightSidebarSurface !== "chat"}
-              >
-                <Suspense fallback={null}>
-                  <RightAgentPanel
-                    workspace={focusedWorkspace ?? workspace}
-                    active={rightSidebarOpen && rightSidebarSurface === "chat"}
-                    preferredRuntimeId={agentPreferredRuntime}
-                    onPreferredRuntimeChange={setAgentPreferredRuntime}
-                    preferredRoute={agentPreferredRoute}
-                    onPreferredRouteChange={setAgentPreferredRoute}
-                    preferredModel={agentPreferredModel}
-                    onPreferredModelChange={setAgentPreferredModel}
-                    onViewChanges={() => {
-                      setActiveView("git");
-                      setSidebarCollapsed(false);
-                    }}
-                    onOpenFile={(path) => {
-                      handleActiveDataPathChange(path);
-                      navigateDesktopView("data");
-                    }}
-                  />
-                </Suspense>
-              </div>
-            )}
+          <div className="desktop-right-sidebar-stack">
+            <div className="desktop-right-sidebar-surface is-active">
+              <RightTerminalPanel
+                workspace={focusedWorkspace ?? workspace}
+                active={rightSidebarOpen}
+                terminalEnabled={desktopTerminalEnabled}
+                hiddenAgentIds={localAgentsSettings.hiddenTerminalAgentIds}
+                contributions={auxiliaryWorkbenchContributions}
+              />
+            </div>
           </div>
         ) : undefined}
       >

@@ -1,0 +1,26 @@
+export {
+  assertAuxiliaryWorkbenchState,
+  auxiliaryWorkbenchReducer,
+  auxiliaryWorkbenchStateErrors,
+  canInsertAuxiliaryWorkbenchItem,
+  canMergeAuxiliaryWorkbenchGroup,
+  canMoveAuxiliaryWorkbenchGroup,
+  canSplitAuxiliaryWorkbenchItem,
+  clampAuxiliaryWorkbenchSplitRatio,
+  createAuxiliaryWorkbenchState,
+  findAuxiliaryWorkbenchItemGroup,
+  getActiveAuxiliaryWorkbenchGroup,
+  getActiveAuxiliaryWorkbenchItemId,
+  getAuxiliaryWorkbenchLayoutGroupIds,
+  getOrderedAuxiliaryWorkbenchItems,
+  getPresentedAuxiliaryWorkbenchItemIds,
+} from "./auxiliaryWorkbenchModel";
+export type {
+  AuxiliaryWorkbenchAction,
+  AuxiliaryWorkbenchGroup,
+  AuxiliaryWorkbenchItem,
+  AuxiliaryWorkbenchLayoutLeaf,
+  AuxiliaryWorkbenchLayoutNode,
+  AuxiliaryWorkbenchLayoutSplit,
+  AuxiliaryWorkbenchState,
+} from "./auxiliaryWorkbenchModel";

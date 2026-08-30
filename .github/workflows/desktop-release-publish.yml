@@ -77,6 +77,21 @@ jobs:
         with:
           node-version: 22
 
+      - name: Reject non-monotonic release version before publication
+        env:
+          RELEASE_CHANNEL: ${{ inputs.channel }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${RELEASE_TAG}" in
+            v*) CANDIDATE_VERSION="${RELEASE_TAG#v}" ;;
+            *) echo "Release tag must start with v: ${RELEASE_TAG}" >&2; exit 1 ;;
+          esac
+          node scripts/verify-desktop-release-version.mjs \
+            --channel "${RELEASE_CHANNEL}" \
+            --candidate-version "${CANDIDATE_VERSION}"
+
       - name: Verify existing Stable update origin before publication
         if: ${{ inputs.channel == 'stable' }}
         run: node scripts/verify-desktop-stable-update-feed.mjs
@@ -616,6 +631,16 @@ jobs:
             const c=require(path.resolve(process.argv[1]));
             if (!c.releases.some((release) => release.tag === process.argv[2])) process.exit(1);
           ' "${RUNNER_TEMP}/catalog-public.json" "${RELEASE_TAG}"
+
+      - name: Verify latest pointer remains at published history head
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          PUPPYONE_INTERNAL_RELEASE_TOKEN: ${{ secrets.PUPPYONE_INTERNAL_RELEASE_TOKEN }}
+        run: >-
+          node scripts/verify-desktop-release-version.mjs
+          --channel "${{ inputs.channel }}"
+          --require-latest-history-head
 
       - name: Clean stale mutable release files
         env:

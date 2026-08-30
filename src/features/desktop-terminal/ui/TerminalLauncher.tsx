@@ -1,78 +1,102 @@
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
+import type { AuxiliaryWorkbenchCreationRecipe } from "../../app-shell/auxiliary-workbench/types";
 import type {
   AvailableTerminalAgentId,
   TerminalAgentDiscoveryPhase,
 } from "../model/terminalAgentAvailability";
 import {
   DESKTOP_TERMINAL_LAUNCHERS,
-  type DesktopTerminalLauncherDefinition,
+  getDesktopTerminalLauncher,
   type DesktopTerminalLauncherId,
 } from "../model/terminalLaunchers";
-import { partitionTerminalAgentLaunchers } from "../model/terminalLauncherPresentation";
 import { TerminalActivityGrid } from "./TerminalActivityGrid";
-import { TerminalLauncherIcon } from "./TerminalLauncherIcon";
+import { WorkbenchLauncherIcon } from "./WorkbenchLauncherIcon";
 import "./terminal-launcher.css";
 
+export type TerminalLauncherAgentMode = "chat" | "terminal";
+type TerminalAgentLauncherDefinition = Exclude<
+  (typeof DESKTOP_TERMINAL_LAUNCHERS)[number],
+  { id: "shell" }
+>;
+
 type TerminalLauncherProps = {
+  agentMode: TerminalLauncherAgentMode;
   discoveryPhase: TerminalAgentDiscoveryPhase;
   availableAgentIds: readonly AvailableTerminalAgentId[];
+  chatCreationAvailable?: boolean;
+  chatPreparing?: boolean;
+  chatRecipes?: readonly AuxiliaryWorkbenchCreationRecipe[];
   launchError?: string | null;
   launching?: boolean;
+  terminalEnabled?: boolean;
   titleId?: string;
+  onCreateChat?: (recipe: AuxiliaryWorkbenchCreationRecipe) => void;
   onLaunch: (launcherId: DesktopTerminalLauncherId) => void;
   onRefresh: () => void;
 };
 
+/**
+ * The neutral Workbench launcher shown before an Item chooses its runtime.
+ * The composition layer explicitly chooses whether Agent rows create Chat
+ * Items or launch detected Terminal CLIs. Shell always resolves to a Terminal.
+ */
 export function TerminalLauncher({
+  agentMode,
   discoveryPhase,
   availableAgentIds,
+  chatCreationAvailable = true,
+  chatPreparing = false,
+  chatRecipes = [],
   launchError = null,
   launching = false,
   onLaunch,
+  onCreateChat,
   onRefresh,
+  terminalEnabled = true,
   titleId = "desktop-terminal-launcher-title",
 }: TerminalLauncherProps) {
   const { t } = useLocalization();
-  const installedAgentIdSet = new Set(availableAgentIds);
-  const agents = DESKTOP_TERMINAL_LAUNCHERS.filter(
-    ({ id }) => id !== "shell" && installedAgentIdSet.has(id),
-  );
-  const visibleAgents = partitionTerminalAgentLaunchers(agents);
-  const shell = DESKTOP_TERMINAL_LAUNCHERS.find(({ id }) => id === "shell");
+  const shell = getDesktopTerminalLauncher("shell");
   const scanning = discoveryPhase === "idle" || discoveryPhase === "loading";
+  const busy = launching || chatPreparing;
+  const availableAgentIdSet = new Set<DesktopTerminalLauncherId>(availableAgentIds);
+  const terminalAgentLaunchers = DESKTOP_TERMINAL_LAUNCHERS.filter(
+    (launcher): launcher is TerminalAgentLauncherDefinition => (
+      launcher.id !== "shell" && availableAgentIdSet.has(launcher.id)
+    ),
+  );
   const availabilityMessage = discoveryPhase === "error"
     ? "terminal.launcher.detectionFailed"
     : scanning
       ? "terminal.launcher.detecting"
-      : agents.length === 0
+      : agentMode === "terminal" && terminalAgentLaunchers.length === 0
         ? "terminal.launcher.noneInstalled"
         : null;
 
   return (
-    <section
-      className="desktop-terminal-launcher"
-      aria-labelledby={titleId}
-    >
+    <section className="desktop-terminal-launcher" aria-labelledby={titleId}>
       <div className="desktop-terminal-launcher-content">
         <div
           className="desktop-terminal-launcher-group is-agents"
+          data-agent-mode={agentMode}
           data-discovery-phase={discoveryPhase}
+          data-detected-terminal-agent-count={availableAgentIds.length}
         >
           <header className="desktop-terminal-launcher-heading">
             <h2 id={titleId}>
-              {launching && (
-                <TerminalActivityGrid
-                  className="desktop-terminal-launcher-spinner"
-                />
+              {busy && (
+                <TerminalActivityGrid className="desktop-terminal-launcher-spinner" />
               )}
-              <span>{t(launching ? "terminal.launcher.launching" : "terminal.launcher.title")}</span>
+              <span>
+                {t(launching ? "terminal.launcher.launching" : "terminal.launcher.title")}
+              </span>
             </h2>
             <button
               type="button"
               className={`desktop-terminal-launcher-scan ${scanning ? "is-scanning" : ""}`}
               onClick={onRefresh}
-              disabled={launching || scanning}
+              disabled={busy || scanning}
               aria-label={t("terminal.launcher.scanAgain")}
               title={t("terminal.launcher.scanAgain")}
             >
@@ -87,65 +111,56 @@ export function TerminalLauncher({
             </div>
           )}
 
-          {visibleAgents.primary.length > 0 && (
-            <div className="desktop-terminal-launcher-tools">
-              {visibleAgents.primary.map((launcher) => (
-                <TerminalLauncherButton
-                  key={launcher.id}
-                  launcher={launcher}
-                  disabled={launching}
-                  onLaunch={onLaunch}
-                />
-              ))}
-            </div>
-          )}
-
-          {visibleAgents.overflow.length > 0 && (
-            <details className="desktop-terminal-launcher-more">
-              <summary>{t("terminal.launcher.moreAgents")}</summary>
-              <div className="desktop-terminal-launcher-tools">
-                {visibleAgents.overflow.map((launcher) => (
-                  <TerminalLauncherButton
-                    key={launcher.id}
-                    launcher={launcher}
-                    disabled={launching}
-                    onLaunch={onLaunch}
-                  />
+          <div className="desktop-terminal-launcher-tools" role="list">
+            {agentMode === "chat"
+              ? chatRecipes.map((recipe) => (
+                  <div key={recipe.id} role="listitem">
+                    <ChatRecipeButton
+                      creationAvailable={Boolean(
+                        onCreateChat && chatCreationAvailable && !busy,
+                      )}
+                      recipe={recipe}
+                      onCreate={onCreateChat}
+                    />
+                  </div>
+                ))
+              : terminalAgentLaunchers.map((launcher) => (
+                  <div key={launcher.id} role="listitem">
+                    <TerminalAgentButton
+                      launcher={launcher}
+                      launchAvailable={terminalEnabled && !busy}
+                      onLaunch={onLaunch}
+                    />
+                  </div>
                 ))}
-              </div>
-            </details>
-          )}
+          </div>
 
           {availabilityMessage && (
-            <div
-              className={`desktop-terminal-launcher-availability ${agents.length > 0 ? "is-assistive" : ""}`}
-              aria-live="polite"
-            >
+            <div className="desktop-terminal-launcher-availability" aria-live="polite">
               <span>{t(availabilityMessage)}</span>
             </div>
           )}
         </div>
 
-        {shell && (
+        {terminalEnabled && (
           <div className="desktop-terminal-launcher-group is-shell">
             <header className="desktop-terminal-launcher-heading">
-              <h2 id="desktop-terminal-launcher-shell-title">
-                <span>{t("terminal.launcher.shell.title")}</span>
+              <h2>
+                <span>
+                  {t("terminal.launcher.shell.title")}
+                </span>
               </h2>
             </header>
             <button
               type="button"
               className="desktop-terminal-launcher-shell"
               onClick={() => onLaunch(shell.id)}
-              disabled={launching}
-              aria-label={`${t(shell.nameMessage)}. ${t(shell.descriptionMessage)}`}
+              disabled={busy}
+              aria-label={`${t("terminal.launcher.shell.action")}. ${t(shell.descriptionMessage)}`}
               title={t(shell.descriptionMessage)}
             >
-              <TerminalLauncherIcon
-                className="desktop-terminal-launcher-shell-icon"
-                launcherId="shell"
-              />
-              <span>{t(shell.nameMessage)}</span>
+              <WorkbenchLauncherIcon launcherId="shell" />
+              <span>{t("terminal.launcher.shell.action")}</span>
             </button>
           </div>
         )}
@@ -154,26 +169,64 @@ export function TerminalLauncher({
   );
 }
 
-type TerminalLauncherButtonProps = {
-  disabled: boolean;
-  launcher: DesktopTerminalLauncherDefinition;
+function TerminalAgentButton({
+  launcher,
+  launchAvailable,
+  onLaunch,
+}: Readonly<{
+  launcher: TerminalAgentLauncherDefinition;
+  launchAvailable: boolean;
   onLaunch: (launcherId: DesktopTerminalLauncherId) => void;
-};
-
-function TerminalLauncherButton({ disabled, launcher, onLaunch }: TerminalLauncherButtonProps) {
+}>) {
   const { t } = useLocalization();
+  const label = t(launcher.nameMessage);
+  const description = t(launcher.descriptionMessage);
 
   return (
     <button
       type="button"
       className="desktop-terminal-launcher-tool"
-      disabled={disabled}
+      disabled={!launchAvailable}
+      aria-label={`${t("terminal.launcher.title")}: ${label}. ${description}`}
+      title={description}
       onClick={() => onLaunch(launcher.id)}
-      aria-label={`${t(launcher.nameMessage)}. ${t(launcher.descriptionMessage)}`}
-      title={t(launcher.descriptionMessage)}
     >
-      <TerminalLauncherIcon launcherId={launcher.id} />
-      <span>{t(launcher.nameMessage)}</span>
+      <WorkbenchLauncherIcon launcherId={launcher.id} />
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function ChatRecipeButton({
+  creationAvailable,
+  recipe,
+  onCreate,
+}: Readonly<{
+  creationAvailable: boolean;
+  recipe: AuxiliaryWorkbenchCreationRecipe;
+  onCreate?: (recipe: AuxiliaryWorkbenchCreationRecipe) => void;
+}>) {
+  const { t } = useLocalization();
+  const available = creationAvailable && recipe.status === "available";
+  const statusLabel = recipe.status === "coming-soon"
+    ? t("terminal.launcher.comingSoon")
+    : recipe.status === "unavailable"
+      ? t("terminal.launcher.notInstalled")
+      : null;
+  const title = statusLabel ? `${recipe.label} — ${statusLabel}` : recipe.label;
+
+  return (
+    <button
+      type="button"
+      className="desktop-terminal-launcher-tool"
+      data-status={recipe.status}
+      disabled={!available}
+      aria-label={`${t("terminal.launcher.title")}: ${title}`}
+      title={title}
+      onClick={() => onCreate?.(recipe)}
+    >
+      <WorkbenchLauncherIcon iconKey={recipe.iconKey} />
+      <span>{recipe.label}</span>
     </button>
   );
 }

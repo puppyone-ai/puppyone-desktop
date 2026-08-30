@@ -1,4 +1,11 @@
-import type { AiEditRequest, DataNode, DataNodeKind, DataPort, Workspace } from "@puppyone/shared-ui";
+import {
+  canonicalizeResourcePath,
+  type AiEditRequest,
+  type DataNode,
+  type DataNodeKind,
+  type DataPort,
+  type Workspace,
+} from "@puppyone/shared-ui";
 import type {
   CloudInitializationCleanupRequest,
   CloudInitializationIdentityRequest,
@@ -135,7 +142,7 @@ export function createLocalDataPort(rootPath: string): DataPort {
       storageIdentity: createLocalDocumentStorageIdentity(rootPath),
       persist: ({ path, content, baseVersion }) => getDesktopBridge().writeFile({
         rootPath,
-        path,
+        path: canonicalizeResourcePath(path),
         content,
         expectedVersion: baseVersion ?? null,
       }),

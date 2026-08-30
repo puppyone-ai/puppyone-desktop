@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import React, { createRef } from "react";
+import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +9,6 @@ import {
   getHeaderElementDefinition,
   type HeaderElementRenderContext,
 } from "../src/features/app-shell/headerElements";
-import { AgentChatTitlebarButton } from "../src/features/app-shell/DesktopTitlebarActions";
 import {
   AGENT_PREFERRED_RUNTIME_STORAGE_KEY,
   RIGHT_SIDEBAR_SURFACE_STORAGE_KEY,
@@ -29,7 +28,7 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-describe("independent Chat and Terminal titlebar buttons", () => {
+describe("unified Chat and Terminal titlebar entry", () => {
   it("defaults the right sidebar to Terminal until the user opens Chat", () => {
     expect(readInitialRightSidebarSurface()).toBe("terminal");
     window.localStorage.setItem(RIGHT_SIDEBAR_SURFACE_STORAGE_KEY, "chat");
@@ -46,7 +45,7 @@ describe("independent Chat and Terminal titlebar buttons", () => {
   });
 
   it("keeps the Terminal titlebar control as a stable toggle without a dropdown menu", () => {
-    const container = renderHeaderActions(false);
+    const container = renderHeaderActions();
     const terminalButton = container.querySelector('button[aria-label="Hide Terminal"]');
 
     expect(terminalButton).not.toBeNull();
@@ -58,16 +57,15 @@ describe("independent Chat and Terminal titlebar buttons", () => {
     expect(container.querySelector('button[aria-label="Show Agent Chat"]')).toBeNull();
   });
 
-  it("adds a separate Chat logo only when the experiment is enabled", () => {
-    const container = renderHeaderActions(true);
-
+  it("does not expose a second Chat toggle beside the Workbench entry", () => {
+    const container = renderHeaderActions();
     expect(container.querySelector('button[aria-label="Hide Terminal"]')).not.toBeNull();
-    expect(container.querySelector('button[aria-label="Show Agent Chat"]')).not.toBeNull();
-    expect(container.querySelectorAll("button.desktop-titlebar-action").length).toBeGreaterThanOrEqual(2);
+    expect(container.querySelector('button[aria-label="Show Agent Chat"]')).toBeNull();
+    expect(container.querySelectorAll("button.desktop-titlebar-action")).toHaveLength(1);
   });
 });
 
-function renderHeaderActions(chatEnabled: boolean) {
+function renderHeaderActions() {
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -75,17 +73,6 @@ function renderHeaderActions(chatEnabled: boolean) {
   if (!definition) throw new Error("Terminal header action is missing.");
   const context: HeaderElementRenderContext = {
     t: testT,
-    externalOpen: {
-      canOpen: false,
-      loading: false,
-      menuOpen: false,
-      menuTargets: [],
-      onCustomize: vi.fn(),
-      onOpen: vi.fn(),
-      onOpenWithApp: vi.fn(),
-      ref: createRef<HTMLDivElement>(),
-      setMenuOpen: vi.fn(),
-    },
     terminal: {
       enabled: true,
       onToggle: vi.fn(),
@@ -97,11 +84,6 @@ function renderHeaderActions(chatEnabled: boolean) {
     React.Fragment,
     null,
     definition.render(context),
-    React.createElement(AgentChatTitlebarButton, {
-      enabled: chatEnabled,
-      open: false,
-      onToggle: vi.fn(),
-    }),
   ))));
   return container;
 }

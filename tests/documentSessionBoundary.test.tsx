@@ -5,6 +5,10 @@ import React, { useLayoutEffect } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  createWorkspaceResourceUri,
+  createWorkspaceRootUri,
+} from "../packages/shared-ui/src/core/resourceUri";
 import { DocumentSessionBoundary } from "../packages/shared-ui/src/editor/document-session/DocumentSessionBoundary";
 import { useEditableDocumentSource } from "../packages/shared-ui/src/editor/document-session/EditableDocumentSourceContext";
 import type { DocumentPersistedCommit } from "../packages/shared-ui/src/editor/document-session/types";
@@ -22,6 +26,48 @@ afterEach(() => {
 });
 
 describe("DocumentSessionBoundary", () => {
+  it("passes an intact Workspace Resource URI across the save boundary", async () => {
+    const documentId = createWorkspaceResourceUri(
+      createWorkspaceRootUri("folder-b"),
+      "shared/README.md",
+    );
+    const persistence = {
+      kind: "local-fs" as const,
+      storageIdentity: "test:document-boundary:workspace-uri",
+      persist: vi.fn(async () => ({ ok: true as const, version: "v2" })),
+    };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    let edit: (() => void) | null = null;
+
+    await act(async () => {
+      root?.render(withTestLocalization(
+        <DocumentSessionBoundary
+          documentId={documentId}
+          initialContent="base"
+          initialVersion="v1"
+          saveMode="auto"
+          persistence={persistence}
+        >
+          <SourceProbe documentId={documentId} onEditReady={(nextEdit) => { edit = nextEdit; }} />
+        </DocumentSessionBoundary>,
+      ));
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      edit?.();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(persistence.persist).toHaveBeenCalledWith(expect.objectContaining({
+      path: documentId,
+      content: `updated ${documentId}`,
+    }));
+  });
+
   it("hides save chrome by default and only renders it when explicitly enabled", () => {
     const persistence = {
       kind: "local-fs" as const,

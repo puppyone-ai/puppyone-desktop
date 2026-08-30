@@ -28,6 +28,7 @@ describe("Desktop updater channel isolation", () => {
       },
       isPackaged: true,
     })).toEqual({
+      allowDowngrade: false,
       allowPrerelease: true,
       channel: "internal",
       currentVersion: "1.4.0-internal.72",
@@ -49,6 +50,7 @@ describe("Desktop updater channel isolation", () => {
       environment: {},
       isPackaged: true,
     })).toMatchObject({
+      allowDowngrade: false,
       allowPrerelease: false,
       channel: "stable",
       currentVersion: "1.4.0",
@@ -71,6 +73,7 @@ describe("Desktop updater channel isolation", () => {
       },
       isPackaged: false,
     })).toMatchObject({
+      allowDowngrade: false,
       channel: "dev",
       feedUrl: null,
       forceDevUpdateConfig: false,
@@ -105,6 +108,7 @@ describe("Desktop updater channel isolation", () => {
       },
       isPackaged: true,
     })).toMatchObject({
+      allowDowngrade: false,
       feedUrl: null,
       forceDevUpdateConfig: false,
       updateChannel: null,
@@ -166,6 +170,148 @@ describe("Desktop updater channel isolation", () => {
       service?.dispose();
       vi.useRealTimers();
     }
+  });
+
+  it("overrides electron-updater's channel side effect and keeps downgrades disabled", () => {
+    const buildInfo = resolveDesktopBuildIdentity({
+      baseVersion: "1.4.0",
+      buildNumber: 75,
+      channel: "stable",
+      commitSha,
+    });
+    const autoUpdater = new EventEmitter();
+    Object.assign(autoUpdater, {
+      allowDowngrade: false,
+      checkForUpdates: vi.fn(async () => ({ updateInfo: null })),
+      setFeedURL: vi.fn(),
+    });
+    Object.defineProperty(autoUpdater, "channel", {
+      configurable: true,
+      get: () => autoUpdater.configuredChannel,
+      set: (value) => {
+        autoUpdater.configuredChannel = value;
+        autoUpdater.allowDowngrade = true;
+      },
+    });
+    const service = createUpdateService({
+      app: { isPackaged: true },
+      autoUpdater,
+      buildInfo,
+      getWindows: () => [],
+      ipcMain: { handle: vi.fn() },
+      platform: "linux",
+    });
+
+    service.start();
+
+    expect(autoUpdater.configuredChannel).toBe("stable");
+    expect(autoUpdater.allowDowngrade).toBe(false);
+    service.dispose();
+  });
+});
+
+describe("Desktop updater P0 monotonicity guard", () => {
+  it.each([
+    ["older", "1.3.9", "not-available"],
+    ["same", "1.4.0", "not-available"],
+    ["cross-channel", "1.4.1-internal.80", "error"],
+    ["malformed", "latest", "error"],
+  ])("rejects a %s feed candidate before download or install", async (_label, candidateVersion, expectedStatus) => {
+    const fixture = createUpdaterFixture({
+      channel: "stable",
+      currentVersion: "1.4.0",
+      candidateVersion,
+    });
+    fixture.service.start();
+
+    const checked = await fixture.service.checkForUpdates();
+    const updated = await fixture.service.updateNow();
+
+    expect(checked).toMatchObject({
+      status: expectedStatus,
+      availableVersion: null,
+      updateInfo: null,
+    });
+    expect(updated.status).toBe(expectedStatus);
+    expect(fixture.autoUpdater.allowDowngrade).toBe(false);
+    expect(fixture.downloadUpdate).not.toHaveBeenCalled();
+    expect(fixture.quitAndInstall).not.toHaveBeenCalled();
+    fixture.service.dispose();
+  });
+
+  it("rejects a stale downloaded downgrade event and never calls quitAndInstall", async () => {
+    const fixture = createUpdaterFixture({
+      channel: "stable",
+      currentVersion: "1.4.0",
+      candidateVersion: "1.4.1",
+    });
+    fixture.service.start();
+    fixture.autoUpdater.emit("update-downloaded", {
+      version: "1.3.9",
+      releaseDate: "2026-08-30T00:00:00.000Z",
+    });
+
+    const state = await fixture.service.installDownloadedUpdate();
+
+    expect(state).toMatchObject({
+      status: "not-available",
+      availableVersion: null,
+    });
+    expect(fixture.quitAndInstall).not.toHaveBeenCalled();
+    fixture.service.dispose();
+  });
+
+  it("accepts a strictly newer same-channel candidate returned without updater events", async () => {
+    const fixture = createUpdaterFixture({
+      channel: "stable",
+      currentVersion: "1.4.0",
+      candidateVersion: "1.4.1",
+      emitAvailableEvent: false,
+    });
+    fixture.service.start();
+
+    const state = await fixture.service.checkForUpdates();
+
+    expect(state).toMatchObject({
+      status: "available",
+      availableVersion: "1.4.1",
+    });
+    fixture.service.dispose();
+  });
+
+  it.each([
+    ["1.4.0-internal.79", "not-available"],
+    ["1.4.0-internal.80", "not-available"],
+    ["1.4.0", "error"],
+  ])("protects Internal build ordering against candidate %s", async (candidateVersion, expectedStatus) => {
+    const fixture = createUpdaterFixture({
+      channel: "internal",
+      currentVersion: "1.4.0-internal.80",
+      candidateVersion,
+    });
+    fixture.service.start();
+
+    const state = await fixture.service.updateNow();
+
+    expect(state.status).toBe(expectedStatus);
+    expect(fixture.downloadUpdate).not.toHaveBeenCalled();
+    expect(fixture.quitAndInstall).not.toHaveBeenCalled();
+    fixture.service.dispose();
+  });
+
+  it("allows only a higher Internal build on the Internal channel", async () => {
+    const fixture = createUpdaterFixture({
+      channel: "internal",
+      currentVersion: "1.4.0-internal.80",
+      candidateVersion: "1.4.0-internal.81",
+    });
+    fixture.service.start();
+
+    await fixture.service.updateNow();
+
+    expect(fixture.downloadUpdate).toHaveBeenCalledOnce();
+    expect(fixture.quitAndInstall).toHaveBeenCalledOnce();
+    fixture.service.dispose();
   });
 });
 
@@ -252,3 +398,61 @@ describe("Desktop updater restart safety", () => {
     expect(quitAndInstall).toHaveBeenCalledOnce();
   });
 });
+
+function createUpdaterFixture({
+  channel,
+  currentVersion,
+  candidateVersion,
+  emitAvailableEvent = true,
+}) {
+  const internalBuild = /-internal\.([1-9]\d*)$/.exec(currentVersion)?.[1];
+  const buildNumber = channel === "internal" ? internalBuild : 80;
+  const baseVersion = currentVersion.split("-")[0];
+  const buildInfo = resolveDesktopBuildIdentity({
+    baseVersion,
+    buildNumber,
+    channel,
+    commitSha,
+  });
+  if (buildInfo.version !== currentVersion) {
+    throw new Error(`Fixture current version ${currentVersion} does not match ${buildInfo.version}.`);
+  }
+  const autoUpdater = new EventEmitter();
+  const updateInfo = {
+    version: candidateVersion,
+    releaseName: `PuppyOne ${candidateVersion}`,
+    releaseDate: "2026-08-30T00:00:00.000Z",
+    releaseNotes: null,
+  };
+  const checkForUpdates = vi.fn(async () => {
+    if (emitAvailableEvent) autoUpdater.emit("update-available", updateInfo);
+    return { updateInfo };
+  });
+  const downloadUpdate = vi.fn(async () => {
+    autoUpdater.emit("update-downloaded", updateInfo);
+    return [];
+  });
+  const quitAndInstall = vi.fn();
+  Object.assign(autoUpdater, {
+    checkForUpdates,
+    downloadUpdate,
+    quitAndInstall,
+    setFeedURL: vi.fn(),
+  });
+  const service = createUpdateService({
+    app: { isPackaged: true },
+    autoUpdater,
+    buildInfo,
+    getRestartBlockers: () => [],
+    getWindows: () => [],
+    ipcMain: { handle: vi.fn() },
+    platform: "linux",
+  });
+  return {
+    autoUpdater,
+    checkForUpdates,
+    downloadUpdate,
+    quitAndInstall,
+    service,
+  };
+}

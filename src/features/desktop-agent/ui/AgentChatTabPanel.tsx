@@ -3,7 +3,7 @@ import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentSessionController } from "../application/AgentSessionController";
 import type { AgentSubmissionStage } from "../application/agent-controller-state";
-import { listEnabledAgentRuntimes } from "../domain/agent-backend-routing";
+import { listAgentRuntimes, listEnabledAgentRuntimes } from "../domain/agent-backend-routing";
 import type { AgentChatTabPresentation } from "../domain/agent-chat-tabs";
 import type { AgentRoutePreference } from "../domain/agent-route-preference";
 import { AgentApprovalDock } from "./AgentApprovalDock";
@@ -21,7 +21,10 @@ import { useAgentRoutingPreferences } from "./useAgentRoutingPreferences";
 import { useAgentSessionPreparation } from "./useAgentSessionPreparation";
 
 type AgentChatTabPanelProps = {
-  active: boolean;
+  /** Compatibility alias for the legacy single-Group Agent panel. */
+  active?: boolean;
+  presented?: boolean;
+  commandTarget?: boolean;
   controller: AgentSessionController;
   workspaceId: string;
   onPresentationChange: (presentation: AgentChatTabPresentation) => void;
@@ -38,7 +41,9 @@ type AgentChatTabPanelProps = {
 };
 
 export function AgentChatTabPanel({
-  active,
+  active = false,
+  presented: presentedProp,
+  commandTarget: commandTargetProp,
   controller,
   workspaceId,
   onPresentationChange,
@@ -53,6 +58,8 @@ export function AgentChatTabPanel({
   enabledRuntimeIds,
   openSessionIds,
 }: AgentChatTabPanelProps) {
+  const presented = presentedProp ?? active;
+  const commandTarget = commandTargetProp ?? active;
   const { t } = useLocalization();
   const [historyOpen, setHistoryOpen] = useState(false);
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
@@ -69,14 +76,20 @@ export function AgentChatTabPanel({
   const failed = state.phase === "failed" || state.phase === "runtime-exited";
   const hasCommittedTranscript = [state.projection.rows, state.projection.parts, state.projection.messages, state.projection.activities]
     .some((entries) => entries.length > 0);
-  const startupLoading = active && (!state.initialized || loading) && !state.pendingPrompt && !hasCommittedTranscript;
+  const startupLoading = presented && (!state.initialized || loading) && !state.pendingPrompt && !hasCommittedTranscript;
   const sessionKey = state.session?.id || "new-agent-session";
   const viewport = useMemo(() => ({ sessionKey, value: controller.readViewport() }), [controller, sessionKey]).value;
   const agentRuntimes = listEnabledAgentRuntimes(inspection, enabledRuntimeIds);
-  const agentRuntimeSelected = agentRuntimes.some((entry) => entry.descriptor.id === state.selectedRuntimeId);
+  const selectedRuntimeRegistered = listAgentRuntimes(inspection).some((entry) => (
+    entry.descriptor.id === state.selectedRuntimeId
+    && (!enabledRuntimeIds || enabledRuntimeIds.includes(entry.descriptor.id))
+  ));
+  // A direct creation recipe remains bound even when its runtime needs setup.
+  // Only the chooser filters not-installed runtimes from subsequent selection.
+  const agentRuntimeSelected = selectedRuntimeRegistered;
   const runtimeModels = agentRuntimeSelected ? inspection?.models ?? [] : [];
   const routingPreferences = useAgentRoutingPreferences({
-    active, controller, state, runtimeModels, preferredRuntimeId, preferredRoute, preferredModel,
+    active: commandTarget, controller, state, runtimeModels, preferredRuntimeId, preferredRoute, preferredModel,
     onPreferredRuntimeChange, onPreferredRouteChange, onPreferredModelChange,
   });
   const modelSelectionAvailable = Boolean(capabilities?.modelSelection);
@@ -88,7 +101,7 @@ export function AgentChatTabPanel({
   const submissionStage: AgentSubmissionStage = state.pendingPrompt && !state.projection.runningTurnId
     ? !state.session || preparingSession ? "preparing-session" : "starting-turn"
     : null;
-  useAgentSessionPreparation(controller, state, active && routingReady);
+  useAgentSessionPreparation(controller, state, commandTarget && routingReady);
   const composerPlaceholder = unavailable || failed
     ? t("agent.composer.placeholder.preparing")
     : !agentRuntimeSelected
@@ -103,7 +116,7 @@ export function AgentChatTabPanel({
   const title = state.session?.title || (agentRuntimeSelected ? runtimeLabel : t("agent.header.newChat"));
   const hasStatus = unavailable || failed || Boolean(state.error);
   const history = useAgentConversationHistory({
-    active,
+    active: commandTarget,
     enabled: historyOpen && state.initialized && Boolean(inspection) && !agentRuntimeSelected && !loading && !failed,
     controller,
     runtimes: agentRuntimes,

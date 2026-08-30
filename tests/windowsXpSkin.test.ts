@@ -241,6 +241,7 @@ describe("Interface style registry", () => {
     const xp = windowsXpStylePack();
     const dataWorkspaceSurface = source("src/features/app-shell/DesktopDataWorkspaceSurface.tsx");
     const visualHarness = source("src/features/appearance/AppearanceVisualSmokeHarness.tsx");
+    const visualSmoke = source("scripts/smoke-appearance-visual-matrix.mjs");
     const explorer = source("packages/shared-ui/src/data/ExplorerTree.tsx");
     const xpExplorerCss = source("src/styles/interfaces/windows-xp/features/explorer.css");
     const profile = getInterfaceStyleDefinition("windows-xp");
@@ -306,7 +307,11 @@ describe("Interface style registry", () => {
     expect(visualHarness).not.toContain("appearance-visual-tree-glyph");
     expect(xp).toContain(".desktop-sidebar-footer-button.active");
     expect(xp).toContain(".desktop-shell-navigation-toolbar-actions");
-    expect(xp).toContain(".desktop-shell-toolbar-agent-logo");
+    expect(visualHarness).toContain('data-toolbar-action="terminal"');
+    expect(visualHarness).not.toContain('data-toolbar-action="agent"');
+    expect(visualSmoke).toContain('JSON.stringify(["terminal"])');
+    expect(visualSmoke).toContain('JSON.stringify(["Terminal"])');
+    expect(visualSmoke).not.toContain('JSON.stringify(["Chat", "Agent"])');
     expect(xp).toContain('.app-shell[data-location-bar-composition="workspace-path-v1"]');
     expect(xp).toContain(".desktop-shell-location-bar-field");
     expect(xp).toContain(".desktop-shell-location-bar-dropdown");
@@ -357,7 +362,6 @@ describe("Interface style registry", () => {
       "toolbar-settings-system.png",
       "toolbar-cloud-skeuomorphic.png",
       "toolbar-terminal-skeuomorphic.png",
-      "toolbar-agent-skeuomorphic.png",
     ]) {
       expect(toolbarCss, asset).toContain(`url("./assets/${asset}")`);
     }

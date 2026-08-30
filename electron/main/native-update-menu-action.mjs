@@ -1,3 +1,5 @@
+import { evaluateDesktopUpdateCandidate } from "../../shared/desktop/update-policy.mjs";
+
 export function createNativeUpdateMenuAction({
   appName,
   dialog,
@@ -41,7 +43,9 @@ export function createNativeUpdateMenuAction({
 }
 
 export function createUpdateCheckPresentation({ appName, state, t }) {
-  const normalizedState = state && typeof state === "object" ? state : {};
+  const normalizedState = enforceMonotonicPresentationState(
+    state && typeof state === "object" ? state : {},
+  );
   const currentVersion = normalizeVersion(normalizedState.currentVersion, t("native.update.manual.unknownVersion"));
   const availableVersion = normalizeVersion(
     normalizedState.availableVersion ?? normalizedState.updateInfo?.version,
@@ -109,6 +113,32 @@ export function createUpdateCheckPresentation({ appName, state, t }) {
   return {
     options: createUnavailableDialog({ appName, t }),
     updateAction: null,
+  };
+}
+
+function enforceMonotonicPresentationState(state) {
+  if (![
+    "available",
+    "downloading",
+    "downloaded",
+    "blocked",
+    "installing",
+  ].includes(state.status)) return state;
+
+  const candidateVersion = state.availableVersion ?? state.updateInfo?.version;
+  const evaluation = evaluateDesktopUpdateCandidate({
+    channel: state.channel,
+    currentVersion: state.currentVersion,
+    candidateVersion,
+  });
+  if (evaluation.allowed) return state;
+  const invalid = evaluation.relation === "invalid" || !evaluation.channelCompatible;
+  return {
+    ...state,
+    status: invalid ? "error" : "not-available",
+    availableVersion: null,
+    updateInfo: null,
+    error: invalid ? "The update feed returned an invalid or cross-channel version." : null,
   };
 }
 

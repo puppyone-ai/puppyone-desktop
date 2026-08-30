@@ -41,6 +41,7 @@ describe("native update menu action", () => {
     const updateService = {
       checkForUpdates: vi.fn(async () => ({
         status: "not-available",
+        channel: "stable",
         currentVersion: "1.4.0",
       })),
       updateNow: vi.fn(),
@@ -67,6 +68,7 @@ describe("native update menu action", () => {
     const updateService = {
       checkForUpdates: vi.fn(async () => ({
         status: "available",
+        channel: "stable",
         currentVersion: "1.4.0",
         availableVersion: "1.5.0",
       })),
@@ -88,6 +90,25 @@ describe("native update menu action", () => {
       message: "puppyone 1.5.0 is available.",
     }));
     expect(updateService.updateNow).toHaveBeenCalledOnce();
+  });
+
+  it("never offers an update action for an older candidate", () => {
+    const presentation = createUpdateCheckPresentation({
+      appName: "puppyone",
+      state: {
+        status: "available",
+        channel: "stable",
+        currentVersion: "1.4.0",
+        availableVersion: "1.3.9",
+      },
+      t,
+    });
+
+    expect(presentation.updateAction).toBeNull();
+    expect(presentation.options).toMatchObject({
+      title: "No Updates Available",
+      message: "puppyone is up to date.",
+    });
   });
 
   it("keeps disabled builds honest instead of running a dead command", async () => {

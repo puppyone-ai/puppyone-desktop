@@ -25,7 +25,7 @@ export type HeaderElementRenderContext = {
 export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
   {
     id: "terminal",
-    label: "Agent",
+    label: "Terminal",
     icon: Terminal,
     linkedRightSidebarToolId: "terminal",
     isAvailable: (context) => context.terminal.enabled,
@@ -34,7 +34,7 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
       const toolbarPlacement = context.placement === "toolbar";
       const TerminalIcon = toolbarPlacement ? SquareTerminal : Terminal;
       const toggleLabel = toolbarPlacement
-        ? context.t("agent.name")
+        ? context.t("terminal.title")
         : context.t(terminal.sidebarOpen ? "shell.titlebar.hideTerminal" : "shell.titlebar.showTerminal");
       return (
         <button
@@ -60,7 +60,7 @@ export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
           )}
           {toolbarPlacement && (
             <span className="desktop-shell-toolbar-button-label">
-              {context.t("agent.name")}
+              {context.t("terminal.title")}
             </span>
           )}
         </button>

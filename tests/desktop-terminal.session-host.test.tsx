@@ -23,6 +23,7 @@ describe("Terminal session host lifecycle", () => {
     const render = (status: DesktopTerminalSession["status"]) => act(() => root.render(
       withTestLocalization(
         <TerminalSessionHost
+          agentMode="terminal"
           focused
           presented
           discoveryPhase="ready"
