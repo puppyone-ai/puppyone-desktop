@@ -5,7 +5,10 @@ import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AGENT_CHAT_CREATION_RECIPES } from "../src/features/app-shell/auxiliary-workbench/agentChatCreationRecipes";
+import {
+  AGENT_CHAT_CREATION_RECIPES,
+  PUPPYONE_AGENT_CREATION_RECIPE,
+} from "../src/features/app-shell/auxiliary-workbench/agentChatCreationRecipes";
 import {
   DESKTOP_TERMINAL_LAUNCHERS,
   getDesktopTerminalLauncher,
@@ -104,10 +107,8 @@ describe("Unified Workbench launcher", () => {
       "Claude Code",
       "Cursor",
       "OpenCode",
-      "PuppyOne",
     ]);
-    expect(agentButtons[4]?.disabled).toBe(true);
-    expect(agentButtons[4]?.title).toBe("PuppyOne — Coming soon");
+    expect(container.textContent).not.toContain("PuppyOne");
     act(() => agentButtons[0]?.click());
     expect(onCreateChat).toHaveBeenCalledWith(AGENT_CHAT_CREATION_RECIPES[0]);
     expect(onLaunch).not.toHaveBeenCalled();
@@ -194,14 +195,18 @@ describe("Unified Workbench launcher", () => {
       .toBe("start with an agent");
   });
 
-  it("keeps Chat recipe identities explicit and PuppyOne last until Hornet ships", () => {
+  it("keeps the managed PuppyOne recipe registered but hidden from the launcher", () => {
     expect(AGENT_CHAT_CREATION_RECIPES.map(({ id }) => id)).toEqual([
       "codex",
       "claude",
       "cursor",
       "opencode-native",
-      "puppyone-agent",
     ]);
+    expect(PUPPYONE_AGENT_CREATION_RECIPE).toMatchObject({
+      id: "puppyone-agent",
+      status: "coming-soon",
+    });
+    expect(AGENT_CHAT_CREATION_RECIPES).not.toContain(PUPPYONE_AGENT_CREATION_RECIPE);
     expect(getDesktopTerminalLauncher("codex").id).toBe("codex");
     expect(getDesktopTerminalLauncher("hermes").id).toBe("hermes");
   });
