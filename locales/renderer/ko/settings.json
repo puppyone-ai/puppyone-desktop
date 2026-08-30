@@ -2,7 +2,6 @@
   "appearance.title": "모양",
   "appearance.detail": "이 기기의 로컬 표시 환경설정입니다.",
   "appearance.themes.title": "테마",
-  "appearance.themes.detail": "애플리케이션, Markdown 및 CSV에 적용할 통합 테마 팩을 선택하세요.",
   "appearance.themes.pack": "테마 팩",
   "appearance.themes.add": "테마 추가",
   "appearance.themes.addUnavailable": "테마 갤러리 URL이 아직 구성되지 않았습니다.",

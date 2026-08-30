@@ -2,7 +2,6 @@
   "appearance.title": "外观",
   "appearance.detail": "此设备的本地显示偏好设置。",
   "appearance.themes.title": "主题",
-  "appearance.themes.detail": "选择一套同时作用于应用界面、Markdown 和 CSV 的协调主题。",
   "appearance.themes.pack": "主题套装",
   "appearance.themes.add": "添加主题",
   "appearance.themes.addUnavailable": "主题库网址尚未配置。",

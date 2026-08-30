@@ -2,7 +2,6 @@
   "appearance.title": "Appearance",
   "appearance.detail": "Local display preferences for this device.",
   "appearance.themes.title": "Theme",
-  "appearance.themes.detail": "Choose one coordinated theme pack for the application, Markdown, and CSV.",
   "appearance.themes.pack": "Theme pack",
   "appearance.themes.add": "Add Theme",
   "appearance.themes.addUnavailable": "Theme gallery URL is not configured yet.",

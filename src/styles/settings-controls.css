@@ -62,7 +62,6 @@
   margin-top: 20px;
 }
 
-.desktop-theme-settings-detail,
 .desktop-theme-settings-error {
   margin: 0;
   color: var(--po-text-muted);
@@ -83,6 +82,7 @@
 
 .desktop-theme-pack-controls {
   display: flex;
+  width: min(100%, 360px);
   min-width: 0;
   flex-wrap: nowrap;
   align-items: center;
@@ -90,8 +90,14 @@
   gap: 8px;
 }
 
-.desktop-theme-pack-controls .desktop-settings-select {
-  flex: 1 1 240px;
+.desktop-theme-pack-label {
+  color: var(--po-text);
+}
+
+.desktop-theme-pack-select {
+  width: 100%;
+  max-width: none;
+  flex: 1 1 auto;
 }
 
 .desktop-theme-add-action {
@@ -101,6 +107,7 @@
 }
 
 .desktop-theme-settings-primary-actions {
+  flex-wrap: nowrap;
   padding-top: 2px;
 }
 
@@ -132,7 +139,7 @@
     justify-content: flex-start;
   }
 
-  .desktop-theme-pack-controls .desktop-settings-select {
+  .desktop-theme-pack-select {
     min-width: 0;
   }
 }

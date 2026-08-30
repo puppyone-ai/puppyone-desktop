@@ -26,14 +26,15 @@ export function ThemeSettingsSection({
       <div className="desktop-settings-subsection-title">
         {t("settings.appearance.themes.title")}
       </div>
-      <p className="desktop-theme-settings-detail">{t("settings.appearance.themes.detail")}</p>
       <div className="desktop-settings-list">
         <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-          <label htmlFor="desktop-theme-pack-select">{t("settings.appearance.themes.pack")}</label>
+          <label className="desktop-theme-pack-label" htmlFor="desktop-theme-pack-select">
+            {t("settings.appearance.themes.pack")}
+          </label>
           <div className="desktop-theme-pack-controls">
             <select
               id="desktop-theme-pack-select"
-              className="desktop-settings-select"
+              className="desktop-settings-select desktop-theme-pack-select"
               value={preferences.pack}
               onChange={(event) => onThemePackChange(event.currentTarget.value)}
             >
@@ -42,23 +43,6 @@ export function ThemeSettingsSection({
               )}
               {packs.map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
             </select>
-            <button
-              className="desktop-settings-action desktop-theme-add-action"
-              type="button"
-              disabled={!THEME_MARKETPLACE_URL}
-              aria-describedby={!THEME_MARKETPLACE_URL ? "desktop-theme-add-status" : undefined}
-              title={!THEME_MARKETPLACE_URL
-                ? t("settings.appearance.themes.addUnavailable")
-                : undefined}
-              onClick={onAddTheme}
-            >
-              {t("settings.appearance.themes.add")}
-            </button>
-            {!THEME_MARKETPLACE_URL && (
-              <span id="desktop-theme-add-status" className="desktop-settings-visually-hidden">
-                {t("settings.appearance.themes.addUnavailable")}
-              </span>
-            )}
           </div>
         </div>
       </div>
@@ -70,6 +54,23 @@ export function ThemeSettingsSection({
         >
           {t("settings.appearance.themes.openFolder")}
         </button>
+        <button
+          className="desktop-settings-action desktop-theme-add-action"
+          type="button"
+          disabled={!THEME_MARKETPLACE_URL}
+          aria-describedby={!THEME_MARKETPLACE_URL ? "desktop-theme-add-status" : undefined}
+          title={!THEME_MARKETPLACE_URL
+            ? t("settings.appearance.themes.addUnavailable")
+            : undefined}
+          onClick={onAddTheme}
+        >
+          {t("settings.appearance.themes.add")}
+        </button>
+        {!THEME_MARKETPLACE_URL && (
+          <span id="desktop-theme-add-status" className="desktop-settings-visually-hidden">
+            {t("settings.appearance.themes.addUnavailable")}
+          </span>
+        )}
       </div>
       {catalog.error && <p className="desktop-theme-settings-error" role="alert">{catalog.error}</p>}
       {catalog.snapshot.diagnostics.length > 0 && (

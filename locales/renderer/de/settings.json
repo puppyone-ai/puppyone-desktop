@@ -2,7 +2,6 @@
   "appearance.title": "Darstellung",
   "appearance.detail": "Lokale Anzeigeeinstellungen für dieses Gerät.",
   "appearance.themes.title": "Design",
-  "appearance.themes.detail": "Wähle ein abgestimmtes Designpaket für Anwendung, Markdown und CSV.",
   "appearance.themes.pack": "Designpaket",
   "appearance.themes.add": "Design hinzufügen",
   "appearance.themes.addUnavailable": "Die URL der Designgalerie ist noch nicht konfiguriert.",

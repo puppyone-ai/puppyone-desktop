@@ -2,7 +2,6 @@
   "appearance.title": "Aparência",
   "appearance.detail": "Preferências locais de exibição para este dispositivo.",
   "appearance.themes.title": "Tema",
-  "appearance.themes.detail": "Escolha um pacote de tema coordenado para o aplicativo, Markdown e CSV.",
   "appearance.themes.pack": "Pacote de tema",
   "appearance.themes.add": "Adicionar tema",
   "appearance.themes.addUnavailable": "A URL da galeria de temas ainda não está configurada.",
