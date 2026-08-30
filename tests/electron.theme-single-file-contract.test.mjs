@@ -11,12 +11,13 @@ describe("single-file CSS theme contract", () => {
         version: 1.2.0;
         author: Example Studio;
         modes: light dark;
+        compatible-root-themes: default;
       }
       @puppyone application {
         .theme-root { --po-surface-canvas: #f1f7f4; }
       }
       @puppyone markdown {
-        .theme-root h1 { color: #234; }
+        .theme-root { --po-md-heading-color: #234; }
       }
       @puppyone csv {
         .theme-root { --po-csv-surface-background: #fff; }
@@ -29,10 +30,12 @@ describe("single-file CSS theme contract", () => {
       version: "1.2.0",
       author: "Example Studio",
       modes: ["light", "dark"],
+      contractVersion: 1,
+      compatibleRootThemeIds: ["default"],
       targets: ["application", "markdown", "csv"],
     });
     expect(theme.stylesheets.application).toContain("--po-surface-canvas: #f1f7f4");
-    expect(theme.stylesheets.markdown).toContain(".theme-root h1");
+    expect(theme.stylesheets.markdown).toContain("--po-md-heading-color: #234");
     expect(theme.stylesheets.csv).toContain("--po-csv-surface-background: #fff");
     expect(Object.isFrozen(theme)).toBe(true);
     expect(Object.isFrozen(theme.stylesheets)).toBe(true);

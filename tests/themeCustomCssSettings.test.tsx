@@ -3,10 +3,9 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ThemeSettingsSection } from "../src/features/settings/main/ThemeSettingsSection";
-import { DEFAULT_SURFACE_THEME_PREFERENCES } from "../src/features/themes/themePreferences";
-import { createThemeCatalogSnapshot } from "../src/features/themes/builtinSurfaceThemes";
-import type { ThemeCatalogController } from "../src/features/themes/useThemeCatalog";
+import { SubThemeSettingsSection } from "../src/features/settings/main/SubThemeSettingsSection";
+import { createSubThemeCatalogSnapshot } from "../src/features/themes/builtinSubThemes";
+import type { SubThemeCatalogController } from "../src/features/themes/useSubThemeCatalog";
 import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -29,10 +28,13 @@ describe("Appearance theme settings", () => {
   it("uses a long pack selector and groups the two theme actions together", async () => {
     await act(async () => {
       root.render(withTestLocalization(
-        <ThemeSettingsSection
+        <SubThemeSettingsSection
           catalog={controller({})}
-          preferences={DEFAULT_SURFACE_THEME_PREFERENCES}
-          onThemePackChange={vi.fn()}
+          rootThemeId="default"
+          requestedSubThemeId="default.neutral"
+          effectiveSubThemeId="default.neutral"
+          effectiveColorMode="light"
+          onSubThemeChange={vi.fn()}
         />,
       ));
       await Promise.resolve();
@@ -55,10 +57,13 @@ describe("Appearance theme settings", () => {
   it("reserves Add Theme until the marketplace URL is configured", async () => {
     await act(async () => {
       root.render(withTestLocalization(
-        <ThemeSettingsSection
+        <SubThemeSettingsSection
           catalog={controller({})}
-          preferences={DEFAULT_SURFACE_THEME_PREFERENCES}
-          onThemePackChange={vi.fn()}
+          rootThemeId="default"
+          requestedSubThemeId="default.neutral"
+          effectiveSubThemeId="default.neutral"
+          effectiveColorMode="light"
+          onSubThemeChange={vi.fn()}
         />,
       ));
       await Promise.resolve();
@@ -74,10 +79,9 @@ describe("Appearance theme settings", () => {
   });
 });
 
-function controller(overrides: Partial<ThemeCatalogController>): ThemeCatalogController {
+function controller(overrides: Partial<SubThemeCatalogController>): SubThemeCatalogController {
   return {
-    snapshot: createThemeCatalogSnapshot({ themes: [], diagnostics: [] }),
-    selection: { application: "default", markdown: "default", csv: "default" },
+    snapshot: createSubThemeCatalogSnapshot({ themes: [], diagnostics: [] }),
     status: "ready",
     error: null,
     openDirectory: vi.fn(async () => ({ opened: true })),

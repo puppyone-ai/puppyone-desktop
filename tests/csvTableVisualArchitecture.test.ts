@@ -239,7 +239,9 @@ describe("CSV table visual architecture", () => {
       /\.csv-table-editor__table\s*\{[^}]*border:\s*1px solid color-mix\([^}]*border-radius:\s*0/s,
     );
     expect(csvTableCss).toContain("--po-editable-table-cell-max-width: 560px");
-    expect(csvTableCss).toContain("--po-editable-table-background: transparent");
+    expect(csvTableCss).toContain(
+      "--po-editable-table-background: var(--po-host-csv-table-background, transparent)",
+    );
     expect(csvTableCss).toContain(".csv-table-editor__column-resize-handle");
     expect(csvColumnResizeSource).toContain("onDoubleClick");
     expect(csvColumnLayoutSource).toContain("View-only CSV column geometry");

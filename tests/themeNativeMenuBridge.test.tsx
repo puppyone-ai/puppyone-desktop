@@ -7,7 +7,7 @@ describe("native theme menu bridge", () => {
   it("syncs safe menu metadata and handles theme-pack selection requests", () => {
     const preload = source("electron/preload.cjs");
     const ipc = source("electron/main/ipc/theme-ipc.mjs");
-    const catalog = source("src/features/themes/useThemeCatalog.ts");
+    const catalog = source("src/features/themes/useSubThemeCatalog.ts");
 
     expect(preload).toContain('ipcRenderer.invoke("theme:sync-native-menu"');
     expect(preload).toContain('ipcRenderer.on("theme:selection-requested"');

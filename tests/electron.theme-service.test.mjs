@@ -106,7 +106,7 @@ describe("host-owned CSS theme service", () => {
       .toEqual([]);
   });
 
-  it("discovers manifest packages and Typora-style top-level CSS themes", async () => {
+  it("discovers manifest packages and metadata-free token themes", async () => {
     const userDataPath = await createTemporaryDirectory();
     const themeRoot = path.join(userDataPath, "themes");
     await mkdir(path.join(themeRoot, "paper"), { recursive: true });
@@ -119,9 +119,9 @@ describe("host-owned CSS theme service", () => {
       targets: ["markdown", "csv"],
       entrypoints: { markdown: "markdown.css", csv: "csv.css" },
     });
-    await writeFile(path.join(themeRoot, "paper", "markdown.css"), "h1 { color: #392f28 }", "utf8");
-    await writeFile(path.join(themeRoot, "paper", "csv.css"), "th { background: #ede4d6 }", "utf8");
-    await writeFile(path.join(themeRoot, "newsprint.css"), ":root { --text-color: #222 } #write { color: var(--text-color) }", "utf8");
+    await writeFile(path.join(themeRoot, "paper", "markdown.css"), ":root { --po-md-content-color: #392f28 }", "utf8");
+    await writeFile(path.join(themeRoot, "paper", "csv.css"), ":root { --po-csv-surface-background: #ede4d6 }", "utf8");
+    await writeFile(path.join(themeRoot, "newsprint.css"), ":root { --po-md-content-color: #222 }", "utf8");
 
     const service = createThemeService({ userDataPath, shell: createShell() });
     const snapshot = await service.listThemes();
@@ -131,8 +131,9 @@ describe("host-owned CSS theme service", () => {
       { id: "local.css.newsprint", source: "local-css", targets: ["markdown"] },
       { id: "com.example.paper", source: "local-package", targets: ["markdown", "csv"] },
     ]);
-    expect(snapshot.themes[0].compiledCss.markdown).toContain('data-po-theme-id="local.css.newsprint"');
-    expect(snapshot.themes[1].compiledCss.csv).toContain('data-po-theme-surface="csv"');
+    expect(snapshot.themes[0].compiledCss.markdown).toContain('data-sub-theme-id="local.css.newsprint"');
+    expect(snapshot.themes[0].compiledCss.markdown).toContain("--po-host-md-content-color");
+    expect(snapshot.themes[1].compiledCss.csv).toContain("--po-host-csv-surface-background");
     expect(JSON.stringify(snapshot)).not.toContain(userDataPath);
   });
 
@@ -152,7 +153,7 @@ describe("host-owned CSS theme service", () => {
         .theme-root { --po-accent: #2f6f52; }
       }
       @puppyone markdown {
-        body { color: #27352f; }
+        :root { --po-md-content-color: #27352f; }
       }
       @puppyone csv {
         .theme-root { --po-csv-surface-color: #27352f; }
@@ -172,12 +173,12 @@ describe("host-owned CSS theme service", () => {
       targets: ["application", "markdown", "csv"],
       source: "local-css",
     });
-    expect(snapshot.themes[0].compiledCss.application).toContain('data-po-theme-surface="application"');
-    expect(snapshot.themes[0].compiledCss.markdown).toContain('data-po-theme-surface="markdown"');
-    expect(snapshot.themes[0].compiledCss.csv).toContain('data-po-theme-surface="csv"');
+    expect(snapshot.themes[0].compiledCss.application).toContain("data-po-appearance-root");
+    expect(snapshot.themes[0].compiledCss.markdown).toContain("--po-host-md-content-color");
+    expect(snapshot.themes[0].compiledCss.csv).toContain("--po-host-csv-surface-color");
   });
 
-  it("loads a coordinated theme.css directory package with package-local assets", async () => {
+  it("rejects global font injection from a coordinated theme.css package", async () => {
     const userDataPath = await createTemporaryDirectory();
     const packagePath = path.join(userDataPath, "themes", "reader");
     await mkdir(path.join(packagePath, "fonts"), { recursive: true });
@@ -198,7 +199,7 @@ describe("host-owned CSS theme service", () => {
           font-family: Reader;
           src: url("./fonts/reader.woff2") format("woff2");
         }
-        body { color: #27352f; font-family: Reader; }
+        :root { --po-md-content-font: Reader; }
       }
       @puppyone csv {
         .theme-root { --po-csv-surface-color: #27352f; }
@@ -207,17 +208,11 @@ describe("host-owned CSS theme service", () => {
 
     const snapshot = await createThemeService({ userDataPath, shell: createShell() }).listThemes();
 
-    expect(snapshot.diagnostics).toEqual([]);
-    expect(snapshot.themes).toHaveLength(1);
-    expect(snapshot.themes[0]).toMatchObject({
-      id: "com.example.reader",
-      name: "Reader",
-      author: "Example Studio",
-      source: "local-package",
-      targets: ["application", "markdown", "csv"],
-    });
-    expect(snapshot.themes[0].compiledCss.markdown).toContain("data:font/woff2;base64,");
-    expect(snapshot.themes[0].compiledCss.markdown).not.toContain(userDataPath);
+    expect(snapshot.themes).toEqual([]);
+    expect(snapshot.diagnostics).toContainEqual(expect.objectContaining({
+      source: "reader",
+      message: expect.stringContaining("Unsupported theme CSS at-rule: @font-face"),
+    }));
   });
 
   it("requires coordinated metadata in a directory theme.css", async () => {
@@ -268,7 +263,7 @@ describe("host-owned CSS theme service", () => {
     });
   });
 
-  it("resolves package-local imports and assets without exposing file paths", async () => {
+  it("rejects imported CSS that attempts to inject global fonts", async () => {
     const userDataPath = await createTemporaryDirectory();
     const packagePath = path.join(userDataPath, "themes", "reader");
     await mkdir(path.join(packagePath, "styles"), { recursive: true });
@@ -285,17 +280,17 @@ describe("host-owned CSS theme service", () => {
     await writeFile(path.join(packagePath, "markdown.css"), '@import "./styles/content.css";', "utf8");
     await writeFile(
       path.join(packagePath, "styles", "content.css"),
-      '@font-face { font-family: Reader; src: url("../fonts/reader.woff2") format("woff2") } body { font-family: Reader }',
+      '@font-face { font-family: Reader; src: url("../fonts/reader.woff2") format("woff2") } :root { --po-md-content-font: Reader }',
       "utf8",
     );
     await writeFile(path.join(packagePath, "fonts", "reader.woff2"), Buffer.from("font-data"));
 
     const snapshot = await createThemeService({ userDataPath, shell: createShell() }).listThemes();
 
-    expect(snapshot.diagnostics).toEqual([]);
-    expect(snapshot.themes[0].compiledCss.markdown).toContain("data:font/woff2;base64,");
-    expect(snapshot.themes[0].compiledCss.markdown).not.toContain("@import");
-    expect(snapshot.themes[0].compiledCss.markdown).not.toContain(userDataPath);
+    expect(snapshot.themes).toEqual([]);
+    expect(snapshot.diagnostics[0]).toMatchObject({ source: "reader" });
+    expect(snapshot.diagnostics[0].message).toContain("Unsupported theme CSS at-rule: @font-face");
+    expect(snapshot.diagnostics[0].message).not.toContain(userDataPath);
   });
 
   it("isolates invalid themes and reports duplicate IDs deterministically", async () => {
@@ -463,9 +458,9 @@ describe("host-owned CSS theme service", () => {
     await writeFile(
       path.join(packagePath, "markdown.css"),
       [
-        '.one { background: url("./background.png") }',
-        '.two { background: url("./background.png") }',
-        '.three { background: url("./background.png") }',
+        ':root { --po-md-content-font: url("./background.png") }',
+        ':root { --po-md-heading-color: url("./background.png") }',
+        ':root { --po-md-link-color: url("./background.png") }',
       ].join("\n"),
       "utf8",
     );
@@ -503,7 +498,7 @@ async function createPackage(themeRoot, directoryName, id, name) {
     targets: ["markdown"],
     entrypoints: { markdown: "markdown.css" },
   });
-  await writeFile(path.join(packagePath, "markdown.css"), "body { color: #222 }", "utf8");
+  await writeFile(path.join(packagePath, "markdown.css"), ":root { --po-md-content-color: #222 }", "utf8");
 }
 
 async function createSingleFilePack(themeRoot, filename, id, name) {
@@ -515,7 +510,7 @@ async function createSingleFilePack(themeRoot, filename, id, name) {
       modes: light dark;
     }
     @puppyone application { .theme-root { --po-accent: #2563eb } }
-    @puppyone markdown { body { color: #222 } }
+    @puppyone markdown { :root { --po-md-content-color: #222 } }
     @puppyone csv { .theme-root { --po-csv-surface-color: #222 } }
   `, "utf8");
 }

@@ -4,10 +4,10 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  SURFACE_THEME_PREFERENCES_STORAGE_KEY,
-  type SurfaceThemePreferences,
-} from "../src/features/themes/themePreferences";
-import { APPEARANCE_PREFERENCES_STORAGE_KEY } from "../src/features/appearance/appearancePreferences";
+  APPEARANCE_PREFERENCES_STORAGE_KEY,
+  type AppearancePreferencesV3,
+} from "../src/features/appearance/appearancePreferences";
+import { LEGACY_SURFACE_THEME_PREFERENCES_STORAGE_KEY } from "../src/features/themes/subThemePreferences";
 import {
   useDesktopPreferences,
   type DesktopPreferencesController,
@@ -41,48 +41,64 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-describe("desktop surface theme preferences", () => {
-  it("persists one coordinated theme pack and synchronizes storage changes", () => {
+describe("desktop appearance preferences", () => {
+  it("persists one canonical V3 document and keeps Root Theme preferences independent", () => {
     act(() => root.render(<Harness />));
 
-    act(() => latest?.setThemePack("com.example.forest"));
-    expect(readStored()).toMatchObject({
-      version: 5,
-      pack: "com.example.forest",
+    act(() => {
+      latest?.setSubThemeId("default.github");
+      latest?.setThemeMode("dark");
+    });
+    expect(readStored().byRootTheme.default).toEqual({
+      requestedSubThemeId: "default.github",
+      requestedColorMode: "dark",
     });
 
-    const remote: SurfaceThemePreferences = {
-      version: 5,
-      pack: "com.example.graphite",
+    act(() => latest?.setInterfaceStyle("windows-xp"));
+    expect(latest?.requestedSubThemeId).toBe("windows-xp.luna-blue");
+    expect(latest?.themeMode).toBe("light");
+
+    act(() => latest?.setInterfaceStyle("default"));
+    expect(latest?.requestedSubThemeId).toBe("default.github");
+    expect(latest?.themeMode).toBe("dark");
+    expect(readStored().schemaVersion).toBe(3);
+    expect(window.localStorage.getItem(LEGACY_SURFACE_THEME_PREFERENCES_STORAGE_KEY)).toBeNull();
+  });
+
+  it("synchronizes the canonical appearance document across windows", () => {
+    act(() => root.render(<Harness />));
+    const remote: AppearancePreferencesV3 = {
+      ...readStored(),
+      activeRootThemeId: "windows-xp",
+      byRootTheme: {
+        ...readStored().byRootTheme,
+        "windows-xp": {
+          requestedSubThemeId: "windows-xp.luna-blue",
+          requestedColorMode: "light",
+        },
+      },
     };
+
     act(() => window.dispatchEvent(new StorageEvent("storage", {
-      key: SURFACE_THEME_PREFERENCES_STORAGE_KEY,
+      key: APPEARANCE_PREFERENCES_STORAGE_KEY,
       newValue: JSON.stringify(remote),
     })));
 
-    expect(latest?.surfaceThemePreferences).toEqual(remote);
+    expect(latest?.interfaceStyle).toBe("windows-xp");
+    expect(latest?.requestedSubThemeId).toBe("windows-xp.luna-blue");
+    expect(latest?.themeMode).toBe("light");
   });
 
-  it("retires previously selected Light and Dark palette presets", () => {
-    window.localStorage.setItem(APPEARANCE_PREFERENCES_STORAGE_KEY, JSON.stringify({
-      schemaVersion: 2,
-      activeStyle: "default",
-      shared: {
-        themeMode: "system",
-        lightThemePreset: "warm",
-        darkThemePreset: "graphite",
-      },
+  it("migrates the retired coordinated Theme Pack into the active root", () => {
+    window.localStorage.setItem(LEGACY_SURFACE_THEME_PREFERENCES_STORAGE_KEY, JSON.stringify({
+      version: 5,
+      pack: "builtin.pack.newspaper",
     }));
 
     act(() => root.render(<Harness />));
 
-    expect(latest?.lightThemePreset).toBe("neutral");
-    expect(latest?.darkThemePreset).toBe("default");
-    const storedAppearance = JSON.parse(
-      window.localStorage.getItem(APPEARANCE_PREFERENCES_STORAGE_KEY) ?? "null",
-    );
-    expect(storedAppearance.shared.lightThemePreset).toBe("neutral");
-    expect(storedAppearance.shared.darkThemePreset).toBe("default");
+    expect(latest?.requestedSubThemeId).toBe("default.newspaper");
+    expect(readStored().byRootTheme.default.requestedSubThemeId).toBe("default.newspaper");
   });
 });
 
@@ -91,6 +107,8 @@ function Harness() {
   return null;
 }
 
-function readStored(): SurfaceThemePreferences {
-  return JSON.parse(window.localStorage.getItem(SURFACE_THEME_PREFERENCES_STORAGE_KEY) ?? "null");
+function readStored(): AppearancePreferencesV3 {
+  return JSON.parse(
+    window.localStorage.getItem(APPEARANCE_PREFERENCES_STORAGE_KEY) ?? "null",
+  );
 }

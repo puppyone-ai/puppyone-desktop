@@ -19,12 +19,14 @@ describe("CSS theme package manifest", () => {
 
     expect(manifest).toEqual({
       schemaVersion: 1,
+      contractVersion: 1,
       id: "com.example.newsprint",
       name: "Newsprint",
       version: "1.2.0",
       author: "Example Studio",
       modes: ["light", "dark"],
       targets: ["markdown", "csv"],
+      compatibleRootThemeIds: ["default"],
       entrypoints: {
         markdown: "markdown.css",
         csv: "csv.css",
@@ -33,6 +35,22 @@ describe("CSS theme package manifest", () => {
     expect(Object.isFrozen(manifest)).toBe(true);
     expect(Object.isFrozen(manifest.entrypoints)).toBe(true);
   });
+
+  it("declares which Root Themes a Sub Theme can extend", () => {
+    const manifest = parseThemeManifest(validManifest({
+      compatibleRootThemeIds: ["windows-xp"],
+    }));
+
+    expect(manifest.contractVersion).toBe(1);
+    expect(manifest.compatibleRootThemeIds).toEqual(["windows-xp"]);
+    expect(Object.isFrozen(manifest.compatibleRootThemeIds)).toBe(true);
+  });
+
+  it.each([[[]], [["Default"]], [["windows xp"]], [["default", "default"]]])
+    ("rejects invalid Root Theme compatibility %j", (compatibleRootThemeIds) => {
+      expect(() => parseThemeManifest(validManifest({ compatibleRootThemeIds })))
+        .toThrow("compatibleRootThemeIds");
+    });
 
   it("rejects unsupported schema versions", () => {
     expect(() => parseThemeManifest(validManifest({ schemaVersion: 2 })))

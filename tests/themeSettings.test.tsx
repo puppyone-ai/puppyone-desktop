@@ -3,17 +3,21 @@ import { describe, expect, it } from "vitest";
 
 const source = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-describe("CSS theme settings", () => {
-  it("offers one coordinated theme pack without packaged surface overrides", () => {
-    const section = source("src/features/settings/main/ThemeSettingsSection.tsx");
+describe("Sub Theme settings", () => {
+  it("offers root-compatible visual variants without editor implementation controls", () => {
+    const section = source("src/features/settings/main/SubThemeSettingsSection.tsx");
 
-    expect(section).toContain("preferences.pack");
-    expect(section).toContain("onThemePackChange");
+    expect(section).toContain("requestedSubThemeId");
+    expect(section).toContain("effectiveSubThemeId");
+    expect(section).toContain("rootThemeId");
+    expect(section).toContain("effectiveColorMode");
+    expect(section).toContain("onSubThemeChange");
+    expect(section).toContain("getCompatibleSubThemes");
     expect(section).toContain("settings.appearance.themes.add");
     expect(section).toContain("THEME_MARKETPLACE_URL");
     expect(section).not.toContain("function ThemeSelector");
     expect(section).not.toContain("getThemesForTarget");
-    expect(section).not.toContain("preferences.overrides");
+    expect(section).not.toContain("surfaceThemePreferences");
     expect(section).not.toContain("onThemeOverrideChange");
     expect(section).not.toContain("themes.reload");
     expect(section).not.toContain("CustomCssEditor");
@@ -39,13 +43,14 @@ describe("CSS theme settings", () => {
     const view = source("src/features/settings/SettingsView.tsx");
     const editor = source("src/features/settings/main/EditorSettingsView.tsx");
 
-    expect(app).toContain("themeCatalog={themeCatalog}");
-    expect(surface).toContain("themeCatalog: ThemeCatalogController");
-    expect(surface).toContain("surfaceThemePreferences");
-    expect(surface).toContain("setThemePack");
+    expect(app).toContain("subThemeCatalog={subThemeCatalog}");
+    expect(surface).toContain("subThemeCatalog: SubThemeCatalogController");
+    expect(surface).toContain("preferences.requestedSubThemeId");
+    expect(surface).toContain("preferences.setSubThemeId");
     expect(surface).not.toContain("setSurfaceThemeOverride");
-    expect(view).toContain("preferences={surfaceThemePreferences}");
-    expect(view.indexOf("<ThemeSettingsSection")).toBeGreaterThan(view.indexOf('activeSection === "appearance"'));
+    expect(view).toContain("<SubThemeSettingsSection");
+    expect(view).toContain("requestedSubThemeId={requestedSubThemeId}");
+    expect(view.indexOf("<SubThemeSettingsSection")).toBeGreaterThan(view.indexOf('activeSection === "appearance"'));
     expect(editor).not.toContain("ThemeSettingsSection");
   });
 });

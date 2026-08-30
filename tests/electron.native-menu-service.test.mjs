@@ -17,7 +17,7 @@ function createHarness({ platform = "darwin" } = {}) {
     "native.menu.file": "File",
     "native.menu.checkForUpdates": "Check for Updates…",
     "native.menu.theme": "Theme",
-    "native.menu.theme.pack": "Theme Pack",
+    "native.menu.theme.pack": "Visual Variant",
     "native.menu.theme.openFolder": "Open Themes Folder",
     "native.dock.newWindow": "New Window",
   };
@@ -104,7 +104,7 @@ describe("DesktopNativeMenuService", () => {
       .find((item) => item.id === "themes");
     expect(themeMenu.label).toBe("Theme");
     expect(themeMenu.submenu.map((item) => item.label).filter(Boolean)).toEqual([
-      "Theme Pack",
+      "Visual Variant",
       "Open Themes Folder",
     ]);
     expect(themeMenu.submenu[0].submenu.find((item) => item.label === "Forest"))

@@ -6,22 +6,18 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../src/styles/github.css?raw", () => ({
-  default: [
-    '[data-po-theme-surface="application"][data-po-theme-id="builtin.pack.github"] {}',
-    '[data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.github"] {}',
-    '[data-po-theme-surface="csv"][data-po-theme-id="builtin.pack.github"] {}',
-  ].join("\n"),
+  default: '[data-po-appearance-root][data-sub-theme-id="default.github"] { --po-host-md-content-color: #24292f; }',
 }));
 vi.mock("../src/styles/newspaper.css?raw", () => ({
-  default: '[data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.newspaper"] {}',
+  default: '[data-po-appearance-root][data-sub-theme-id="default.newspaper"] { --po-host-md-content-color: #342f29; }',
 }));
-import { ThemeStyleHost } from "../src/features/themes/ThemeStyleHost";
+
+import { SubThemeStyleHost } from "../src/features/themes/SubThemeStyleHost";
 import {
-  BUILTIN_SURFACE_THEMES,
-  createThemeCatalogSnapshot,
-} from "../src/features/themes/builtinSurfaceThemes";
-import type { ThemeDefinition } from "../src/features/themes/themeTypes";
-import type { SurfaceThemeSelection } from "../src/features/themes/themePreferences";
+  BUILTIN_SUB_THEMES,
+  createSubThemeCatalogSnapshot,
+} from "../src/features/themes/builtinSubThemes";
+import type { SubThemeDefinition } from "../src/features/themes/themeTypes";
 import { DEFAULT_MARKDOWN_PRESENTATION_SETTINGS } from "../src/features/markdown/markdownPresentation";
 
 let container: HTMLDivElement;
@@ -36,195 +32,101 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  document.head.querySelectorAll("[data-po-theme-style]").forEach((element) => element.remove());
+  document.head.querySelectorAll("[data-po-sub-theme-style]").forEach((element) => element.remove());
 });
 
-describe("renderer CSS theme style host", () => {
-  it("registers exactly three complete built-in theme packs", () => {
-    expect(BUILTIN_SURFACE_THEMES.map(({ id, name, targets, source }) => ({
+describe("renderer Sub Theme style host", () => {
+  it("registers built-ins as root-compatible visual variants", () => {
+    expect(BUILTIN_SUB_THEMES.map(({ id, compatibleRootThemeIds, modes, targets }) => ({
       id,
-      name,
+      compatibleRootThemeIds,
+      modes,
       targets,
-      source,
     }))).toEqual([
-      {
-        id: "default",
-        name: "Default",
-        targets: ["application", "markdown", "csv"],
-        source: "builtin",
-      },
-      {
-        id: "builtin.pack.github",
-        name: "GitHub",
-        targets: ["application", "markdown", "csv"],
-        source: "builtin",
-      },
-      {
-        id: "builtin.pack.newspaper",
-        name: "Newspaper",
-        targets: ["application", "markdown", "csv"],
-        source: "builtin",
-      },
+      variant("default.neutral"),
+      variant("default.warm"),
+      variant("default.graphite"),
+      variant("default.github"),
+      variant("default.newspaper"),
+      variant("windows-xp.luna-blue", ["windows-xp"], ["light"], ["markdown", "csv"]),
     ]);
+  });
 
-    expect(BUILTIN_SURFACE_THEMES[0]?.compiledCss).toEqual({});
-    for (const id of ["builtin.pack.github", "builtin.pack.newspaper"]) {
-      const theme = BUILTIN_SURFACE_THEMES.find((candidate) => candidate.id === id);
-      expect(theme?.compiledCss.application).toContain(`data-po-theme-id="${id}"`);
-      expect(theme?.compiledCss.markdown).toBeUndefined();
-      expect(theme?.compiledCss.csv).toBeUndefined();
+  it("keeps built-in Sub Theme CSS at the public host-token boundary", () => {
+    for (const relativePath of ["src/styles/github.css", "src/styles/newspaper.css"]) {
+      const css = readFileSync(`${process.cwd()}/${relativePath}`, "utf8");
+      expect(css).toContain("[data-po-appearance-root][data-sub-theme-id=");
+      expect(css).toMatch(/--po-host-(?:md|csv)-/);
+      expect(css).not.toMatch(/\.cm-|\.markdown-codemirror-editor|\.csv-table-editor/);
     }
   });
 
-  it("lets scoped built-in theme tokens override editor defaults", () => {
-    const defaultCss = readFileSync(
-      `${process.cwd()}/packages/shared-ui/src/styles/editor/markdown-content.css`,
-      "utf8",
-    );
-    const themeCss = readFileSync(
-      `${process.cwd()}/src/styles/newspaper.css`,
-      "utf8",
-    );
-    const styles = document.createElement("style");
-    styles.dataset.testThemeCascade = "true";
-    styles.textContent = `${defaultCss}\n${themeCss}`;
-    document.head.append(styles);
+  it("injects selected CSS inside the sub-theme cascade layer", () => {
+    const selected = externalSubTheme({
+      compiledCss: {
+        application: '[data-po-appearance-root][data-sub-theme-id="com.example.reader"] { --po-text: #222; }',
+        markdown: '[data-po-appearance-root][data-sub-theme-id="com.example.reader"] { --po-host-md-content-color: #222; }',
+      },
+    });
 
     act(() => root.render(
-      <div
-        className="markdown-codemirror-editor"
-        data-po-theme-surface="markdown"
-        data-po-theme-id="builtin.pack.newspaper"
-      />,
-    ));
-
-    expect(getComputedStyle(container.firstElementChild as Element)
-      .getPropertyValue("--po-md-content-color").trim()).toBe("#342f29");
-    styles.remove();
-  });
-
-  it("injects one unlayered stylesheet for the selected built-in pack", () => {
-    const snapshot = createThemeCatalogSnapshot({ themes: [], diagnostics: [] });
-
-    act(() => root.render(
-      <ThemeStyleHost
-        snapshot={snapshot}
-        selection={selection({
-          application: "builtin.pack.github",
-          markdown: "builtin.pack.github",
-          csv: "builtin.pack.github",
-        })}
+      <SubThemeStyleHost
+        subTheme={selected}
         markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS}
       />,
     ));
 
     const styles = [...document.head.querySelectorAll<HTMLStyleElement>(
-      'style[data-po-theme-id="builtin.pack.github"]',
+      "style[data-po-sub-theme-style]",
     )];
-    expect(styles).toHaveLength(1);
-    expect(styles[0]?.dataset.poThemeTarget).toBe("application");
-    expect(styles[0]?.textContent).toContain('data-po-theme-surface="application"');
-    expect(styles[0]?.textContent).toContain('data-po-theme-surface="markdown"');
-    expect(styles[0]?.textContent).toContain('data-po-theme-surface="csv"');
-  });
-
-  it("merges built-ins with installed themes and injects one style per compiled target", () => {
-    const installed = externalTheme({
-      id: "com.example.combo",
-      targets: ["markdown", "csv"],
-      compiledCss: {
-        markdown: '[data-po-theme-id="com.example.combo"] h1 { color: red }',
-        csv: '[data-po-theme-id="com.example.combo"] th { color: blue }',
-      },
-    });
-    const snapshot = createThemeCatalogSnapshot({ themes: [installed], diagnostics: [] });
-
-    act(() => root.render(
-      <ThemeStyleHost
-        snapshot={snapshot}
-        selection={selection({ markdown: installed.id, csv: installed.id })}
-        markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS}
-      />,
-    ));
-
-    expect(snapshot.themes.some((theme) => theme.id === "builtin.pack.newspaper")).toBe(true);
-    const styles = [...document.head.querySelectorAll<HTMLStyleElement>("style[data-po-theme-style]")];
     expect(styles).toHaveLength(2);
-    expect(styles.map((style) => style.dataset.poThemeTarget)).toEqual(["markdown", "csv"]);
-    expect(styles.map((style) => style.textContent)).toEqual([
-      installed.compiledCss.markdown,
-      installed.compiledCss.csv,
+    expect(styles.map((style) => style.dataset.poSubThemeTarget)).toEqual([
+      "application",
+      "markdown",
     ]);
+    expect(styles.every((style) => style.dataset.poThemeLayer === "sub-theme")).toBe(true);
+    expect(styles[0]?.textContent).toContain("@layer sub-theme");
+    expect(styles[0]?.textContent).toContain("--po-text: #222");
   });
 
-  it("removes stale installed CSS when the catalog is reloaded", () => {
-    const first = createThemeCatalogSnapshot({
-      themes: [externalTheme({ id: "com.example.first" })],
-      diagnostics: [],
-    });
-    const second = createThemeCatalogSnapshot({
-      themes: [externalTheme({ id: "com.example.second" })],
-      diagnostics: [],
-    });
+  it("removes stale CSS when the resolved Sub Theme changes", () => {
+    const first = externalSubTheme({ id: "com.example.first" });
+    const second = externalSubTheme({ id: "com.example.second" });
     act(() => root.render(
-      <ThemeStyleHost snapshot={first} selection={selection({ markdown: "com.example.first" })} markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
+      <SubThemeStyleHost subTheme={first} markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
+    ));
+    act(() => root.render(
+      <SubThemeStyleHost subTheme={second} markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
     ));
 
-    act(() => root.render(
-      <ThemeStyleHost snapshot={second} selection={selection({ markdown: "com.example.second" })} markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
-    ));
-
-    expect(document.head.querySelector('[data-po-theme-id="com.example.first"]')).toBeNull();
-    expect(document.head.querySelector('[data-po-theme-id="com.example.second"]')).not.toBeNull();
+    expect(document.head.querySelector('[data-po-sub-theme-id="com.example.first"]')).toBeNull();
+    expect(document.head.querySelector('[data-po-sub-theme-id="com.example.second"]')).not.toBeNull();
   });
 
-  it("does not inject installed themes that are not selected", () => {
-    const snapshot = createThemeCatalogSnapshot({
-      themes: [externalTheme({ id: "com.example.unselected" })],
+  it("keeps retired managed Custom CSS out of the catalog", () => {
+    const snapshot = createSubThemeCatalogSnapshot({
+      themes: [externalSubTheme({ id: "local.puppyone.custom-css" })],
       diagnostics: [],
     });
 
-    act(() => root.render(
-      <ThemeStyleHost snapshot={snapshot} selection={selection()} markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
-    ));
-
-    expect(document.head.querySelector("[data-po-theme-style]")).toBeNull();
+    expect(snapshot.subThemes.some(({ id }) => id === "local.puppyone.custom-css")).toBe(false);
   });
 
-  it("does not apply a legacy managed Custom CSS package", () => {
-    const legacyCustomCss = externalTheme({
-      id: "local.puppyone.custom-css",
-      compiledCss: {
-        markdown: '[data-po-theme-surface="markdown"][data-po-theme-id] { color: red }',
-      },
+  it("preserves declared future Root Theme compatibility without relabeling it as Default", () => {
+    const installed = externalSubTheme({
+      compatibleRootThemeIds: ["future-shell"],
     });
-    const snapshot = createThemeCatalogSnapshot({ themes: [legacyCustomCss], diagnostics: [] });
+    const snapshot = createSubThemeCatalogSnapshot({ themes: [installed], diagnostics: [] });
 
-    act(() => root.render(
-      <ThemeStyleHost
-        snapshot={snapshot}
-        selection={selection()}
-        markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS}
-      />,
-    ));
-
-    expect(document.head.querySelector('[data-po-theme-id="local.puppyone.custom-css"]'))
-      .toBeNull();
+    expect(snapshot.subThemes.find(({ id }) => id === installed.id)?.compatibleRootThemeIds)
+      .toEqual(["future-shell"]);
   });
 
-  it("injects the selected theme before Editor presentation overrides", () => {
-    const base = externalTheme({
-      id: "com.example.reader",
-      compiledCss: {
-        markdown: '[data-po-theme-surface="markdown"][data-po-theme-id="com.example.reader"] { --po-md-h1-size: 2em }',
-      },
-    });
-    const snapshot = createThemeCatalogSnapshot({ themes: [base], diagnostics: [] });
-
+  it("puts typed surface preferences after Sub Theme CSS", () => {
+    const selected = externalSubTheme();
     act(() => root.render(
-      <ThemeStyleHost
-        snapshot={snapshot}
-        selection={selection({ markdown: base.id })}
+      <SubThemeStyleHost
+        subTheme={selected}
         markdownPresentation={{
           ...DEFAULT_MARKDOWN_PRESENTATION_SETTINGS,
           headingScale: "large",
@@ -232,64 +134,43 @@ describe("renderer CSS theme style host", () => {
       />,
     ));
 
-    const layers = [...document.head.querySelectorAll<HTMLStyleElement>("style[data-po-theme-style]")];
-    expect(layers.map((style) => style.dataset.poThemeLayer)).toEqual([
-      "theme",
-      "editor",
+    const styles = [...document.head.querySelectorAll<HTMLStyleElement>(
+      "style[data-po-sub-theme-style]",
+    )];
+    expect(styles.map((style) => style.dataset.poThemeLayer)).toEqual([
+      "sub-theme",
+      "appearance-overrides",
     ]);
-    expect(layers[1]?.textContent).toContain("--po-md-h1-size: 2.25em");
-  });
-
-  it("keeps Editor preferences authoritative over a dark theme root", () => {
-    const base = externalTheme({
-      id: "com.example.dark-reader",
-      compiledCss: {
-        markdown: ':where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="com.example.dark-reader"] { --po-md-h1-size: 2em }',
-      },
-    });
-    const snapshot = createThemeCatalogSnapshot({ themes: [base], diagnostics: [] });
-    const markdownPresentation = {
-      ...DEFAULT_MARKDOWN_PRESENTATION_SETTINGS,
-      headingScale: "large" as const,
-    };
-
-    act(() => root.render(
-      <div className="dark">
-        <ThemeStyleHost
-          snapshot={snapshot}
-          selection={selection({ markdown: base.id })}
-          markdownPresentation={markdownPresentation}
-        />
-        <div data-dark-cascade data-po-theme-surface="markdown" data-po-theme-id={base.id} />
-      </div>,
-    ));
-    const surface = container.querySelector("[data-dark-cascade]") as Element;
-    expect(getComputedStyle(surface).getPropertyValue("--po-md-h1-size").trim()).toBe("2.25em");
+    expect(styles[1]?.textContent).toContain("@layer appearance-overrides");
+    expect(styles[1]?.textContent).toContain("--po-user-md-h1-size: 2.25em");
+    expect(styles[1]?.textContent).toContain("[data-po-appearance-root][data-sub-theme-id]");
   });
 });
 
-function externalTheme(overrides: Partial<ThemeDefinition> = {}): ThemeDefinition {
+function externalSubTheme(overrides: Partial<SubThemeDefinition> = {}): SubThemeDefinition {
+  const id = overrides.id ?? "com.example.reader";
   return {
-    id: "com.example.reader",
+    id,
+    family: "com.example",
     name: "Reader",
     version: "1.0.0",
-    modes: ["light"],
-    targets: ["markdown"],
+    contractVersion: 1,
+    compatibleRootThemeIds: ["default"],
+    modes: ["light", "dark"],
+    targets: ["application", "markdown", "csv"],
     source: "local-package",
     compiledCss: {
-      markdown: '[data-po-theme-id="com.example.reader"] { color: #222 }',
+      markdown: `[data-po-appearance-root][data-sub-theme-id="${id}"] { --po-host-md-content-color: #222; }`,
     },
     ...overrides,
   };
 }
 
-function selection(
-  overrides: Partial<SurfaceThemeSelection> = {},
-): SurfaceThemeSelection {
-  return {
-    application: "default",
-    markdown: "default",
-    csv: "default",
-    ...overrides,
-  };
+function variant(
+  id: string,
+  compatibleRootThemeIds: readonly ("default" | "windows-xp")[] = ["default"],
+  modes: readonly ("light" | "dark")[] = ["light", "dark"],
+  targets: readonly ("application" | "markdown" | "csv")[] = ["application", "markdown", "csv"],
+) {
+  return { id, compatibleRootThemeIds, modes, targets };
 }

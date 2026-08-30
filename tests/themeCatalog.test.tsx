@@ -3,14 +3,16 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useThemeCatalog, type ThemeCatalogController } from "../src/features/themes/useThemeCatalog";
-import { DEFAULT_SURFACE_THEME_PREFERENCES } from "../src/features/themes/themePreferences";
-import type { ThemeColorMode } from "../src/features/themes/themeTypes";
+import {
+  useSubThemeNativeMenu,
+  useSubThemeCatalog,
+  type SubThemeCatalogController,
+} from "../src/features/themes/useSubThemeCatalog";
 import type { DesktopThemeSnapshot } from "../src/types/electron";
 
 let container: HTMLDivElement;
 let root: Root;
-let latest: ThemeCatalogController | null;
+let latest: SubThemeCatalogController | null;
 const originalDesktopApi = window.puppyoneDesktop;
 
 beforeEach(() => {
@@ -26,13 +28,11 @@ afterEach(() => {
   window.puppyoneDesktop = originalDesktopApi;
 });
 
-describe("renderer theme catalog", () => {
-  it("loads themes and refreshes them when the window regains focus", async () => {
+describe("renderer Sub Theme catalog", () => {
+  it("loads variants and refreshes them when the window regains focus", async () => {
     const first = snapshot("com.example.first");
     const second = snapshot("com.example.second");
-    const list = vi.fn()
-      .mockResolvedValueOnce(first)
-      .mockResolvedValue(second);
+    const list = vi.fn().mockResolvedValueOnce(first).mockResolvedValue(second);
     window.puppyoneDesktop = {
       themes: {
         list,
@@ -47,8 +47,8 @@ describe("renderer theme catalog", () => {
 
     expect(list).toHaveBeenCalledOnce();
     expect(latest?.status).toBe("ready");
-    expect(latest?.snapshot.themes.some((theme) => theme.id === "default")).toBe(true);
-    expect(latest?.snapshot.themes.some((theme) => theme.id === "com.example.first")).toBe(true);
+    expect(latest?.snapshot.subThemes.some(({ id }) => id === "default.neutral")).toBe(true);
+    expect(latest?.snapshot.subThemes.some(({ id }) => id === "com.example.first")).toBe(true);
 
     await act(async () => {
       window.dispatchEvent(new Event("focus"));
@@ -56,11 +56,11 @@ describe("renderer theme catalog", () => {
     });
 
     expect(list).toHaveBeenCalledTimes(2);
-    expect(latest?.snapshot.themes.some((theme) => theme.id === "com.example.first")).toBe(false);
-    expect(latest?.snapshot.themes.some((theme) => theme.id === "com.example.second")).toBe(true);
+    expect(latest?.snapshot.subThemes.some(({ id }) => id === "com.example.first")).toBe(false);
+    expect(latest?.snapshot.subThemes.some(({ id }) => id === "com.example.second")).toBe(true);
   });
 
-  it("uses built-ins when the desktop host API is unavailable", async () => {
+  it("uses the six built-in variants when the desktop host API is unavailable", async () => {
     window.puppyoneDesktop = undefined;
 
     await act(async () => {
@@ -70,10 +70,13 @@ describe("renderer theme catalog", () => {
 
     expect(latest?.status).toBe("ready");
     expect(latest?.error).toBeNull();
-    expect(latest?.snapshot.themes.map((theme) => theme.id)).toEqual([
-      "default",
-      "builtin.pack.github",
-      "builtin.pack.newspaper",
+    expect(latest?.snapshot.subThemes.map(({ id }) => id)).toEqual([
+      "default.neutral",
+      "default.warm",
+      "default.graphite",
+      "default.github",
+      "default.newspaper",
+      "windows-xp.luna-blue",
     ]);
   });
 
@@ -99,55 +102,10 @@ describe("renderer theme catalog", () => {
     expect(latest?.error).toBe("Finder unavailable");
   });
 
-  it("falls back every surface when the active pack is incomplete", async () => {
-    window.puppyoneDesktop = {
-      themes: {
-        list: vi.fn(async () => snapshot("com.example.first")),
-        openDirectory: vi.fn(async () => ({ opened: true as const })),
-      },
-    } as typeof window.puppyoneDesktop;
-
-    await act(async () => {
-      root.render(
-        <Harness
-          colorMode="light"
-          preferences={{
-            ...DEFAULT_SURFACE_THEME_PREFERENCES,
-            pack: "com.example.first",
-          }}
-        />,
-      );
-      await Promise.resolve();
-    });
-
-    expect(latest?.selection).toEqual({
-      application: "default",
-      markdown: "default",
-      csv: "default",
-    });
-
-    await act(async () => {
-      root.render(
-        <Harness
-          colorMode="dark"
-          preferences={{
-            ...DEFAULT_SURFACE_THEME_PREFERENCES,
-            pack: "com.example.first",
-          }}
-        />,
-      );
-    });
-
-    expect(latest?.selection.markdown).toBe("default");
-  });
-
-  it("syncs one theme pack to the native menu and routes pack requests", async () => {
+  it("syncs only root-compatible variants to the native menu and routes requests", async () => {
     const syncNativeMenu = vi.fn(async () => ({ synced: true as const }));
-    let requestSelection: ((request: {
-      kind: "pack";
-      themeId: string;
-    }) => void) | undefined;
-    const onThemePackChange = vi.fn();
+    let requestSelection: ((request: { kind: "pack"; themeId: string }) => void) | undefined;
+    const onSubThemeChange = vi.fn();
     window.puppyoneDesktop = {
       themes: {
         list: vi.fn(async () => ({ themes: [], diagnostics: [] })),
@@ -161,45 +119,41 @@ describe("renderer theme catalog", () => {
     } as typeof window.puppyoneDesktop;
 
     await act(async () => {
-      root.render(
-        <NativeHarness onThemePackChange={onThemePackChange} />,
-      );
+      root.render(<NativeHarness onSubThemeChange={onSubThemeChange} />);
       await Promise.resolve();
     });
 
-    expect(syncNativeMenu).toHaveBeenCalledWith(expect.objectContaining({
-      pack: "builtin.pack.forest",
-    }));
-    expect(syncNativeMenu.mock.calls.at(-1)?.[0]).not.toHaveProperty("overrides");
-    expect(syncNativeMenu.mock.calls.at(-1)?.[0]).not.toHaveProperty("selection");
-    act(() => requestSelection?.({ kind: "pack", themeId: "builtin.pack.github" }));
-    expect(onThemePackChange).toHaveBeenCalledWith("builtin.pack.github");
+    const request = syncNativeMenu.mock.calls.at(-1)?.[0];
+    expect(request).toMatchObject({ pack: "default.github" });
+    expect(request?.themes.map(({ id }: { id: string }) => id)).toEqual([
+      "default.neutral",
+      "default.warm",
+      "default.graphite",
+      "default.github",
+      "default.newspaper",
+    ]);
+    act(() => requestSelection?.({ kind: "pack", themeId: "default.newspaper" }));
+    expect(onSubThemeChange).toHaveBeenCalledWith("default.newspaper");
   });
 });
 
-function Harness({
-  colorMode = "light",
-  preferences = DEFAULT_SURFACE_THEME_PREFERENCES,
-}: {
-  colorMode?: ThemeColorMode;
-  preferences?: typeof DEFAULT_SURFACE_THEME_PREFERENCES;
-} = {}) {
-  latest = useThemeCatalog({ colorMode, preferences });
+function Harness() {
+  latest = useSubThemeCatalog();
   return null;
 }
 
 function NativeHarness({
-  onThemePackChange,
+  onSubThemeChange,
 }: {
-  onThemePackChange: (themeId: string) => void;
+  onSubThemeChange: (subThemeId: string) => void;
 }) {
-  latest = useThemeCatalog({
-    colorMode: "light",
-    preferences: {
-      version: 5,
-      pack: "builtin.pack.forest",
-    },
-    onThemePackChange,
+  const catalog = useSubThemeCatalog();
+  latest = catalog;
+  useSubThemeNativeMenu({
+    snapshot: catalog.snapshot,
+    rootThemeId: "default",
+    selectedSubThemeId: "default.github",
+    onSubThemeChange,
   });
   return null;
 }
@@ -210,10 +164,14 @@ function snapshot(id: string): DesktopThemeSnapshot {
       id,
       name: id,
       version: "1.0.0",
+      contractVersion: 1,
+      compatibleRootThemeIds: ["default"],
       modes: ["light"],
       targets: ["markdown"],
       source: "local-package",
-      compiledCss: { markdown: `[data-po-theme-id="${id}"] { color: red }` },
+      compiledCss: {
+        markdown: `[data-po-appearance-root][data-sub-theme-id="${id}"] { --po-host-md-content-color: red; }`,
+      },
     }],
     diagnostics: [],
   };

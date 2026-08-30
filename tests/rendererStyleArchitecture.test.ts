@@ -13,7 +13,7 @@ describe("renderer style architecture", () => {
     const sourceControlStyles = source("src/features/source-control/source-control.css");
     const tailwindConfig = source("tailwind.config.cjs");
 
-    expect(cascade.trim()).toBe("@layer reset, tokens, primitives, patterns, features, interface-style, accessibility, overrides;");
+    expect(cascade.trim()).toBe("@layer reset, tokens, primitives, patterns, features, interface-style, sub-theme, appearance-overrides, accessibility, overrides;");
     expectInOrder(entry, [
       'import "./styles/cascade.css";',
       'import "./cloud-globals.css";',
