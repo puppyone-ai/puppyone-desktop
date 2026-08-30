@@ -34,6 +34,8 @@ describe("semantic Agent reference capabilities", () => {
     expect(acceptsAgentAttachment(capabilities, { mime: "image/webp", name: "shot.webp" })).toBe(false);
     expect(acceptsAgentAttachment(capabilities, { mime: "text/x-python", name: "app.py" })).toBe(true);
     expect(acceptsAgentAttachment(capabilities, { mime: "", name: "README.md" })).toBe(true);
+    expect(acceptsAgentAttachment(capabilities, { mime: "audio/wav", name: "note.wav" })).toBe(false);
+    expect(acceptsAgentAttachment(capabilities, { mime: "video/mp4", name: "clip.mp4" })).toBe(false);
     expect(acceptsAgentAttachment(capabilities, { mime: "application/pdf", name: "paper.pdf" })).toBe(false);
     expect(acceptedAgentAttachmentPickerTypes(capabilities)).toEqual([
       "image/png",
