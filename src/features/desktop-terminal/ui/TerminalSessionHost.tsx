@@ -6,10 +6,14 @@ import type {
 import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
 import type { DesktopTerminalSession } from "../model/terminalSessions";
 import type { TerminalRuntimeHandle } from "../runtime/terminalRuntime";
-import { TerminalLauncher } from "./TerminalLauncher";
+import {
+  TerminalLauncher,
+  type TerminalLauncherAgentMode,
+} from "./TerminalLauncher";
 import { TerminalSessionView } from "./TerminalSessionView";
 
 type TerminalSessionHostProps = {
+  agentMode: TerminalLauncherAgentMode;
   discoveryPhase: TerminalAgentDiscoveryPhase;
   availableAgentIds: readonly AvailableTerminalAgentId[];
   chatCreationAvailable?: boolean;
@@ -29,6 +33,7 @@ type TerminalSessionHostProps = {
 
 /** Keeps one Session component mounted while Group slots reparent its host. */
 export function TerminalSessionHost({
+  agentMode,
   discoveryPhase,
   availableAgentIds,
   chatCreationAvailable = true,
@@ -53,6 +58,7 @@ export function TerminalSessionHost({
       >
         <div className="desktop-terminal-launcher-tab" hidden={!presented}>
           <TerminalLauncher
+            agentMode={agentMode}
             discoveryPhase={discoveryPhase}
             availableAgentIds={availableAgentIds}
             chatCreationAvailable={chatCreationAvailable}
@@ -87,6 +93,7 @@ export function TerminalSessionHost({
       {starting && (
         <div className="desktop-terminal-launcher-tab" hidden={!presented}>
           <TerminalLauncher
+            agentMode={agentMode}
             discoveryPhase={discoveryPhase}
             availableAgentIds={availableAgentIds}
             chatCreationAvailable={false}

@@ -117,8 +117,15 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(controller).not.toContain("initiallyActive");
     expect(controller).not.toContain("getDesktopTerminalLauncher(launcherId)");
     expect(launcher).toContain('getDesktopTerminalLauncher("shell")');
+    expect(launcher).toContain("agentMode === \"chat\"");
     expect(launcher).toContain("chatRecipes.map");
-    expect(launcher).not.toContain("DESKTOP_TERMINAL_LAUNCHERS.map");
+    expect(launcher).toContain("terminalAgentLaunchers.map");
+    expect(launcher).toContain("DESKTOP_TERMINAL_LAUNCHERS.filter");
+    expect(panel).toContain('agentLauncherMode = agentChatContribution ? "chat" : "terminal"');
+    expect(panel).toContain("agentMode={agentLauncherMode}");
+    expect(panel).toContain('agentLauncherMode === "terminal"');
+    expect(app).toContain("if (!desktopAgentChatEnabled) return null");
+    expect(app).toContain("agentChatContribution ? [agentChatContribution] : []");
     expect(launcher).not.toContain("window.puppyoneDesktop");
     expect(launchers).not.toContain("command:");
     expect(controller).not.toContain('dispatch({ type: "restart-active" });');

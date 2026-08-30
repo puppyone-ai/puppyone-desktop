@@ -25,15 +25,13 @@ afterEach(() => {
 });
 
 describe("Unified Workbench launcher", () => {
-  it("restores the vertical two-frame launcher with Chat Agents above Shell", () => {
-    const onCreateChat = vi.fn();
+  it("uses detected Terminal Agent commands above Shell before Chat opt-in", () => {
     const onLaunch = vi.fn();
     const container = renderLauncher(
       <TerminalLauncher
+        agentMode="terminal"
         discoveryPhase="ready"
-        availableAgentIds={["codex", "claude", "cursor", "opencode", "pi", "hermes"]}
-        chatRecipes={AGENT_CHAT_CREATION_RECIPES}
-        onCreateChat={onCreateChat}
+        availableAgentIds={["codex", "claude", "cursor", "opencode", "hermes"]}
         onLaunch={onLaunch}
         onRefresh={vi.fn()}
       />,
@@ -43,6 +41,7 @@ describe("Unified Workbench launcher", () => {
     expect(groups).toHaveLength(2);
     expect(groups[0].classList).toContain("is-agents");
     expect(groups[1].classList).toContain("is-shell");
+    expect(groups[0].getAttribute("data-agent-mode")).toBe("terminal");
     expect(groups[0].querySelector("h2")?.textContent).toBe("start with an agent");
     expect(groups[1].querySelector("h2")?.textContent).toBe("or open a shell");
 
@@ -52,13 +51,19 @@ describe("Unified Workbench launcher", () => {
     expect(Array.from(agentButtons, (button) => button.textContent)).toEqual([
       "Codex",
       "Claude Code",
-      "Cursor",
+      "Cursor Agent",
       "OpenCode",
-      "PuppyOne",
+      "Hermes Agent",
     ]);
-    expect(agentButtons[0].getAttribute("aria-label")).toBe("start with an agent: Codex");
-    expect(agentButtons[4].disabled).toBe(true);
-    expect(agentButtons[4].title).toBe("PuppyOne — Coming soon");
+    expect(agentButtons[0].getAttribute("aria-label"))
+      .toBe("start with an agent: Codex. Run the Codex CLI");
+    expect(Array.from(agentButtons, (button) => button.disabled)).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
 
     const shellButtons = groups[1].querySelectorAll<HTMLButtonElement>("button");
     expect(shellButtons).toHaveLength(1);
@@ -67,28 +72,66 @@ describe("Unified Workbench launcher", () => {
     expect(container.querySelector(".desktop-terminal-launcher-group.is-terminal")).toBeNull();
 
     act(() => agentButtons[0].click());
-    expect(onCreateChat).toHaveBeenCalledOnce();
-    expect(onCreateChat).toHaveBeenCalledWith(AGENT_CHAT_CREATION_RECIPES[0]);
+    expect(onLaunch).toHaveBeenCalledWith("codex");
     act(() => shellButtons[0].click());
-    expect(onLaunch).toHaveBeenCalledOnce();
     expect(onLaunch).toHaveBeenCalledWith("shell");
   });
 
-  it("keeps Terminal Agent commands in the model but out of the launcher", () => {
+  it("switches the same frame to Chat recipes only in Chat mode", () => {
+    const onCreateChat = vi.fn();
+    const onLaunch = vi.fn();
     const container = renderLauncher(
       <TerminalLauncher
+        agentMode="chat"
         discoveryPhase="ready"
         availableAgentIds={["codex", "claude", "cursor", "opencode", "pi", "hermes"]}
         chatRecipes={AGENT_CHAT_CREATION_RECIPES}
-        onCreateChat={vi.fn()}
+        onCreateChat={onCreateChat}
+        onLaunch={onLaunch}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    const agentGroup = container.querySelector<HTMLElement>(
+      ".desktop-terminal-launcher-group.is-agents",
+    );
+    expect(agentGroup?.getAttribute("data-agent-mode")).toBe("chat");
+    const agentButtons = agentGroup?.querySelectorAll<HTMLButtonElement>(
+      ".desktop-terminal-launcher-tool",
+    ) ?? [];
+    expect(Array.from(agentButtons, (button) => button.textContent)).toEqual([
+      "Codex",
+      "Claude Code",
+      "Cursor",
+      "OpenCode",
+      "PuppyOne",
+    ]);
+    expect(agentButtons[4]?.disabled).toBe(true);
+    expect(agentButtons[4]?.title).toBe("PuppyOne — Coming soon");
+    act(() => agentButtons[0]?.click());
+    expect(onCreateChat).toHaveBeenCalledWith(AGENT_CHAT_CREATION_RECIPES[0]);
+    expect(onLaunch).not.toHaveBeenCalled();
+
+    expect(container.querySelectorAll(".desktop-terminal-launcher-shell")).toHaveLength(1);
+    expect(container.textContent).not.toContain("Pi Agent");
+    expect(container.textContent).not.toContain("Hermes Agent");
+  });
+
+  it("keeps the full Terminal Agent catalog command-free and renders only detected ids", () => {
+    const container = renderLauncher(
+      <TerminalLauncher
+        agentMode="terminal"
+        discoveryPhase="ready"
+        availableAgentIds={["hermes", "codex"]}
         onLaunch={vi.fn()}
         onRefresh={vi.fn()}
       />,
     );
 
-    expect(container.querySelectorAll(".desktop-terminal-launcher-shell")).toHaveLength(1);
-    expect(container.textContent).not.toContain("Pi Agent");
-    expect(container.textContent).not.toContain("Hermes Agent");
+    expect(Array.from(
+      container.querySelectorAll<HTMLButtonElement>(".desktop-terminal-launcher-tool"),
+      (button) => button.textContent,
+    )).toEqual(["Codex", "Hermes Agent"]);
     expect(DESKTOP_TERMINAL_LAUNCHERS.map(({ id }) => id)).toEqual([
       "codex",
       "claude",
@@ -107,6 +150,7 @@ describe("Unified Workbench launcher", () => {
     root = createRoot(container);
     const render = (phase: "loading" | "ready") => withTestLocalization(
       <TerminalLauncher
+        agentMode="chat"
         discoveryPhase={phase}
         availableAgentIds={phase === "ready" ? ["codex"] : []}
         chatRecipes={AGENT_CHAT_CREATION_RECIPES}
@@ -133,6 +177,7 @@ describe("Unified Workbench launcher", () => {
   it("supports a standalone Chat launcher without exposing the Shell frame", () => {
     const container = renderLauncher(
       <TerminalLauncher
+        agentMode="chat"
         discoveryPhase="ready"
         availableAgentIds={[]}
         terminalEnabled={false}
@@ -164,6 +209,7 @@ describe("Unified Workbench launcher", () => {
   it("keeps both frames available when a prior Shell start reports an error", () => {
     const container = renderLauncher(
       <TerminalLauncher
+        agentMode="chat"
         discoveryPhase="ready"
         availableAgentIds={[]}
         chatRecipes={AGENT_CHAT_CREATION_RECIPES}

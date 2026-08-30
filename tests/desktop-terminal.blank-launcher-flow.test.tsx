@@ -44,6 +44,7 @@ describe("Unified Workbench blank launcher flow", () => {
       ));
     });
 
+    expect(document.querySelector("[data-agent-mode=\"chat\"]")).not.toBeNull();
     await clickButton("Codex");
     await vi.waitFor(() => {
       expect(document.querySelector('[data-fake-chat="codex"]')).not.toBeNull();
@@ -65,6 +66,32 @@ describe("Unified Workbench blank launcher flow", () => {
       expect(document.querySelector(".desktop-terminal-launcher")).toBeNull();
     });
     expect(document.querySelectorAll('[role="tab"]')).toHaveLength(2);
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  it("uses detected Terminal CLI Agents when the Chat contribution is absent", async () => {
+    installTerminalAgentBridge(["codex", "cursor", "hermes"]);
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(withTestLocalization(
+        <RightTerminalPanel
+          active
+          hiddenAgentIds={[]}
+          workspace={WORKSPACE}
+        />,
+      ));
+    });
+
+    await vi.waitFor(() => {
+      const agentFrame = document.querySelector('[data-agent-mode="terminal"]');
+      expect(agentFrame).not.toBeNull();
+      expect(agentFrame?.textContent).toContain("Codex");
+      expect(agentFrame?.textContent).toContain("Cursor Agent");
+      expect(agentFrame?.textContent).toContain("Hermes Agent");
+    });
+    expect(document.body.textContent).not.toContain("PuppyOne");
     expect(document.querySelector('[role="menu"]')).toBeNull();
   });
 });
@@ -118,12 +145,17 @@ async function clickButton(label: string) {
   });
 }
 
-function installTerminalAgentBridge() {
+function installTerminalAgentBridge(
+  availableAgentIds: readonly ("codex" | "claude" | "cursor" | "opencode" | "pi" | "hermes")[] = [
+    "codex",
+    "claude",
+  ],
+) {
   Object.defineProperty(window, "puppyoneDesktop", {
     configurable: true,
     value: {
       locateTerminalAgents: vi.fn(async () => ({
-        availableAgentIds: ["codex", "claude"],
+        availableAgentIds,
         scannedAt: "2026-08-30T00:00:00.000Z",
         source: "scan",
       })),

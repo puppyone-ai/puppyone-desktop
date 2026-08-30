@@ -7,6 +7,7 @@ export function TerminalLauncherVisualSmokeHarness() {
   const query = new URLSearchParams(window.location.search);
   const width = clamp(Number(query.get("width")) || 420, 280, 760);
   const theme = query.get("theme") === "light" ? "light" : "dark";
+  const agentMode = query.get("agentMode") === "chat" ? "chat" : "terminal";
   const [selection, setSelection] = useState<string | null>(null);
 
   return (
@@ -20,6 +21,7 @@ export function TerminalLauncherVisualSmokeHarness() {
       >
         <div className="desktop-terminal-body is-empty">
           <TerminalLauncher
+            agentMode={agentMode}
             discoveryPhase="ready"
             availableAgentIds={["codex", "claude", "cursor", "opencode", "pi", "hermes"]}
             chatRecipes={AGENT_CHAT_CREATION_RECIPES}

@@ -109,6 +109,7 @@ export function RightTerminalPanel({
   });
   const hosts = usePersistentTerminalSessionHosts(itemIds);
   const agentChatContribution = contributionByKind.get(AGENT_CHAT_WORKBENCH_ITEM_KIND) ?? null;
+  const agentLauncherMode = agentChatContribution ? "chat" : "terminal";
   const chatRecipes = agentChatContribution?.creationRecipes ?? [];
   const canCreateChat = Boolean(agentChatContribution && chatRecipes.some((recipe) => (
     canCreateContribution(agentChatContribution, recipe)
@@ -137,8 +138,14 @@ export function RightTerminalPanel({
     return availableAgentIds.filter((agentId) => !hidden.has(agentId));
   }, [availableAgentIds, hiddenAgentIds]);
   const canLaunch = useCallback((launcherId: DesktopTerminalLauncherId) => (
-    terminalEnabled && launcherId === "shell"
-  ), [terminalEnabled]);
+    terminalEnabled && (
+      launcherId === "shell"
+      || (
+        agentLauncherMode === "terminal"
+        && visibleAgentIds.some((agentId) => agentId === launcherId)
+      )
+    )
+  ), [agentLauncherMode, terminalEnabled, visibleAgentIds]);
   const createDetectedTerminal = useCallback((launcherId: DesktopTerminalLauncherId) => {
     if (terminalEnabled && canLaunch(launcherId)) {
       workbench.createTerminal(currentRoot, launcherId);
@@ -265,6 +272,7 @@ export function RightTerminalPanel({
         )}
         {workbench.items.length === 0 ? (
           <TerminalLauncher
+            agentMode={agentLauncherMode}
             discoveryPhase={agentDiscoveryPhase}
             availableAgentIds={visibleAgentIds}
             chatCreationAvailable={canCreateChat}
@@ -298,6 +306,7 @@ export function RightTerminalPanel({
           item.kind === TERMINAL_WORKBENCH_ITEM_KIND ? (
             workbench.terminalById.get(item.id) ? (
               <TerminalSessionHost
+                agentMode={agentLauncherMode}
                 discoveryPhase={agentDiscoveryPhase}
                 availableAgentIds={visibleAgentIds}
                 chatCreationAvailable={canCreateChat}
