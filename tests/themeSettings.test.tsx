@@ -30,13 +30,15 @@ describe("Sub Theme settings", () => {
     const styles = source("src/styles/settings-controls.css");
     expect(styles).toMatch(/\.desktop-theme-pack-controls\s*\{[\s\S]*flex-wrap:\s*nowrap/);
     expect(styles).toMatch(/\.desktop-theme-pack-label\s*\{[^}]*color:\s*var\(--po-text-subtle\)/);
-    expect(styles).toMatch(/\.desktop-theme-pack-controls\s*\{[\s\S]*width:\s*min\(100%,\s*360px\)/);
+    expect(styles).toMatch(/\.desktop-theme-pack-controls\s*\{[^}]*width:\s*fit-content[^}]*max-width:\s*100%/);
+    expect(section).toContain("desktop-theme-pack-picker");
+    expect(styles).toMatch(/\.desktop-theme-pack-picker\s*\{[^}]*width:\s*clamp\(180px,\s*24vw,\s*240px\)/);
     expect(styles).toMatch(/\.desktop-theme-add-action\s*\{[\s\S]*white-space:\s*nowrap/);
-    expect(section).toContain("desktop-theme-settings-action-row");
-    expect(styles).toMatch(/\.desktop-theme-settings-action-row\s*\{[^}]*justify-content:\s*flex-end/);
-    expect(styles).toMatch(/\.desktop-theme-settings-primary-actions\s*\{[^}]*width:\s*min\(100%,\s*360px\)[^}]*justify-content:\s*flex-end/);
-    expect(styles).not.toMatch(/\.desktop-theme-settings-primary-actions\s*\{[^}]*background:\s*var\(--po-control\)/);
-    expect(styles).toMatch(/\.desktop-theme-settings-primary-actions\s*>\s*\.desktop-settings-action\s*\{[^}]*flex:\s*0\s+0\s+auto[^}]*border:\s*1px\s+solid\s+var\(--po-divider\)/);
+    expect(section).not.toContain("desktop-theme-settings-action-row");
+    expect(section.match(/desktop-settings-row desktop-settings-row-control/g)).toHaveLength(1);
+    expect(section.indexOf("desktop-theme-pack-select")).toBeLessThan(section.indexOf("catalog.openDirectory"));
+    expect(styles).toMatch(/\.desktop-theme-pack-controls\s*>\s*\.desktop-settings-action\s*\{[^}]*flex:\s*0\s+0\s+auto[^}]*border:\s*1px\s+solid\s+var\(--po-divider\)/);
+    expect(styles).toMatch(/@media\s*\(max-width:\s*760px\)[\s\S]*\.desktop-theme-pack-controls\s*\{[^}]*flex-wrap:\s*wrap/);
   });
 
   it("wires the catalog and preferences through the settings surface", () => {

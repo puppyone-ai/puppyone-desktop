@@ -73,21 +73,12 @@
   color: var(--po-danger);
 }
 
-.desktop-theme-settings-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.desktop-theme-settings-action-row {
-  justify-content: flex-end;
-}
-
 .desktop-theme-pack-controls {
   display: flex;
-  width: min(100%, 360px);
+  width: fit-content;
+  max-width: 100%;
   min-width: 0;
+  flex: 0 1 auto;
   flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
@@ -111,10 +102,15 @@
   line-height: 1.4;
 }
 
+.desktop-theme-pack-picker {
+  width: clamp(180px, 24vw, 240px);
+  min-width: 0;
+  flex: 0 1 240px;
+}
+
 .desktop-theme-pack-select {
   width: 100%;
   max-width: none;
-  flex: 1 1 auto;
 }
 
 .desktop-theme-add-action {
@@ -123,15 +119,7 @@
   white-space: nowrap;
 }
 
-.desktop-theme-settings-primary-actions {
-  width: min(100%, 360px);
-  align-items: center;
-  flex-wrap: nowrap;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.desktop-theme-settings-primary-actions > .desktop-settings-action {
+.desktop-theme-pack-controls > .desktop-settings-action {
   min-width: 0;
   flex: 0 0 auto;
   border: 1px solid var(--po-divider);
@@ -139,7 +127,7 @@
   color: var(--po-text-muted);
 }
 
-.desktop-theme-settings-primary-actions > .desktop-settings-action:hover:not(:disabled) {
+.desktop-theme-pack-controls > .desktop-settings-action:hover:not(:disabled) {
   border-color: var(--po-border-strong);
   background: var(--po-hover);
   color: var(--po-text);
@@ -170,11 +158,14 @@
 @media (max-width: 760px) {
   .desktop-theme-pack-controls {
     width: 100%;
+    flex-wrap: wrap;
     justify-content: flex-start;
   }
 
-  .desktop-theme-pack-select {
-    min-width: 0;
+  .desktop-theme-pack-picker {
+    width: auto;
+    max-width: 100%;
+    flex: 1 1 220px;
   }
 }
 
