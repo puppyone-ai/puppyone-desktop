@@ -68,6 +68,7 @@
     "smoke:workspace-menu": "electron scripts/smoke-workspace-menu-visual.mjs",
     "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
     "smoke:native-agents": "node scripts/smoke-native-agent-roundtrip.mjs",
+    "smoke:native-agent-references": "node scripts/smoke-native-agent-references.mjs",
     "smoke:terminal-p0": "electron scripts/smoke-terminal-p0.mjs",
     "smoke:agent-references": "electron scripts/smoke-agent-reference-ingestion.mjs",
     "smoke:viewer-pack": "electron scripts/smoke-viewer-pack.mjs",
