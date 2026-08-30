@@ -383,7 +383,7 @@ function safeDisplayName(value) {
 function inferMimeType(filePath, header) {
   const detected = sniffMimeType(header);
   const extensionMime = MIME_BY_EXTENSION.get(path.extname(filePath).toLowerCase());
-  if ((extensionMime?.startsWith("image/") || extensionMime === "application/pdf") && detected !== extensionMime) {
+  if (MAGIC_VERIFIED_MIME_TYPES.has(extensionMime) && detected !== extensionMime) {
     return "application/octet-stream";
   }
   return detected || extensionMime || "application/octet-stream";
@@ -411,7 +411,23 @@ const MIME_BY_EXTENSION = new Map([
   [".png", "image/png"], [".jpg", "image/jpeg"], [".jpeg", "image/jpeg"],
   [".gif", "image/gif"], [".webp", "image/webp"], [".svg", "image/svg+xml"],
   [".pdf", "application/pdf"], [".txt", "text/plain"], [".md", "text/markdown"],
-  [".json", "application/json"], [".csv", "text/csv"], [".html", "text/html"],
+  [".mdx", "text/markdown"], [".json", "application/json"], [".jsonl", "application/json"],
+  [".csv", "text/csv"], [".tsv", "text/tab-separated-values"], [".html", "text/html"],
+  [".htm", "text/html"], [".xml", "application/xml"], [".yaml", "application/yaml"],
+  [".yml", "application/yaml"], [".toml", "application/toml"], [".js", "text/javascript"],
+  [".mjs", "text/javascript"], [".cjs", "text/javascript"], [".jsx", "text/javascript"],
+  [".ts", "text/typescript"], [".tsx", "text/typescript"], [".css", "text/css"],
+  [".py", "text/x-python"], [".rb", "text/x-ruby"], [".go", "text/x-go"],
+  [".rs", "text/x-rust"], [".java", "text/x-java-source"], [".swift", "text/x-swift"],
+  [".sh", "text/x-shellscript"], [".bash", "text/x-shellscript"], [".zsh", "text/x-shellscript"],
+  [".sql", "text/x-sql"], [".graphql", "text/x-graphql"], [".gql", "text/x-graphql"],
+]);
+const MAGIC_VERIFIED_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
 ]);
 
 export const agentAttachmentStoreLimits = Object.freeze({

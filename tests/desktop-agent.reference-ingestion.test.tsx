@@ -140,12 +140,13 @@ describe("Desktop Agent reference ingestion", () => {
     expect(container.querySelector("[role='status']")?.textContent).toContain("another workspace");
   });
 
-  it("routes Finder drop, picker and pasted image Files through the same staging method", async () => {
+  it("routes Finder drop, picker and every semantically supported pasted File through one staging method", async () => {
     const controller = controllerFixture();
     const container = render(<IngestionHarness controller={controller} withComposer />);
     const boundary = container.querySelector<HTMLElement>(".desktop-agent-boundary")!;
     const textarea = container.querySelector<HTMLTextAreaElement>("textarea")!;
     const image = new File(["image"], "capture.png", { type: "image/png" });
+    const markdown = new File(["# Notes"], "notes.md", { type: "text/markdown" });
 
     await act(async () => boundary.dispatchEvent(dragEvent("drop", fileTransfer([image]))));
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
@@ -154,9 +155,13 @@ describe("Desktop Agent reference ingestion", () => {
     const paste = new Event("paste", { bubbles: true, cancelable: true });
     Object.defineProperty(paste, "clipboardData", { value: fileTransfer([image]) });
     act(() => textarea.dispatchEvent(paste));
+    const textPaste = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(textPaste, "clipboardData", { value: fileTransfer([markdown]) });
+    act(() => textarea.dispatchEvent(textPaste));
 
-    await vi.waitFor(() => expect(controller.stageExternalFiles).toHaveBeenCalledTimes(3));
-    expect(controller.stageExternalFiles.mock.calls.every(([files]) => files[0] === image)).toBe(true);
+    await vi.waitFor(() => expect(controller.stageExternalFiles).toHaveBeenCalledTimes(4));
+    expect(controller.stageExternalFiles.mock.calls.slice(0, 3).every(([files]) => files[0] === image)).toBe(true);
+    expect(controller.stageExternalFiles.mock.calls[3]?.[0][0]).toBe(markdown);
   });
 
   it("opens the file picker directly from plus and keeps status-aware retryable chips", () => {
@@ -372,14 +377,20 @@ function controllerFixture() {
 
 function capabilities(): AgentReferenceInputCapabilities {
   return {
-    workspaceFiles: true,
-    workspaceDirectories: true,
-    images: "local-snapshot",
-    genericFiles: "none",
-    acceptedMimeTypes: ["image/png"],
-    maxReferences: 32,
-    maxReferenceBytes: 25 * 1024 * 1024,
-    maxTotalReferenceBytes: 25 * 1024 * 1024,
+    schemaVersion: 1,
+    workspace: { files: true, directories: true },
+    attachments: {
+      image: { accepted: true, mimeTypes: ["image/png"] },
+      text: { accepted: true, mimeTypes: ["text/*", "application/json"], extensions: [".md"] },
+      audio: { accepted: false },
+      video: { accepted: false },
+      binary: { accepted: false },
+    },
+    limits: {
+      maxCount: 32,
+      maxBytesPerReference: 25 * 1024 * 1024,
+      maxTotalBytes: 25 * 1024 * 1024,
+    },
     steer: false,
     attachmentOnly: false,
   };

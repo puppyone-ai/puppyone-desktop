@@ -2,32 +2,78 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { ACP_INLINE_IMAGE_MAX_BYTES } from "./acp-limits.mjs";
+import { classifyAgentAttachment } from "../../../../../shared/agent-contract/reference-input.mjs";
+import {
+  AGENT_REFERENCE_ERROR_CODES,
+  agentReferenceError,
+} from "../../domain/agent-reference-error.mjs";
 
-export async function materializeAcpImageReferences(references) {
+export const ACP_NATIVE_IMAGE_MIME_TYPES = Object.freeze(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+const ACP_NATIVE_IMAGE_MIME_TYPE_SET = new Set(ACP_NATIVE_IMAGE_MIME_TYPES);
+
+export async function materializeAcpReferences(references, profile = {}) {
+  const nativeProfile = normalizeProfile(profile);
   return Promise.all(array(references).map(async (reference) => {
-    if (reference?.kind !== "staged-attachment" || reference.snapshotUrl) return reference;
-    if (!reference.mime?.startsWith("image/") || typeof reference.path !== "string" || !path.isAbsolute(reference.path)) {
-      return reference;
+    if (reference?.kind !== "staged-attachment") return reference;
+    const kind = classifyAgentAttachment({ mime: reference.mime, name: reference.displayName ?? reference.name });
+    if (kind === "image" && reference.snapshotUrl) return reference;
+    if ((kind === "image" && (!nativeProfile.image || !ACP_NATIVE_IMAGE_MIME_TYPE_SET.has(reference.mime)))
+      || (kind === "text" && !nativeProfile.embeddedText)) {
+      throw unsupportedAttachmentError(kind);
+    }
+    if (!["image", "text"].includes(kind) || typeof reference.path !== "string" || !path.isAbsolute(reference.path)) {
+      throw unsupportedAttachmentError(kind);
     }
     const metadata = await fs.promises.lstat(reference.path).catch(() => null);
     if (!metadata?.isFile() || metadata.isSymbolicLink() || metadata.size > ACP_INLINE_IMAGE_MAX_BYTES) {
-      throw invalidImageError();
+      throw materializationError(kind);
     }
     const bytes = await fs.promises.readFile(reference.path);
-    return { ...reference, snapshotUrl: `data:${reference.mime};base64,${bytes.toString("base64")}` };
+    if (kind === "image") {
+      return { ...reference, snapshotUrl: `data:${reference.mime};base64,${bytes.toString("base64")}` };
+    }
+    let snapshotText;
+    try {
+      snapshotText = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch (cause) {
+      throw materializationError(kind, cause);
+    }
+    return { ...reference, snapshotText };
   }));
 }
 
-export function buildAcpPromptBlocks({ prompt, instructions, references, workspaceRoot }) {
+/** @deprecated Use materializeAcpReferences with an explicit native profile. */
+export function materializeAcpImageReferences(references) {
+  return materializeAcpReferences(references, { image: true });
+}
+
+export function buildAcpPromptBlocks({ prompt, instructions, references, workspaceRoot, profile = {} }) {
+  const nativeProfile = normalizeProfile(profile);
   const content = instructions ? `${instructions}\n\nUser request:\n${prompt}` : prompt;
   const blocks = [{ type: "text", text: content }];
   const seen = new Set();
   for (const reference of array(references)) {
     if (reference?.kind === "staged-attachment") {
-      const image = dataUrlParts(reference.snapshotUrl);
-      if (!image || !reference.mime?.startsWith("image/") || image.mime !== reference.mime) throw invalidImageError();
-      blocks.push({ type: "image", data: image.data, mimeType: image.mime });
-      continue;
+      const kind = classifyAgentAttachment({ mime: reference.mime, name: reference.displayName ?? reference.name });
+      if (kind === "image") {
+        const image = dataUrlParts(reference.snapshotUrl);
+        if (!nativeProfile.image || !ACP_NATIVE_IMAGE_MIME_TYPE_SET.has(reference.mime)
+          || !image || image.mime !== reference.mime) throw materializationError(kind);
+        blocks.push({ type: "image", data: image.data, mimeType: image.mime });
+        continue;
+      }
+      if (kind === "text" && nativeProfile.embeddedText && typeof reference.snapshotText === "string") {
+        blocks.push({
+          type: "resource",
+          resource: {
+            uri: attachmentUri(reference),
+            mimeType: reference.mime || "text/plain",
+            text: reference.snapshotText,
+          },
+        });
+        continue;
+      }
+      throw unsupportedAttachmentError(kind);
     }
     const filename = typeof reference?.path === "string" ? path.resolve(reference.path) : null;
     if (!filename || !isInsideWorkspace(workspaceRoot, filename)) {
@@ -52,8 +98,32 @@ function isInsideWorkspace(workspaceRoot, filename) {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
-function invalidImageError() {
-  return new Error("ACP received an invalid staged image reference (possibly oversized).");
+function attachmentUri(reference) {
+  const id = text(reference?.id, 256).replace(/[^A-Za-z0-9:._-]/g, "-") || "attachment";
+  const name = encodeURIComponent(text(reference?.displayName ?? reference?.name, 512) || "attachment");
+  return `puppyone-attachment://local/${encodeURIComponent(id)}/${name}`;
+}
+
+function normalizeProfile(value) {
+  return {
+    image: value?.image === true,
+    embeddedText: value?.embeddedText === true,
+  };
+}
+
+function unsupportedAttachmentError(kind) {
+  return agentReferenceError(
+    AGENT_REFERENCE_ERROR_CODES.missingRuntimeCapability,
+    `The ACP runtime does not accept ${kind} attachments through its negotiated prompt capabilities.`,
+  );
+}
+
+function materializationError(kind, cause) {
+  return agentReferenceError(
+    AGENT_REFERENCE_ERROR_CODES.materializationFailed,
+    `ACP could not safely materialize the staged ${kind} attachment.`,
+    cause ? { cause } : undefined,
+  );
 }
 
 function text(value, limit) {

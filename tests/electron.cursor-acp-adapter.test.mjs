@@ -84,7 +84,14 @@ describe("Cursor ACP runtime", () => {
       manualApprovals: true,
       structuredQuestions: true,
       resume: true,
+      referenceInputs: {
+        attachments: {
+          image: { accepted: true },
+          text: { accepted: false },
+        },
+      },
     });
+    expect(inspection.capabilities.revision).toBe("cursor-acp:1:image1:embedded0");
 
     await adapter.createSession({ mode: "agent" });
     const { turnId } = await adapter.startTurn({ prompt: "Fix it" });

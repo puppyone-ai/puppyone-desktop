@@ -1,3 +1,12 @@
+import {
+  acceptsAgentAttachment,
+  classifyAgentAttachment,
+} from "../../../../shared/agent-contract/reference-input.mjs";
+import {
+  AGENT_REFERENCE_ERROR_CODES,
+  agentReferenceError,
+} from "../domain/agent-reference-error.mjs";
+
 const MAX_REFERENCE_SNAPSHOT_URL_LENGTH = Math.ceil(512 * 1024 * 4 / 3) + 256;
 
 export function readinessWithAccountState(readiness, accountState, runtimeName = "Agent runtime") {
@@ -90,7 +99,10 @@ export function normalizeAuthorizedReferences(value) {
   if (value.length > 32) throw new Error("Agent references exceed the 32-file safety limit.");
   return value.map((entry) => {
     if (!entry || typeof entry !== "object" || entry.authorized !== true) {
-      throw new Error("Agent references must be authorized by the main process.");
+      throw agentReferenceError(
+        AGENT_REFERENCE_ERROR_CODES.unauthorized,
+        "Agent references must be authorized by the main process.",
+      );
     }
     if (entry.kind !== "workspace-entry" && entry.kind !== "staged-attachment") {
       throw new Error("Agent reference kind is not supported.");
@@ -118,34 +130,65 @@ export function normalizeAuthorizedReferences(value) {
 }
 
 export function requireSupportedAgentReferences(capabilities, references) {
-  const input = capabilities?.referenceInputs ?? {};
+  const input = capabilities?.referenceInputs;
   const values = Array.isArray(references) ? references : [];
+  if (!input) {
+    if (values.length > 0) {
+      throw agentReferenceError(
+        AGENT_REFERENCE_ERROR_CODES.missingRuntimeCapability,
+        "The selected Agent has not reported reference input support.",
+      );
+    }
+    return;
+  }
   const totalBytes = values.reduce((sum, entry) => sum + (Number.isSafeInteger(entry?.size) ? entry.size : 0), 0);
-  if (values.length > (input.maxReferences ?? 0)) throw new Error("This Agent accepts fewer reference inputs.");
-  if (totalBytes > (input.maxTotalReferenceBytes ?? 0)) throw new Error("Reference inputs exceed this Agent's total size limit.");
+  if (values.length > input.limits.maxCount) {
+    throw agentReferenceError(AGENT_REFERENCE_ERROR_CODES.limitExceeded, "This Agent accepts fewer reference inputs.");
+  }
+  if (totalBytes > input.limits.maxTotalBytes) {
+    throw agentReferenceError(
+      AGENT_REFERENCE_ERROR_CODES.limitExceeded,
+      "Reference inputs exceed this Agent's total size limit.",
+    );
+  }
   for (const reference of values) {
-    if ((reference.size ?? 0) > (input.maxReferenceBytes ?? 0)) {
-      throw new Error("A reference exceeds this Agent's per-file size limit.");
+    if ((reference.size ?? 0) > input.limits.maxBytesPerReference) {
+      throw agentReferenceError(
+        AGENT_REFERENCE_ERROR_CODES.limitExceeded,
+        "A reference exceeds this Agent's per-file size limit.",
+      );
     }
     if (reference.kind === "workspace-entry") {
-      if (reference.entryType === "directory" && input.workspaceDirectories !== true) {
-        throw new Error("The selected Agent does not accept workspace directories.");
+      if (reference.entryType === "directory" && input.workspace.directories !== true) {
+        throw agentReferenceError(
+          AGENT_REFERENCE_ERROR_CODES.unsupportedKind,
+          "The selected Agent does not accept workspace directories.",
+        );
       }
-      if (reference.entryType !== "directory" && input.workspaceFiles !== true) {
-        throw new Error("The selected Agent does not accept workspace files.");
+      if (reference.entryType !== "directory" && input.workspace.files !== true) {
+        throw agentReferenceError(
+          AGENT_REFERENCE_ERROR_CODES.unsupportedKind,
+          "The selected Agent does not accept workspace files.",
+        );
       }
       continue;
     }
-    const isImage = typeof reference.mime === "string" && reference.mime.startsWith("image/");
-    const transport = isImage ? input.images : input.genericFiles;
-    if (!transport || transport === "none") {
-      throw new Error(isImage
-        ? "The selected Agent does not accept image attachments."
-        : "The selected Agent does not accept this file attachment type.");
+    const attachment = { mime: reference.mime, name: reference.displayName ?? reference.name };
+    const kind = classifyAgentAttachment(attachment);
+    const kindLimit = input.attachments[kind].maxBytes;
+    if (kindLimit && (reference.size ?? 0) > kindLimit) {
+      throw agentReferenceError(
+        AGENT_REFERENCE_ERROR_CODES.limitExceeded,
+        `The ${kind} attachment exceeds this Agent's native input size limit.`,
+      );
     }
-    if (Array.isArray(input.acceptedMimeTypes) && input.acceptedMimeTypes.length > 0
-      && !input.acceptedMimeTypes.includes(reference.mime)) {
-      throw new Error("The selected Agent does not accept this attachment MIME type.");
+    if (!acceptsAgentAttachment(input, attachment)) {
+      throw agentReferenceError(
+        AGENT_REFERENCE_ERROR_CODES.unsupportedKind,
+        kind === "image"
+          ? "The selected Agent does not accept image attachments."
+          : `The selected Agent does not accept ${kind} file attachments.`,
+      );
     }
   }
 }

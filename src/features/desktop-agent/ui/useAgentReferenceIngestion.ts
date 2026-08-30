@@ -9,6 +9,10 @@ import { useLocalization } from "@puppyone/localization/react";
 import type { AgentSessionController } from "../application/AgentSessionController";
 import type { AgentReferenceVisualPreview } from "../application/AgentReferencePreviewStore";
 import type { AgentReferenceInputCapabilities } from "../domain/agent-contract";
+import {
+  acceptsAgentAttachment,
+  hasAgentAttachmentSupport,
+} from "../domain/agent-reference-capabilities";
 
 export type AgentWorkspaceReferenceResolution = Readonly<{
   workspaceRoot: string;
@@ -95,14 +99,17 @@ export function useAgentReferenceIngestion({
   }, [announceBatchResult, controller, resolveWorkspaceReference, t, workspaceId]);
 
   const onPaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
-    const images = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
-    if (images.length === 0) return;
+    const files = Array.from(event.clipboardData.files).filter((file) => acceptsAgentAttachment(capabilities, {
+      mime: file.type,
+      name: file.name,
+    }));
+    if (files.length === 0) return;
     event.preventDefault();
     const beforeIds = new Set(controller.getSnapshot().references.map((reference) => reference.id));
-    void controller.stageExternalFiles(images).then((count) => {
+    void controller.stageExternalFiles(files).then((count) => {
       announceBatchResult(beforeIds, count);
     });
-  }, [announceBatchResult, controller]);
+  }, [announceBatchResult, capabilities, controller]);
 
   const addExternalFiles = useCallback((files: File[]) => {
     const beforeIds = new Set(controller.getSnapshot().references.map((reference) => reference.id));
@@ -142,25 +149,23 @@ function canIngestDataTransfer(
   if (source.kind === "text") return true;
   if (source.kind === "none") {
     const types = Array.from(dataTransfer.types ?? []);
-    if (types.includes("Files")) return Boolean(capabilities
-      && (capabilities.images !== "none" || capabilities.genericFiles !== "none"));
+    if (types.includes("Files")) return hasAgentAttachmentSupport(capabilities);
     return true;
   }
   if (!capabilities) return false;
   if (source.kind === "workspace-entries") {
     if (source.workspaceId && source.workspaceId !== workspaceId) return false;
     return source.entries.every((entry) => entry.entryType === "directory"
-      ? capabilities.workspaceDirectories
-      : capabilities.workspaceFiles);
+      ? capabilities.workspace.directories
+      : capabilities.workspace.files);
   }
   if (source.files.length === 0) {
-    return capabilities.images !== "none" || capabilities.genericFiles !== "none";
+    return hasAgentAttachmentSupport(capabilities);
   }
-  return source.files.every((file) => {
-    const transport = file.type.startsWith("image/") ? capabilities.images : capabilities.genericFiles;
-    return transport !== "none"
-      && (!capabilities.acceptedMimeTypes?.length || capabilities.acceptedMimeTypes.includes(file.type));
-  });
+  return source.files.every((file) => acceptsAgentAttachment(capabilities, {
+    mime: file.type,
+    name: file.name,
+  }));
 }
 
 async function ingestDataTransfer(

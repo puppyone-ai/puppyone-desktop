@@ -99,6 +99,32 @@ describe("Agent main-owned attachment staging", () => {
     await store.close();
   });
 
+  it("preserves plain-text and SVG semantics for Harness-specific admission", async () => {
+    const root = await temporaryRoot();
+    const workspace = await temporaryRoot();
+    const markdown = path.join(root, "README.md");
+    const source = path.join(root, "app.ts");
+    const svg = path.join(root, "logo.svg");
+    await Promise.all([
+      fs.promises.writeFile(markdown, "# Read me"),
+      fs.promises.writeFile(source, "export const value = 1;"),
+      fs.promises.writeFile(svg, "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>"),
+    ]);
+    const store = createAgentAttachmentStore({ rootPath: path.join(root, "staging") });
+
+    await expect(store.stage({
+      ownerId: 9,
+      workspaceRoot: workspace,
+      epoch: "text-draft",
+      sourcePaths: [markdown, source, svg],
+    })).resolves.toEqual([
+      expect.objectContaining({ displayName: "README.md", mime: "text/markdown" }),
+      expect.objectContaining({ displayName: "app.ts", mime: "text/typescript" }),
+      expect.objectContaining({ displayName: "logo.svg", mime: "image/svg+xml" }),
+    ]);
+    await store.close();
+  });
+
   it("enforces aggregate count and byte budgets across separate staging calls", async () => {
     const root = await temporaryRoot();
     const workspace = await temporaryRoot();

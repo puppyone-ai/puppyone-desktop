@@ -928,7 +928,24 @@ function capabilities(overrides: Record<string, unknown> = {}) {
 }
 
 function referenceCapabilities() {
-  return { workspaceFiles: true, workspaceDirectories: true, images: "local-snapshot", genericFiles: "none", acceptedMimeTypes: ["image/png"], maxReferences: 32, maxReferenceBytes: 25 * 1024 * 1024, maxTotalReferenceBytes: 25 * 1024 * 1024, steer: false, attachmentOnly: false };
+  return {
+    schemaVersion: 1 as const,
+    workspace: { files: true, directories: true },
+    attachments: {
+      image: { accepted: true, mimeTypes: ["image/png"] },
+      text: { accepted: false },
+      audio: { accepted: false },
+      video: { accepted: false },
+      binary: { accepted: false },
+    },
+    limits: {
+      maxCount: 32,
+      maxBytesPerReference: 25 * 1024 * 1024,
+      maxTotalBytes: 25 * 1024 * 1024,
+    },
+    steer: false,
+    attachmentOnly: false,
+  };
 }
 
 function event(sequence: number, type: AgentEvent["type"], payload: Record<string, unknown>, turnId: string | null = null, itemId: string | null = null, sessionId = "session-1"): AgentEvent {

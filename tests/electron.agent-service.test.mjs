@@ -447,16 +447,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
       capabilities: {
         manualApprovals: true,
         attachments: true,
-        referenceInputs: {
-          workspaceFiles: true,
-          workspaceDirectories: true,
-          images: "local-snapshot",
-          genericFiles: "none",
-          acceptedMimeTypes: ["image/png"],
-          maxReferences: 32,
-          maxReferenceBytes: 25 * 1024 * 1024,
-          maxTotalReferenceBytes: 25 * 1024 * 1024,
-        },
+        referenceInputs: semanticReferenceCapabilities(),
       },
     });
     const owner = createSender(61);
@@ -555,10 +546,7 @@ describe("Agent IPC workspace authorization", () => {
       archiveSession: vi.fn(),
       deleteSession: vi.fn(),
       compactSession: vi.fn(),
-      getReferenceInputCapabilities: vi.fn(() => ({
-        workspaceFiles: true, workspaceDirectories: true, images: "local-snapshot", genericFiles: "none",
-        maxReferences: 32, maxReferenceBytes: 25 * 1024 * 1024, maxTotalReferenceBytes: 25 * 1024 * 1024,
-      })),
+      getReferenceInputCapabilities: vi.fn(() => semanticReferenceCapabilities()),
     };
     const authorizeWorkspaceRoot = vi.fn(async (_event, requested) => {
       if (requested !== "/workspace") throw new Error("Requested workspace root does not match");
@@ -605,10 +593,7 @@ describe("Agent IPC workspace authorization", () => {
       archiveSession: vi.fn(),
       deleteSession: vi.fn(),
       compactSession: vi.fn(),
-      getReferenceInputCapabilities: vi.fn(() => ({
-        workspaceFiles: true, workspaceDirectories: true, images: "local-snapshot", genericFiles: "none",
-        maxReferences: 32, maxReferenceBytes: 25 * 1024 * 1024, maxTotalReferenceBytes: 25 * 1024 * 1024,
-      })),
+      getReferenceInputCapabilities: vi.fn(() => semanticReferenceCapabilities()),
     };
     registerAgentIpcHandlers({
       ipcMain: { handle: (channel, listener) => handlers.set(channel, listener) },
@@ -790,5 +775,26 @@ function ipcSnapshot() {
     partial: false,
     firstAvailableSequence: 0,
     lastSequence: 0,
+  };
+}
+
+function semanticReferenceCapabilities() {
+  return {
+    schemaVersion: 1,
+    workspace: { files: true, directories: true },
+    attachments: {
+      image: { accepted: true, mimeTypes: ["image/png"] },
+      text: { accepted: false },
+      audio: { accepted: false },
+      video: { accepted: false },
+      binary: { accepted: false },
+    },
+    limits: {
+      maxCount: 32,
+      maxBytesPerReference: 25 * 1024 * 1024,
+      maxTotalBytes: 25 * 1024 * 1024,
+    },
+    steer: false,
+    attachmentOnly: false,
   };
 }

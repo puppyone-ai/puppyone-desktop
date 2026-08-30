@@ -56,7 +56,13 @@ describe("Claude Agent SDK runtime adapter", () => {
       requiresRuntimeSetup: false,
     });
     expect(inspection.models[0]).toMatchObject({ model: "claude-sonnet", variants: ["low", "high"] });
-    expect(inspection.capabilities).toMatchObject({ manualApprovals: true, structuredQuestions: true, fork: true });
+    expect(inspection.capabilities).toMatchObject({
+      manualApprovals: true,
+      structuredQuestions: true,
+      fork: true,
+      revision: "claude-agent-sdk:0.3.159:claude-code:2.1.0",
+      protocol: { name: "claude-agent-sdk", version: "0.3.159", agentVersion: "2.1.0" },
+    });
     const options = sdk.query.mock.calls[0][0].options;
     expect(options.settingSources).toEqual(["user"]);
     expect(options.systemPrompt).toEqual({ type: "preset", preset: "claude_code" });

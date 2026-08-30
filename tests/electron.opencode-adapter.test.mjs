@@ -19,6 +19,7 @@ describe("OpenCode ACP AgentRuntimePort adapter", () => {
         { kind: "workspace-entry", path: "/workspace/src/app.ts", name: "app.ts" },
         { kind: "staged-attachment", mime: "image/png", snapshotUrl: `data:image/png;base64,${image}` },
       ],
+      profile: { image: true },
     })).toEqual([
       { type: "text", text: "Inspect" },
       { type: "resource_link", uri: "file:///workspace/src/app.ts", name: "app.ts", title: "app.ts" },
@@ -29,7 +30,8 @@ describe("OpenCode ACP AgentRuntimePort adapter", () => {
       instructions: "",
       workspaceRoot: "/workspace",
       references: [{ kind: "staged-attachment", mime: "image/png", snapshotUrl: "data:image/jpeg;base64,aQ==" }],
-    })).toThrow(/invalid staged image/i);
+      profile: { image: true },
+    })).toThrow(/materialize.*staged image/i);
     expect(() => buildPromptBlocks({
       prompt: "Inspect",
       instructions: "",
@@ -63,6 +65,14 @@ describe("OpenCode ACP AgentRuntimePort adapter", () => {
       modes: expect.arrayContaining([expect.objectContaining({ id: "build", isDefault: true })]),
       capabilities: { streamingText: true, manualApprovals: true, sessionHistory: false },
     });
+    expect(inspection.capabilities.referenceInputs).toMatchObject({
+      attachments: {
+        image: { accepted: true },
+        text: { accepted: true },
+        binary: { accepted: false },
+      },
+    });
+    expect(inspection.capabilities.revision).toBe("opencode-native-acp:1:image1:embedded1");
     expect(inspection.models.map((model) => model.model)).toEqual(["openai/gpt-5", "openai/gpt-4.1"]);
     expect(inspection.commands).toEqual([expect.objectContaining({ name: "review" })]);
     expect(connections[0].options.env.OPENCODE_DB).toBe(":memory:");
@@ -192,7 +202,7 @@ class FakeAcpConnection extends EventEmitter {
       if (method === "initialize") {
         return {
           agentInfo: { name: "OpenCode", version: "1.17.18" },
-          agentCapabilities: { loadSession: true, promptCapabilities: { image: true } },
+          agentCapabilities: { loadSession: true, promptCapabilities: { image: true, embeddedContext: true } },
         };
       }
       if (method === "session/new" || method === "session/load") {

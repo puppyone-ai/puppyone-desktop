@@ -51,7 +51,7 @@ describe("Agent capability negotiation", () => {
   });
 
   it("keeps ACP data-url images below the JSONL frame budget", () => {
-    expect(BASE_ACP_CAPABILITIES.referenceInputs.maxReferenceBytes).toBe(ACP_INLINE_IMAGE_MAX_BYTES);
+    expect(BASE_ACP_CAPABILITIES.referenceInputs.attachments.image.maxBytes).toBe(ACP_INLINE_IMAGE_MAX_BYTES);
     expect(ACP_INLINE_IMAGE_MAX_BYTES).toBeLessThan(1024 * 1024);
   });
 
