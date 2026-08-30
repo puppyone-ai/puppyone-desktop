@@ -565,8 +565,7 @@ async function runSmoke() {
     if (style === "windows-xp") {
       // A previous matrix window may still own macOS focus even though this
       // BrowserWindow is visible. Focus the target before synthesizing hover.
-      window.focus();
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await focusWindowForSyntheticInput(window);
       const hoverPoint = await window.webContents.executeJavaScript(`(() => {
         const button = document.querySelector('[data-navigation-item="git"]');
         const rect = button.getBoundingClientRect();
@@ -697,6 +696,9 @@ async function runDialogSmoke() {
       y: Math.round(value.top + value.height / 2),
     };
   })()`, true);
+  // The last matrix window can still own macOS focus when the dialog window
+  // opens. Synthetic pointer events only update :hover in the focused window.
+  await focusWindowForSyntheticInput(window);
   window.webContents.sendInputEvent({ type: "mouseMove", ...closePoint });
   await new Promise((resolve) => setTimeout(resolve, 140));
   const hoverSnapshot = await window.webContents.executeJavaScript(`(() => {
@@ -756,6 +758,13 @@ app.whenReady().then(runSmoke).catch((error) => {
   console.error(error);
   app.exit(1);
 });
+
+async function focusWindowForSyntheticInput(window) {
+  if (process.platform === "darwin") app.focus({ steal: true });
+  window.show();
+  window.focus();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+}
 
 async function waitForReady(window) {
   for (let attempt = 0; attempt < 100; attempt += 1) {
