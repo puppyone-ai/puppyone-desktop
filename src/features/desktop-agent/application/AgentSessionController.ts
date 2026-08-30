@@ -12,7 +12,7 @@ import type {
   AgentSessionsListResponse,
   AgentSessionSnapshot,
 } from "../domain/agent-contract";
-import { AgentEventSynchronizer } from "./AgentEventSynchronizer";
+import { AgentEventSynchronizer, type AgentStreamFlushScheduler } from "./AgentEventSynchronizer";
 import { agentControllerTransitions, type AgentControllerState } from "./agent-controller-state";
 import { AgentKnownError, createAgentError, formatAgentError } from "./agent-error";
 import { SessionUiStateStore, type SessionUiState } from "./SessionUiStateStore";
@@ -53,7 +53,11 @@ export class AgentSessionController {
   private lastInspectionAt = 0;
   private disposed = false;
 
-  constructor(workspaceRoot: string, private readonly bridgeProvider: AgentClientProvider) {
+  constructor(
+    workspaceRoot: string,
+    private readonly bridgeProvider: AgentClientProvider,
+    scheduleStreamFlush?: AgentStreamFlushScheduler,
+  ) {
     this.workspaceRoot = workspaceRoot;
     this.state = {
       phase: "idle",
@@ -107,6 +111,7 @@ export class AgentSessionController {
       this.getSnapshot,
       (patch) => this.patch(patch),
       this.submission.drainQueuedIntent,
+      scheduleStreamFlush,
     );
     this.sessionLifecycle = new AgentSessionLifecycle({
       workspaceRoot,

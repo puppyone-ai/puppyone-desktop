@@ -269,8 +269,10 @@ describe("Desktop Agent reference ingestion", () => {
     const actions = toolbar.querySelector(".desktop-agent-composer-actions")!;
     const attachment = toolbar.querySelector(".desktop-agent-reference-trigger")!;
     const modelPicker = actions.querySelector(".desktop-agent-composer-picker.is-model")!;
+    const effortPicker = actions.querySelector(".desktop-agent-composer-picker.is-effort")!;
     const send = actions.querySelector(".desktop-agent-composer-action")!;
-    const configurationTrigger = modelPicker.querySelector<HTMLButtonElement>('[aria-label="Agent model · Reasoning"]')!;
+    const modelTrigger = modelPicker.querySelector<HTMLButtonElement>('[aria-label="Agent model"]')!;
+    const effortTrigger = effortPicker.querySelector<HTMLButtonElement>('[aria-label="Reasoning effort"]')!;
     const remove = imageCard.querySelector<HTMLButtonElement>(".desktop-agent-reference-card-actions button:last-child")!;
     expect(fileCard.textContent).toContain("SECURITY.md");
     expect(fileCard.textContent).toContain("MD");
@@ -278,11 +280,15 @@ describe("Desktop Agent reference ingestion", () => {
     expect(cards.compareDocumentPosition(textarea) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(textarea.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(leading.contains(attachment)).toBe(true);
-    expect(configurationTrigger.textContent).toContain("GPT-5.6 · High");
-    expect(modelPicker.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(modelTrigger.textContent).toContain("GPT-5.6");
+    expect(effortTrigger.textContent).toBe("High");
+    expect(modelTrigger.querySelector(".desktop-agent-picker-trigger-mark")).toBeNull();
+    expect(effortTrigger.querySelector("svg")).toBeNull();
+    expect(modelPicker.compareDocumentPosition(effortPicker) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(effortPicker.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(remove.closest(".desktop-agent-reference-card-actions")).not.toBeNull();
-    act(() => configurationTrigger.click());
-    expect(document.querySelectorAll('.desktop-agent-picker-list [role="group"]')).toHaveLength(2);
+    act(() => effortTrigger.click());
+    expect(document.querySelectorAll('.desktop-agent-picker-list [role="group"]')).toHaveLength(0);
     const light = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]'))
       .find((option) => option.textContent?.includes("Light"))!;
     act(() => light.click());

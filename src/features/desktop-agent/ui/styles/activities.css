@@ -61,6 +61,7 @@
 
 /* Cursor-style work evidence: compact disclosures, not a Research timeline. */
 .desktop-agent-tool-call {
+  --agent-current-tool-accent: var(--agent-text-subtle);
   min-width: 0;
   margin: 0 4px;
   padding: 0;
@@ -106,8 +107,8 @@
   grid-column: 2;
   color: var(--agent-current-tool-accent, var(--agent-text-muted));
   font-size: var(--agent-font-size);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 500;
+  letter-spacing: normal;
   white-space: nowrap;
 }
 .desktop-agent-tool-call.has-detail .desktop-agent-tool-row {
@@ -152,7 +153,7 @@
 .desktop-agent-file-query,
 .desktop-agent-file-change,
 .desktop-agent-generic-tool {
-  --agent-current-tool-accent: var(--po-accent-text);
+  --agent-current-tool-accent: var(--agent-text-subtle);
 }
 
 .desktop-agent-command {

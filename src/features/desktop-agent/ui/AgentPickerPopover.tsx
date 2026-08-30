@@ -44,6 +44,8 @@ type AgentPickerPopoverProps = {
   title?: string;
   triggerDescription?: string;
   triggerIcon?: ReactNode;
+  showChevron?: boolean;
+  preferredWidth?: number;
   compactWhenSelected?: boolean;
   onSelect: (id: string) => void;
 };
@@ -58,6 +60,8 @@ export function AgentPickerPopover({
   title,
   triggerDescription,
   triggerIcon,
+  showChevron = true,
+  preferredWidth,
   compactWhenSelected = false,
   onSelect,
 }: AgentPickerPopoverProps) {
@@ -86,6 +90,7 @@ export function AgentPickerPopover({
     open,
     anchorRef: triggerRef,
     boundarySelector: ".desktop-agent-boundary",
+    preferredWidth,
   });
 
   useEffect(() => {
@@ -240,7 +245,7 @@ export function AgentPickerPopover({
       >
         {triggerIcon && <span className="desktop-agent-picker-trigger-mark">{triggerIcon}</span>}
         {!compact && <span className="desktop-agent-picker-trigger-value" dir="auto">{valueLabel || placeholder}</span>}
-        {!compact && <ChevronDown size={12} aria-hidden="true" />}
+        {!compact && showChevron && <ChevronDown size={12} aria-hidden="true" />}
       </button>
       {open && (
         <DesktopOverlayLayer>

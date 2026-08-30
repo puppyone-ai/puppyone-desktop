@@ -122,8 +122,10 @@
   min-width: 0;
   flex: 0 1 auto;
 }
-.desktop-agent-composer-picker.is-model { width: max-content; max-width: min(228px, 55vw); }
-.desktop-agent-composer-picker.is-model .desktop-agent-picker { width: max-content; max-width: 100%; }
+.desktop-agent-composer-picker.is-model { width: max-content; max-width: min(148px, 34vw); }
+.desktop-agent-composer-picker.is-model .desktop-agent-picker,
+.desktop-agent-composer-picker.is-effort .desktop-agent-picker { width: max-content; max-width: 100%; }
+.desktop-agent-composer-picker.is-effort { width: max-content; max-width: min(72px, 20vw); }
 .desktop-agent-composer-picker .desktop-agent-picker-trigger {
   width: max-content;
   max-width: 100%;
@@ -132,12 +134,16 @@
   color: var(--agent-text-subtle);
   font-weight: 400;
 }
-.desktop-agent-composer-picker.is-model .desktop-agent-picker-trigger-mark { width: 14px; height: 14px; }
+.desktop-agent-composer-picker .desktop-agent-picker-trigger:focus { outline: 0; }
+.desktop-agent-composer-picker .desktop-agent-picker-trigger:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--agent-border);
+}
 .desktop-agent-composer-picker .desktop-agent-picker-trigger:hover:not(:disabled) {
   border-color: transparent;
   background: var(--agent-row-hover-surface);
   color: var(--agent-text-muted);
 }
+.desktop-agent-composer-picker.is-effort .desktop-agent-picker-trigger { padding-inline-end: 4px; }
 .desktop-agent-composer-action {
   display: grid;
   width: var(--agent-control-size);

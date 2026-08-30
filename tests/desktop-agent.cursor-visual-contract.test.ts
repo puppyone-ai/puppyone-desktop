@@ -35,8 +35,8 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/--agent-message-content-inset:\s*12px/);
     expect(css).toMatch(/--agent-message-turn-gap:\s*24px/);
     expect(css).toMatch(/--agent-work-handoff-gap:\s*8px/);
-    expect(css).toMatch(/--agent-radius-message:\s*var\(--desktop-sidebar-row-radius, 6px\)/);
     expect(css).toMatch(/--agent-radius-composer:\s*12px/);
+    expect(css).toMatch(/--agent-radius-message:\s*var\(--agent-radius-composer\)/);
     expect(css).toMatch(/\.desktop-agent-transcript\s*\{[^}]*padding:\s*12px var\(--agent-inline-inset\) 24px/s);
     expect(css).toMatch(/\.desktop-agent-live-tail\s*\{[^}]*gap:\s*var\(--agent-message-turn-gap\)[^}]*padding:\s*0 0 20px/s);
     expect(css).toMatch(/\.desktop-agent-message\.is-user\s*\{[^}]*box-sizing:\s*border-box[^}]*width:\s*100%[^}]*max-width:\s*none[^}]*margin:\s*0[^}]*padding:\s*8px var\(--agent-message-content-inset\)[^}]*border:\s*0[^}]*background:\s*var\(--agent-composer-surface\)[^}]*box-shadow:\s*none/s);
@@ -100,7 +100,8 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-picker-option\.is-selected:not\(\[aria-disabled="true"\]\):hover,[^{]*\{[^}]*background:\s*var\(--agent-row-selected-surface\)/s);
     expect(css).toMatch(/\.desktop-agent-composer-trailing\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto[^}]*min-height:\s*var\(--agent-composer-toolbar-height\)[^}]*padding:\s*0 8px 8px 12px[^}]*border:\s*0/s);
     expect(css).toMatch(/\.desktop-agent-picker-trigger\s*\{[^}]*width:\s*fit-content[^}]*border:\s*1px solid var\(--agent-config-border\)[^}]*background:\s*transparent/s);
-    expect(css).toMatch(/\.desktop-agent-composer-picker\.is-model\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*min\(228px, 55vw\)/s);
+    expect(css).toMatch(/\.desktop-agent-composer-picker\.is-model\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*min\(148px, 34vw\)/s);
+    expect(css).toMatch(/\.desktop-agent-composer-picker\.is-effort\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*min\(72px, 20vw\)/s);
     expect(css).not.toContain("max-width: min(70%, 300px)");
     expect(css).toMatch(/--agent-composer-input-padding:\s*12px/);
     expect(css).toMatch(/--agent-composer-text-min-height:\s*44px/);
@@ -118,6 +119,7 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(attachmentButton).toContain('<Plus size={17} strokeWidth={1.6} aria-hidden="true" />');
     expect(css).toMatch(/\.desktop-agent-composer textarea\s*\{[^}]*min-height:\s*var\(--agent-composer-text-min-height\)[^}]*max-height:\s*var\(--agent-composer-text-max-height\)[^}]*field-sizing:\s*content[^}]*overflow-y:\s*auto[^}]*padding:\s*0[^}]*cursor:\s*text[^}]*font-size:\s*var\(--agent-font-size\)[^}]*line-height:\s*var\(--agent-composer-line-height\)/s);
     expect(css).toMatch(/\.desktop-agent-composer-picker \.desktop-agent-picker-trigger\s*\{[^}]*padding:\s*0 6px 0 0[^}]*border:\s*0[^}]*color:\s*var\(--agent-text-subtle\)[^}]*font-weight:\s*400/s);
+    expect(css).toMatch(/\.desktop-agent-composer-picker \.desktop-agent-picker-trigger:focus-visible\s*\{[^}]*box-shadow:\s*inset 0 0 0 1px var\(--agent-border\)/s);
     expect(css).toMatch(/\.desktop-agent-session-menu\s*\{[^}]*inset-inline:\s*auto[^}]*inset-inline-start:\s*0/s);
     expect(transcript).not.toContain("What do you want to do in this project?");
     expect(transcript).not.toContain("What should we build?");
@@ -170,6 +172,7 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).not.toContain("desktop-agent-picker-in");
     expect(css).toMatch(/\.desktop-agent-picker-group-label\s*\{[^}]*font-size:\s*var\(--agent-font-size-caption\)[^}]*font-weight:\s*var\(--desktop-sidebar-font-weight, 500\)/s);
     expect(css).toMatch(/\.desktop-agent-picker-option\s*\{[^}]*min-height:\s*32px[^}]*border-radius:\s*4px/s);
+    expect(css).toMatch(/\.desktop-agent-picker-option-copy strong\s*\{[^}]*color:\s*var\(--agent-text-muted\)[^}]*font-weight:\s*var\(--po-text-weight-regular, 400\)/s);
     expect(css).toMatch(/\.desktop-agent-session-header-actions\s*\{[^}]*border:\s*0[^}]*background:\s*transparent/s);
     expect(panelStatus).toContain("const detail = failed");
     expect(composer).not.toContain("<Zap");
@@ -212,12 +215,14 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(panelStatus).not.toContain("desktop-agent-provider-progress");
   });
 
-  it("uses one compact highlighted row grammar for every native tool", () => {
+  it("keeps native tool rows quiet until the user asks for detail", () => {
     expect(css).toMatch(/\.desktop-agent-tool-icon\s*\{[^}]*display:\s*grid[^}]*color:\s*var\(--agent-current-tool-accent, var\(--agent-text-subtle\)\)/s);
     expect(css).toMatch(/\.desktop-agent-tool-name\s*\{[^}]*color:\s*var\(--agent-current-tool-accent, var\(--agent-text-muted\)\)/s);
     expect(css).toMatch(/\.desktop-agent-tool-chevron\s*\{[^}]*grid-column:\s*3/s);
     expect(css).toMatch(/\.desktop-agent-tool-call\.has-detail \.desktop-agent-tool-summary\s*\{[^}]*grid-column:\s*4/s);
-    expect(css).toMatch(/\.desktop-agent-command,[^{]*\.desktop-agent-file-query,[^{]*\.desktop-agent-file-change,[^{]*\.desktop-agent-generic-tool\s*\{[^}]*--agent-current-tool-accent:\s*var\(--po-accent-text\)/s);
+    expect(css).toMatch(/\.desktop-agent-tool-call\s*\{[^}]*--agent-current-tool-accent:\s*var\(--agent-text-subtle\)/s);
+    expect(css).toMatch(/\.desktop-agent-command,[^{]*\.desktop-agent-file-query,[^{]*\.desktop-agent-file-change,[^{]*\.desktop-agent-generic-tool\s*\{[^}]*--agent-current-tool-accent:\s*var\(--agent-text-subtle\)/s);
+    expect(css).toMatch(/\.desktop-agent-tool-name\s*\{[^}]*font-weight:\s*500/s);
     expect(css).toMatch(/\.desktop-agent-tool-branch\s*\{[^}]*border:\s*0[^}]*border-inline-start:\s*2px solid var\(--agent-border-subtle\)[^}]*background:\s*transparent/s);
     expect(commandActivity).not.toContain('"via Bash"');
     expect(commandActivity).not.toContain("commandMetadata");

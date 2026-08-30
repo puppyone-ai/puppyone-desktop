@@ -1,4 +1,5 @@
 import { AgentSessionController } from "./AgentSessionController";
+import type { AgentStreamFlushScheduler } from "./AgentEventSynchronizer";
 import type { AgentClientProvider } from "./AgentClientPort";
 import { clearAgentChatTabStateRegistryForTests } from "./agent-chat-tab-state-registry";
 
@@ -13,11 +14,12 @@ export function getAgentSessionController(
   workspaceRoot: string,
   clientProvider: AgentClientProvider,
   tabId = "default",
+  scheduleStreamFlush?: AgentStreamFlushScheduler,
 ) {
   const controllerKey = key(workspaceRoot, tabId);
   let controller = controllers.get(controllerKey);
   if (!controller) {
-    controller = new AgentSessionController(workspaceRoot, clientProvider);
+    controller = new AgentSessionController(workspaceRoot, clientProvider, scheduleStreamFlush);
   } else {
     controllers.delete(controllerKey);
   }
