@@ -112,7 +112,7 @@ describe("appearance profile architecture", () => {
     expect(xp).not.toHaveProperty("surfaceAdapters");
   });
 
-  it("migrates legacy intent, preserves per-root intent, and round-trips V3", () => {
+  it("migrates legacy intent, preserves per-root and per-mode intent, and round-trips V4", () => {
     const legacy = legacySnapshot();
     const result = readAppearancePreferences(JSON.stringify({
       schemaVersion: 2,
@@ -135,18 +135,24 @@ describe("appearance profile architecture", () => {
     expect(result.preferences.shared.sidebarNavigationLayout).toBe("left-vertical");
     expect(result.preferences.shared).not.toHaveProperty("editorPresentation");
     expect(result.preferences.byRootTheme.default).toEqual({
-      requestedSubThemeId: "default.github",
       requestedColorMode: "dark",
+      requestedSubThemeIds: {
+        light: "default.github",
+        dark: "default.github",
+      },
     });
     expect(result.preferences.byRootTheme["windows-xp"]).toEqual({
-      requestedSubThemeId: "windows-xp.luna-blue",
       requestedColorMode: "light",
+      requestedSubThemeIds: {
+        light: "windows-xp.luna-blue",
+        dark: "windows-xp.luna-blue",
+      },
     });
     expect(result.preferences.bySurface.markdown.headingScale).toBe("large");
 
     const serialized = serializeAppearancePreferences(result.preferences);
     const roundTrip = readAppearancePreferences(serialized, legacy);
-    expect(roundTrip.source).toBe("v3");
+    expect(roundTrip.source).toBe("v4");
     expect(roundTrip.preferences).toEqual(result.preferences);
   });
 
@@ -161,17 +167,54 @@ describe("appearance profile architecture", () => {
     expect(result.preferences.shared.sidebarNavigationLayout).toBe("left-vertical");
   });
 
+  it("migrates legacy Light and Dark presets into independent Sub Theme memories", () => {
+    const result = readAppearancePreferences(null, {
+      ...legacySnapshot(),
+      lightThemePreset: "warm",
+      darkThemePreset: "graphite",
+    });
+
+    expect(result.preferences.byRootTheme.default.requestedSubThemeIds).toEqual({
+      light: "default.warm",
+      dark: "default.graphite",
+    });
+  });
+
+  it("resolves the remembered Sub Theme after resolving the effective Color Mode", () => {
+    const requestedSubThemeIds = {
+      light: "default.github",
+      dark: "default.newspaper",
+    } as const;
+    const shared = {
+      interfaceStyle: "default" as const,
+      requestedSubThemeIds,
+      sidebarNavigationLayout: "bottom-horizontal" as const,
+      textSize: "medium" as const,
+      fileIconTheme: "default" as const,
+    };
+
+    expect(resolveAppearance({ ...shared, themeMode: "light" }).subThemeId)
+      .toBe("default.github");
+    expect(resolveAppearance({ ...shared, themeMode: "dark" }).subThemeId)
+      .toBe("default.newspaper");
+    expect(resolveAppearance({
+      ...shared,
+      themeMode: "system",
+      systemColorMode: "dark",
+    }).subThemeId).toBe("default.newspaper");
+  });
+
   it("resolves requested and effective Sub Themes without leaking identity into editors", () => {
     const incompatible = subTheme({
       id: "external.xp-only",
       compatibleRootThemeIds: ["windows-xp"],
-      modes: ["light"],
+      variants: { light: { compiledCss: {} } },
       targets: ["markdown", "csv"],
     });
     const result = resolveAppearance({
       interfaceStyle: "default",
       themeMode: "dark",
-      requestedSubThemeId: incompatible.id,
+      requestedSubThemeIds: { light: incompatible.id, dark: incompatible.id },
       subThemeCatalog: {
         subThemes: [...BUILTIN_SUB_THEMES, incompatible],
         diagnostics: [],
@@ -199,13 +242,13 @@ describe("appearance profile architecture", () => {
     const lightOnly = subTheme({
       id: "external.light-reader",
       compatibleRootThemeIds: ["default"],
-      modes: ["light"],
+      variants: { light: { compiledCss: {} } },
     });
     const result = resolveAppearance({
       interfaceStyle: "default",
       themeMode: "system",
       systemColorMode: "dark",
-      requestedSubThemeId: lightOnly.id,
+      requestedSubThemeIds: { light: lightOnly.id, dark: lightOnly.id },
       subThemeCatalog: {
         subThemes: [...BUILTIN_SUB_THEMES, lightOnly],
         diagnostics: [],
@@ -221,12 +264,12 @@ describe("appearance profile architecture", () => {
     expect(result.diagnostics[0]?.code).toBe("sub-theme-mode-unsupported");
   });
 
-  it("renders appearance controls in Root Theme, Sub Theme, Color Mode order", () => {
+  it("renders appearance controls in Root Theme, Color Mode, Sub Theme order", () => {
     const settings = source("src/features/settings/SettingsView.tsx");
     expectInOrder(settings, [
       "<InterfaceStyleSetting",
-      "<SubThemeSettingsSection",
       "<InterfacePaletteSettings",
+      "<SubThemeSettingsSection",
     ]);
   });
 
@@ -371,10 +414,12 @@ function subTheme(overrides: Partial<SubThemeDefinition>): SubThemeDefinition {
     version: "1.0.0",
     contractVersion: 1,
     compatibleRootThemeIds: ["default"],
-    modes: ["light", "dark"],
     targets: ["application", "markdown", "csv"],
     source: "local-package",
-    compiledCss: {},
+    variants: {
+      light: { compiledCss: {} },
+      dark: { compiledCss: {} },
+    },
     ...overrides,
   };
 }

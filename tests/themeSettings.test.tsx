@@ -13,6 +13,8 @@ describe("Sub Theme settings", () => {
     expect(section).toContain("effectiveColorMode");
     expect(section).toContain("onSubThemeChange");
     expect(section).toContain("getCompatibleSubThemes");
+    expect(section).toContain("getCompatibleSubThemes(catalog.snapshot, rootThemeId, effectiveColorMode)");
+    expect(section).toContain("desktop-sub-theme-mode-badge");
     expect(section).toContain("settings.appearance.themes.add");
     expect(section).toContain("THEME_MARKETPLACE_URL");
     expect(section).not.toContain("function ThemeSelector");
@@ -51,6 +53,7 @@ describe("Sub Theme settings", () => {
     expect(view).toContain("<SubThemeSettingsSection");
     expect(view).toContain("requestedSubThemeId={requestedSubThemeId}");
     expect(view.indexOf("<SubThemeSettingsSection")).toBeGreaterThan(view.indexOf('activeSection === "appearance"'));
+    expect(view.indexOf("<SubThemeSettingsSection")).toBeGreaterThan(view.indexOf("<InterfacePaletteSettings"));
     expect(editor).not.toContain("ThemeSettingsSection");
   });
 });
