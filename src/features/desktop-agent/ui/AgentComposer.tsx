@@ -85,6 +85,11 @@ export function AgentComposer({
   const referencesReady = references.every((reference) => reference.status === "ready");
   const hasSubmission = Boolean(draft.trim()) || Boolean(references.length && referenceCapabilities?.attachmentOnly);
   const canSubmit = hasSubmission && referencesReady && !disabled && !submitting && (!running || canSendWhileRunning);
+  const primaryActionLabel = running
+    ? t(stopping ? "agent.composer.stopping" : "agent.composer.stop", { agent: bidiIsolate(runtimeLabel) })
+    : t("agent.composer.send");
+  const primaryActionBusy = running ? stopping : submitting;
+  const primaryActionDisabled = running ? stopping : !canSubmit;
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -157,8 +162,20 @@ export function AgentComposer({
                 onAddExternalFiles={onAddExternalFiles}
                 onPickWorkspaceReferences={onPickWorkspaceReferences}
               />
-              {running && <button type="button" className="desktop-agent-composer-action is-stop" aria-label={t(stopping ? "agent.composer.stopping" : "agent.composer.stop", { agent: bidiIsolate(runtimeLabel) })} disabled={stopping} onClick={onStop}><Square size={11} fill="currentColor" /></button>}
-              {(!running || canSendWhileRunning) && <button type="button" className="desktop-agent-composer-action" aria-label={running && steerAvailable ? t("agent.composer.steer", { agent: bidiIsolate(runtimeLabel) }) : t("agent.composer.send")} aria-busy={submitting || undefined} disabled={!canSubmit} onClick={() => void submit()}>{submitting ? <LoaderCircle size={15} className="desktop-agent-spin" /> : <ArrowUp size={17} strokeWidth={2.2} />}</button>}
+              <button
+                type="button"
+                className={`desktop-agent-composer-action${running ? " is-stop" : ""}`}
+                aria-label={primaryActionLabel}
+                aria-busy={primaryActionBusy || undefined}
+                disabled={primaryActionDisabled}
+                onClick={running ? onStop : () => void submit()}
+              >
+                {primaryActionBusy
+                  ? <LoaderCircle size={15} className="desktop-agent-spin" />
+                  : running
+                    ? <Square size={11} fill="currentColor" />
+                    : <ArrowUp size={17} strokeWidth={2.2} />}
+              </button>
             </div>
           </div>
         </div>

@@ -101,7 +101,11 @@ h2 {
   letter-spacing: 0;
 }
 [dir="rtl"] .desktop-right-sidebar::before {
-  background: linear-gradient(270deg, transparent, color-mix(in srgb, var(--po-shadow) 42%, transparent));
+  background: linear-gradient(
+    270deg,
+    color-mix(in srgb, var(--po-shell-divider, var(--po-divider)) 72%, transparent),
+    transparent
+  );
 }
 
 [dir="rtl"] .po-directional-icon,

@@ -382,6 +382,39 @@ describe("Desktop Agent renderer surfaces", () => {
     expect((container.querySelector("textarea") as HTMLTextAreaElement).placeholder).toBe("Ask about this project");
   });
 
+  it("morphs the single send action into stop while a turn is running", () => {
+    const onStop = vi.fn();
+    const props = {
+      draft: "Follow up",
+      onDraftChange: vi.fn(),
+      disabled: false,
+      running: true,
+      stopping: false,
+      submitting: false,
+      runtimeLabel: "Codex",
+      steerAvailable: true,
+      queueAvailable: true,
+      onSubmit: vi.fn(async () => true),
+      onStop,
+    };
+    const container = render(React.createElement(AgentComposer, props));
+
+    const actions = container.querySelectorAll(".desktop-agent-composer-action");
+    expect(actions).toHaveLength(1);
+    const stopAction = actions[0] as HTMLButtonElement;
+    expect(stopAction.classList.contains("is-stop")).toBe(true);
+    expect(stripBidiIsolation(stopAction.getAttribute("aria-label"))).toBe(testT("agent.composer.stop", { agent: "Codex" }));
+    expect(container.querySelector(`button[aria-label="${testT("agent.composer.send")}"]`)).toBeNull();
+
+    act(() => stopAction.click());
+    expect(onStop).toHaveBeenCalledTimes(1);
+
+    act(() => root?.render(withTestLocalization(React.createElement(AgentComposer, { ...props, stopping: true }))));
+    const stoppingAction = container.querySelector(".desktop-agent-composer-action") as HTMLButtonElement;
+    expect(stoppingAction.getAttribute("aria-busy")).toBe("true");
+    expect(stoppingAction.disabled).toBe(true);
+  });
+
   it("hides the configured Model in Minimal Mode without removing the composer", () => {
     const container = render(React.createElement(AgentComposer, {
       draft: "Continue",

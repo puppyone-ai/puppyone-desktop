@@ -317,10 +317,15 @@
 .desktop-right-sidebar::before {
   position: absolute;
   inset-block: 0;
-  inset-inline-start: -18px;
+  inset-inline-start: 0;
+  z-index: 1;
   width: 18px;
   pointer-events: none;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--po-shadow) 42%, transparent));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--po-shell-divider, var(--po-divider)) 72%, transparent),
+    transparent
+  );
   content: "";
   opacity: 0;
   transition: opacity 160ms ease;
