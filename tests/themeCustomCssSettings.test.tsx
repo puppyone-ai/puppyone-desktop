@@ -55,27 +55,35 @@ describe("Appearance theme settings", () => {
     expect(document.querySelector("textarea")).toBeNull();
   });
 
-  it("reserves Add Theme until the marketplace URL is configured", async () => {
+  it("creates and selects a local one-file theme from Add Theme", async () => {
+    const createTheme = vi.fn(async () => ({
+      created: true,
+      themeId: "local.user.custom-theme",
+    }));
+    const onSubThemeChange = vi.fn();
     await act(async () => {
       root.render(withTestLocalization(
         <SubThemeSettingsSection
-          catalog={controller({})}
+          catalog={controller({ createTheme })}
           rootThemeId="default"
           requestedSubThemeId="default.neutral"
           effectiveSubThemeId="default.neutral"
           effectiveColorMode="light"
-          onSubThemeChange={vi.fn()}
+          onSubThemeChange={onSubThemeChange}
         />,
       ));
       await Promise.resolve();
     });
 
     const addTheme = document.querySelector<HTMLButtonElement>('button[aria-label="Add Theme"]');
-    expect(addTheme).toBeDefined();
-    expect(addTheme?.disabled).toBe(true);
-    expect(addTheme?.title).toContain("URL");
-    expect(addTheme?.getAttribute("aria-describedby")).toBe("desktop-theme-add-status");
-    expect(document.getElementById("desktop-theme-add-status")?.textContent).toContain("URL");
+    expect(addTheme?.disabled).toBe(false);
+    await act(async () => {
+      addTheme?.click();
+      await Promise.resolve();
+    });
+    expect(createTheme).toHaveBeenCalledOnce();
+    expect(onSubThemeChange).toHaveBeenCalledWith("local.user.custom-theme");
+    expect(document.getElementById("desktop-theme-add-status")).toBeNull();
   });
 });
 
@@ -85,6 +93,7 @@ function controller(overrides: Partial<SubThemeCatalogController>): SubThemeCata
     status: "ready",
     error: null,
     openDirectory: vi.fn(async () => ({ opened: true })),
+    createTheme: vi.fn(async () => ({ created: true, themeId: "local.user.custom-theme" })),
     ...overrides,
   };
 }

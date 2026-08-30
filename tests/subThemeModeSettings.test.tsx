@@ -78,5 +78,6 @@ function controller(): SubThemeCatalogController {
     status: "ready",
     error: null,
     openDirectory: vi.fn(async () => ({ opened: true })),
+    createTheme: vi.fn(async () => ({ created: true, themeId: "local.user.custom-theme" })),
   };
 }

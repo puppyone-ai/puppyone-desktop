@@ -27,6 +27,12 @@ Open **Settings → Appearance → Open Themes Folder**. Add either:
 
 PuppyOne refreshes the catalog when its window regains focus.
 
+The **+** action in Appearance creates a new `custom-theme/theme.css`, reveals
+the file in this folder, refreshes the catalog, and selects it. Repeated use
+creates `custom-theme-2`, `custom-theme-3`, and so on. The built-in Sub Themes
+remain inside the application and are intentionally not copied here as editable
+duplicates.
+
 The recommended user layout is:
 
 ```text

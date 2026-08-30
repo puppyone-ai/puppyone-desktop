@@ -3,7 +3,6 @@ import { FolderOpen, Plus } from "lucide-react";
 import {
   getCompatibleSubThemes,
 } from "../../themes/builtinSubThemes";
-import { THEME_MARKETPLACE_URL } from "../../themes/themeMarketplace";
 import type { SubThemeCatalogController } from "../../themes/useSubThemeCatalog";
 import type { InterfaceStyle, ResolvedTheme } from "../../appearance/interfaceStyles";
 import { getInterfaceStyleSubThemePolicy } from "../../appearance/interfaceStyles";
@@ -34,9 +33,9 @@ export function SubThemeSettingsSection({
   );
   const effective = variants.find((subTheme) => subTheme.id === effectiveSubThemeId);
   const selectValue = selectedExists ? requestedSubThemeId : effectiveSubThemeId;
-  const onAddTheme = () => {
-    if (!THEME_MARKETPLACE_URL) return;
-    void window.puppyoneDesktop?.openExternalUrl(THEME_MARKETPLACE_URL);
+  const onAddTheme = async () => {
+    const result = await catalog.createTheme();
+    if (result.created && result.themeId) onSubThemeChange(result.themeId);
   };
 
   return (
@@ -82,21 +81,12 @@ export function SubThemeSettingsSection({
             <button
               className="desktop-theme-pack-icon-action"
               type="button"
-              disabled={!THEME_MARKETPLACE_URL}
               aria-label={t("settings.appearance.themes.add")}
-              aria-describedby={!THEME_MARKETPLACE_URL ? "desktop-theme-add-status" : undefined}
-              title={!THEME_MARKETPLACE_URL
-                ? t("settings.appearance.themes.addUnavailable")
-                : t("settings.appearance.themes.add")}
-              onClick={onAddTheme}
+              title={t("settings.appearance.themes.add")}
+              onClick={() => void onAddTheme()}
             >
               <Plus size={14} strokeWidth={1.9} aria-hidden="true" />
             </button>
-            {!THEME_MARKETPLACE_URL && (
-              <span id="desktop-theme-add-status" className="desktop-settings-visually-hidden">
-                {t("settings.appearance.themes.addUnavailable")}
-              </span>
-            )}
           </div>
         </div>
       </div>

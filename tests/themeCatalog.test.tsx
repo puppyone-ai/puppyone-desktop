@@ -53,6 +53,7 @@ describe("renderer Sub Theme catalog", () => {
       themes: {
         list,
         openDirectory: vi.fn(async () => ({ opened: true as const })),
+        create: vi.fn(async () => ({ created: true as const, themeId: "local.user.custom-theme" })),
       },
     } as typeof window.puppyoneDesktop;
 
@@ -101,6 +102,7 @@ describe("renderer Sub Theme catalog", () => {
       themes: {
         list: vi.fn(async () => ({ themes: [], diagnostics: [] })),
         openDirectory: vi.fn(async () => { throw new Error("Finder unavailable"); }),
+        create: vi.fn(async () => ({ created: true as const, themeId: "local.user.custom-theme" })),
       },
     } as typeof window.puppyoneDesktop;
     await act(async () => {
@@ -118,6 +120,40 @@ describe("renderer Sub Theme catalog", () => {
     expect(latest?.error).toBe("Finder unavailable");
   });
 
+  it("creates a local theme through the pathless host command and refreshes the catalog", async () => {
+    const createdSnapshot = snapshot("local.user.custom-theme");
+    const list = vi.fn()
+      .mockResolvedValueOnce({ themes: [], diagnostics: [] })
+      .mockResolvedValue(createdSnapshot);
+    const create = vi.fn(async () => ({
+      created: true as const,
+      themeId: "local.user.custom-theme",
+    }));
+    window.puppyoneDesktop = {
+      themes: {
+        list,
+        openDirectory: vi.fn(async () => ({ opened: true as const })),
+        create,
+      },
+    } as typeof window.puppyoneDesktop;
+
+    await act(async () => {
+      root.render(<Harness />);
+      await Promise.resolve();
+    });
+
+    let result: { created: boolean; themeId?: string } | undefined;
+    await act(async () => {
+      result = await latest?.createTheme();
+    });
+
+    expect(result).toEqual({ created: true, themeId: "local.user.custom-theme" });
+    expect(create).toHaveBeenCalledOnce();
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(latest?.snapshot.subThemes.some(({ id }) => id === "local.user.custom-theme"))
+      .toBe(true);
+  });
+
   it("syncs only root-compatible variants to the native menu and routes requests", async () => {
     const syncNativeMenu = vi.fn(async () => ({ synced: true as const }));
     let requestSelection: ((request: { kind: "pack"; themeId: string }) => void) | undefined;
@@ -126,6 +162,7 @@ describe("renderer Sub Theme catalog", () => {
       themes: {
         list: vi.fn(async () => ({ themes: [], diagnostics: [] })),
         openDirectory: vi.fn(async () => ({ opened: true as const })),
+        create: vi.fn(async () => ({ created: true as const, themeId: "local.user.custom-theme" })),
         syncNativeMenu,
         onSelectionRequested: vi.fn((callback) => {
           requestSelection = callback;

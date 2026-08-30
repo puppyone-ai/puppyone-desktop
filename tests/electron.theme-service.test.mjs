@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -325,6 +325,35 @@ describe("host-owned CSS theme service", () => {
     expect(shell.openPath).toHaveBeenCalledExactlyOnceWith(path.join(userDataPath, "themes"));
   });
 
+  it("creates one-file local theme packages and reveals each new theme.css", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const shell = createShell();
+    const service = createThemeService({ userDataPath, shell });
+
+    await expect(service.createTheme()).resolves.toEqual({
+      created: true,
+      themeId: "local.user.custom-theme",
+    });
+    await expect(service.createTheme()).resolves.toEqual({
+      created: true,
+      themeId: "local.user.custom-theme-2",
+    });
+
+    const firstCss = path.join(userDataPath, "themes", "custom-theme", "theme.css");
+    const secondCss = path.join(userDataPath, "themes", "custom-theme-2", "theme.css");
+    expect(await readFile(firstCss, "utf8")).toContain("id: local.user.custom-theme;");
+    expect(await readFile(secondCss, "utf8")).toContain("name: Custom Theme 2;");
+    expect(shell.showItemInFolder).toHaveBeenNthCalledWith(1, await realpath(firstCss));
+    expect(shell.showItemInFolder).toHaveBeenNthCalledWith(2, await realpath(secondCss));
+
+    const snapshot = await service.listThemes();
+    expect(snapshot.diagnostics).toEqual([]);
+    expect(snapshot.themes.map(({ id }) => id)).toEqual([
+      "local.user.custom-theme",
+      "local.user.custom-theme-2",
+    ]);
+  });
+
   it("keeps a legacy managed Custom CSS directory on disk without loading it", async () => {
     const userDataPath = await createTemporaryDirectory();
     const themeRoot = path.join(userDataPath, "themes");
@@ -479,7 +508,10 @@ async function createTemporaryDirectory() {
 }
 
 function createShell() {
-  return { openPath: vi.fn(async () => "") };
+  return {
+    openPath: vi.fn(async () => ""),
+    showItemInFolder: vi.fn(),
+  };
 }
 
 async function writeJson(filePath, value) {

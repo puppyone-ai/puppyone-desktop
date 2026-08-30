@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   themes: {
     list: () => ipcRenderer.invoke("theme:list"),
     openDirectory: () => ipcRenderer.invoke("theme:open-directory"),
+    create: () => ipcRenderer.invoke("theme:create"),
     syncNativeMenu: (request) => ipcRenderer.invoke("theme:sync-native-menu", {
       pack: request?.pack,
       themes: Array.isArray(request?.themes) ? request.themes.map((theme) => ({

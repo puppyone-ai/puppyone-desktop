@@ -7,6 +7,7 @@ import {
   readdir,
   realpath,
   rename,
+  rm,
   stat,
   unlink,
   writeFile,
@@ -27,6 +28,7 @@ const LEGACY_CUSTOM_THEME_DIRECTORY = "puppyone-custom-css";
 const LEGACY_CUSTOM_THEME_ID = "local.puppyone.custom-css";
 const THEME_GUIDE_MARKER = ".puppyone-theme-guide-v1";
 const THEME_GUIDE_README = "README.md";
+const CUSTOM_THEME_DIRECTORY = "custom-theme";
 const assetMimeTypes = new Map([
   [".woff", "font/woff"],
   [".woff2", "font/woff2"],
@@ -50,6 +52,7 @@ export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
   const resolvedUserDataPath = path.resolve(userDataPath);
   const themeRoot = path.join(resolvedUserDataPath, "themes");
   let guideInstallQueue = Promise.resolve();
+  let createThemeQueue = Promise.resolve();
 
   const ensureRoot = async () => {
     await mkdir(resolvedUserDataPath, { recursive: true });
@@ -119,7 +122,19 @@ export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
     return Object.freeze({ opened: true });
   };
 
-  return Object.freeze({ listThemes, openDirectory });
+  const createTheme = () => {
+    const operation = createThemeQueue.then(async () => {
+      const canonicalThemeRoot = await ensureRoot();
+      return createLocalThemePackage({
+        shell,
+        themeRoot: canonicalThemeRoot,
+      });
+    });
+    createThemeQueue = operation.catch(() => undefined);
+    return operation;
+  };
+
+  return Object.freeze({ listThemes, openDirectory, createTheme });
 }
 
 async function loadDirectoryTheme(packageRoot) {
@@ -151,6 +166,66 @@ async function installBundledFileIfMissing({ source, destination }) {
   } catch (error) {
     if (error?.code !== "EEXIST") throw error;
   }
+}
+
+async function createLocalThemePackage({ shell, themeRoot }) {
+  for (let index = 1; index <= MAX_THEME_ENTRIES; index += 1) {
+    const suffix = index === 1 ? "" : `-${index}`;
+    const directoryName = `${CUSTOM_THEME_DIRECTORY}${suffix}`;
+    const packageRoot = path.join(themeRoot, directoryName);
+    try {
+      await mkdir(packageRoot);
+    } catch (error) {
+      if (error?.code === "EEXIST") continue;
+      throw error;
+    }
+
+    const themeId = `local.user.${directoryName}`;
+    const themeName = index === 1 ? "Custom Theme" : `Custom Theme ${index}`;
+    const themeCssPath = path.join(packageRoot, "theme.css");
+    try {
+      await writeFile(themeCssPath, createStarterThemeCss({ themeId, themeName }), {
+        encoding: "utf8",
+        flag: "wx",
+      });
+    } catch (error) {
+      await rm(packageRoot, { recursive: true, force: true });
+      throw error;
+    }
+
+    if (typeof shell.showItemInFolder === "function") {
+      shell.showItemInFolder(themeCssPath);
+    } else {
+      const message = await shell.openPath(packageRoot);
+      if (typeof message === "string" && message.length > 0) {
+        throw new Error(`Unable to reveal the new theme: ${message}`);
+      }
+    }
+    return Object.freeze({ created: true, themeId });
+  }
+  throw new Error("The themes directory has reached its package limit.");
+}
+
+function createStarterThemeCss({ themeId, themeName }) {
+  return `/* Edit public PuppyOne tokens, save, then return to Appearance. */
+@puppyone-theme {
+  id: ${themeId};
+  name: ${themeName};
+  version: 1.0.0;
+  compatible-root-themes: default;
+  modes: light dark;
+}
+
+@puppyone application {
+  :root {
+    --po-accent: #2563eb;
+  }
+}
+
+@puppyone markdown {}
+
+@puppyone csv {}
+`;
 }
 
 async function pathEntryExists(filePath) {

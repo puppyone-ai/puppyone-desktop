@@ -18,6 +18,7 @@ const EMPTY_HOST_SNAPSHOT: DesktopThemeSnapshot = Object.freeze({
 
 export type SubThemeCatalogController = SubThemeCatalogState & Readonly<{
   openDirectory: () => Promise<{ opened: boolean }>;
+  createTheme: () => Promise<{ created: boolean; themeId?: string }>;
 }>;
 
 export function useSubThemeCatalog(): SubThemeCatalogController {
@@ -81,7 +82,23 @@ export function useSubThemeCatalog(): SubThemeCatalogController {
     }
   }, [desktopThemes]);
 
-  return { ...state, openDirectory };
+  const createTheme = useCallback(async () => {
+    if (!desktopThemes) return { created: false };
+    try {
+      const result = await desktopThemes.create();
+      await refresh();
+      return result;
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+      }));
+      return { created: false };
+    }
+  }, [desktopThemes, refresh]);
+
+  return { ...state, openDirectory, createTheme };
 }
 
 export function useSubThemeNativeMenu({
