@@ -49,31 +49,29 @@ export function SubThemeSettingsSection({
             </span>
           </label>
           <div className="desktop-theme-pack-controls">
-            {variants.length <= 1 ? (
-              <span className="desktop-appearance-policy-reason">
-                {effective?.name ?? effectiveSubThemeId}
-              </span>
-            ) : (
-              <select
-                id="desktop-sub-theme-select"
-                className="desktop-settings-select desktop-theme-pack-select"
-                value={selectValue}
-                onChange={(event) => onSubThemeChange(event.currentTarget.value)}
-              >
-                {!selectedExists && !requestedExistsInCatalog && (
-                  <option value={requestedSubThemeId}>
-                    {t("settings.appearance.themes.missing", { id: requestedSubThemeId })}
-                  </option>
-                )}
-                {variants.map((subTheme) => (
-                  <option key={subTheme.id} value={subTheme.id}>{subTheme.name}</option>
-                ))}
-              </select>
-            )}
-          </div>
-        </div>
-        <div className="desktop-settings-row desktop-settings-row-control desktop-theme-settings-action-row">
-          <div className="desktop-theme-settings-actions desktop-theme-settings-primary-actions">
+            <div className="desktop-theme-pack-picker">
+              {variants.length <= 1 ? (
+                <span className="desktop-appearance-policy-reason">
+                  {effective?.name ?? effectiveSubThemeId}
+                </span>
+              ) : (
+                <select
+                  id="desktop-sub-theme-select"
+                  className="desktop-settings-select desktop-theme-pack-select"
+                  value={selectValue}
+                  onChange={(event) => onSubThemeChange(event.currentTarget.value)}
+                >
+                  {!selectedExists && !requestedExistsInCatalog && (
+                    <option value={requestedSubThemeId}>
+                      {t("settings.appearance.themes.missing", { id: requestedSubThemeId })}
+                    </option>
+                  )}
+                  {variants.map((subTheme) => (
+                    <option key={subTheme.id} value={subTheme.id}>{subTheme.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
             <button
               className="desktop-settings-action"
               type="button"

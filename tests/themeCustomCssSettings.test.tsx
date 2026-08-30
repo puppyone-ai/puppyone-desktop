@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 describe("Appearance theme settings", () => {
-  it("uses a long pack selector and groups the two theme actions together", async () => {
+  it("keeps the compact pack selector and theme actions in one control row", async () => {
     await act(async () => {
       root.render(withTestLocalization(
         <SubThemeSettingsSection
@@ -42,10 +42,9 @@ describe("Appearance theme settings", () => {
 
     const controls = document.querySelector(".desktop-theme-pack-controls");
     expect(controls?.querySelector("select")).not.toBeNull();
-    expect(controls?.querySelector("button")).toBeNull();
-    const actions = document.querySelector(".desktop-theme-settings-actions");
-    expect([...actions?.querySelectorAll("button") ?? []].map((button) => button.textContent))
+    expect([...controls?.querySelectorAll("button") ?? []].map((button) => button.textContent))
       .toEqual(["Open Themes Folder", "Add Theme"]);
+    expect(document.querySelector(".desktop-theme-settings-action-row")).toBeNull();
     expect(document.body.textContent).not.toContain(
       "Choose one coordinated theme pack for the application, Markdown, and CSV.",
     );
