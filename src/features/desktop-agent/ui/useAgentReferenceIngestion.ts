@@ -7,16 +7,18 @@ import {
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentSessionController } from "../application/AgentSessionController";
+import type { AgentReferenceVisualPreview } from "../application/AgentReferencePreviewStore";
 import type { AgentReferenceInputCapabilities } from "../domain/agent-contract";
 
 export type AgentWorkspaceReferenceResolution = Readonly<{
   workspaceRoot: string;
   referencePath: string;
+  loadVisualPreview?: () => Promise<AgentReferenceVisualPreview | null>;
 }>;
 
 export type AgentWorkspaceReferenceResolver = (
   resource: string,
-) => AgentWorkspaceReferenceResolution | null;
+) => AgentWorkspaceReferenceResolution | null | Promise<AgentWorkspaceReferenceResolution | null>;
 
 export function useAgentReferenceIngestion({
   controller,
@@ -171,17 +173,32 @@ async function ingestDataTransfer(
   if (source.kind === "workspace-entries") {
     if (source.workspaceId && source.workspaceId !== workspaceId) return "workspace-mismatch";
     const paths: string[] = [];
+    const resolutions: AgentWorkspaceReferenceResolution[] = [];
     for (const entry of source.entries) {
       if (!isDataResourceUri(entry.path)) {
         paths.push(entry.path);
         continue;
       }
-      const resolved = resolveWorkspaceReference?.(entry.path) ?? null;
+      const resolved = await resolveWorkspaceReference?.(entry.path) ?? null;
       if (!resolved) return "resource-unavailable";
       if (resolved.workspaceRoot !== controller.workspaceRoot) return "workspace-mismatch";
       paths.push(resolved.referencePath);
+      resolutions.push(resolved);
     }
-    return controller.addWorkspacePaths(paths);
+    const visualPreviews = new Map<string, AgentReferenceVisualPreview>();
+    await Promise.all(resolutions.map(async (resolved) => {
+      if (!resolved.loadVisualPreview) return;
+      const preview = await resolved.loadVisualPreview().catch(() => null);
+      if (preview) {
+        try {
+          visualPreviews.get(resolved.referencePath)?.release?.();
+        } catch {
+          // A stale duplicate preview must not block the valid reference.
+        }
+        visualPreviews.set(resolved.referencePath, preview);
+      }
+    }));
+    return controller.addWorkspacePaths(paths, visualPreviews);
   }
   if (source.kind === "files") return controller.stageExternalFiles(source.files);
   if (source.kind === "text") return (await controller.addPathTextOrDraft(source.text)) ? 1 : 0;

@@ -94,7 +94,7 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   margin-inline-start: auto;
 }
 .desktop-agent-composer-leading {
@@ -121,8 +121,10 @@
   min-width: 0;
   flex: 0 1 auto;
 }
-.desktop-agent-composer-picker.is-model { width: max-content; max-width: 100%; }
+.desktop-agent-composer-picker.is-model { width: max-content; max-width: min(168px, 34vw); }
 .desktop-agent-composer-picker.is-model .desktop-agent-picker { width: max-content; max-width: 100%; }
+.desktop-agent-composer-picker.is-effort { width: max-content; max-width: min(112px, 25vw); }
+.desktop-agent-composer-picker.is-effort .desktop-agent-picker { width: max-content; max-width: 100%; }
 .desktop-agent-composer-picker .desktop-agent-picker-trigger {
   width: max-content;
   max-width: 100%;
@@ -131,6 +133,8 @@
   color: var(--agent-text-subtle);
   font-weight: 400;
 }
+.desktop-agent-composer-picker.is-effort .desktop-agent-picker-trigger { gap: 2px; }
+.desktop-agent-composer-picker.is-effort .desktop-agent-picker-trigger-mark { width: 14px; height: 14px; }
 .desktop-agent-composer-picker .desktop-agent-picker-trigger:hover:not(:disabled) {
   border-color: transparent;
   background: var(--agent-row-hover-surface);
@@ -155,41 +159,98 @@
 .desktop-agent-composer-action:disabled { cursor: default; background: color-mix(in srgb, var(--agent-text) 14%, transparent); box-shadow: none; color: color-mix(in srgb, var(--agent-text) 48%, transparent); opacity: 1; }
 .desktop-agent-composer-action.is-stop:disabled { background: var(--agent-text); color: var(--agent-canvas); opacity: 0.52; }
 
-.desktop-agent-reference-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 0; }
-.desktop-agent-reference-chips > span {
-  display: inline-flex;
-  max-width: 100%;
-  align-items: center;
-  gap: 2px;
-  min-height: 28px;
-  padding: 1px 3px 1px 1px;
+.desktop-agent-reference-cards {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 0 0 10px;
+}
+.desktop-agent-reference-card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
   border: 1px solid var(--agent-border-subtle);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--agent-control-surface);
-  color: var(--agent-text-muted);
+  color: var(--agent-text);
   font-size: var(--agent-font-size-meta);
 }
-.desktop-agent-reference-chip-preview {
+.desktop-agent-reference-card.is-file-card {
+  width: min(188px, 100%);
+  height: 64px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 34px 8px 8px;
+}
+.desktop-agent-reference-card.is-file-card.is-error { padding-inline-end: 58px; }
+.desktop-agent-reference-file-icon {
   display: grid;
-  width: 24px;
-  height: 24px;
+  width: 44px;
+  height: 44px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--agent-row-hover-surface);
   color: var(--agent-text-muted);
 }
-.desktop-agent-reference-chip-preview.is-image {
-  background: var(--agent-accent-soft);
-  color: var(--po-accent-text);
+.desktop-agent-reference-card-copy { display: grid; min-width: 0; gap: 3px; line-height: 1.15; }
+.desktop-agent-reference-card-copy strong { overflow: hidden; font-size: var(--agent-font-size); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.desktop-agent-reference-card-copy small { overflow: hidden; color: var(--agent-text-subtle); font-size: var(--agent-font-size-caption); text-overflow: ellipsis; white-space: nowrap; }
+.desktop-agent-reference-card.is-image-card {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  background: var(--agent-row-hover-surface);
 }
-.desktop-agent-reference-chip-copy { display: block; min-width: 0; max-width: min(220px, 48vw); padding: 0 4px; line-height: 1.25; }
-.desktop-agent-reference-chip-copy > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.desktop-agent-reference-chips > span.is-resolving { opacity: 0.72; }
-.desktop-agent-reference-chips > span.is-error { border-color: color-mix(in srgb, var(--po-danger) 40%, var(--agent-border-subtle)); background: color-mix(in srgb, var(--po-danger) 5%, var(--agent-control-surface)); color: var(--agent-text); }
-.desktop-agent-reference-chips > span.is-error .desktop-agent-reference-chip-preview { background: color-mix(in srgb, var(--po-danger) 10%, transparent); color: var(--po-danger); }
-.desktop-agent-reference-chips span > button { display: grid; width: 24px; height: 24px; place-items: center; padding: 0; border: 0; border-radius: var(--desktop-control-radius); background: transparent; color: var(--agent-text-subtle); }
-.desktop-agent-reference-chips span > button:hover { background: var(--po-hover); color: var(--po-text); }
+.desktop-agent-reference-image-preview {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--agent-text-muted);
+}
+.desktop-agent-reference-image-preview img { width: 100%; height: 100%; object-fit: cover; }
+.desktop-agent-reference-card-actions {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  display: flex;
+  gap: 2px;
+}
+.desktop-agent-reference-card-actions > button {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--agent-border) 72%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--agent-composer-surface) 92%, transparent);
+  box-shadow: 0 1px 2px color-mix(in srgb, black 16%, transparent);
+  color: var(--agent-text-muted);
+  backdrop-filter: blur(6px);
+}
+.desktop-agent-reference-card-actions > button:hover { background: var(--po-hover); color: var(--po-text); }
+.desktop-agent-reference-card.is-resolving { opacity: 0.72; }
+.desktop-agent-reference-card.is-error { border-color: color-mix(in srgb, var(--po-danger) 46%, var(--agent-border-subtle)); }
+.desktop-agent-reference-card-status {
+  position: absolute;
+  inset-block-end: 5px;
+  inset-inline-end: 5px;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--agent-composer-surface) 92%, transparent);
+  color: var(--agent-text-muted);
+}
+.desktop-agent-reference-card-status.is-error { background: color-mix(in srgb, var(--po-danger) 12%, var(--agent-composer-surface)); color: var(--po-danger); }
 .desktop-agent-attachment-control { position: relative; display: grid; flex: 0 0 auto; }
 .desktop-agent-reference-trigger {
   display: grid;

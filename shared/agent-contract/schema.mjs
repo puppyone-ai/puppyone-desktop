@@ -52,6 +52,7 @@ export function parseAgentIpcRequest(channel, value) {
         rootPath: requiredString(input.rootPath, "rootPath", MAX_PATH_LENGTH),
         runtimeId: optionalRuntimeId(input.runtimeId),
         model: optionalString(input.model, "model", 512),
+        effort: optionalString(input.effort, "effort", 160),
         mode: optionalString(input.mode, "mode", 160),
       });
     case "agent:session-resume":
@@ -115,6 +116,7 @@ export function parseAgentIpcRequest(channel, value) {
         sessionId: requiredOpaqueId(input.sessionId, "sessionId"),
         prompt: requiredString(input.prompt, "prompt", MAX_MESSAGE_LENGTH, { allowEmpty: true, preserveWhitespace: true }),
         model: optionalString(input.model, "model", 512),
+        effort: optionalString(input.effort, "effort", 160),
         mode: optionalString(input.mode, "mode", 160),
         referenceEpoch: optionalOpaqueId(input.referenceEpoch, "referenceEpoch"),
         attachments: optionalReferences(input.attachments, "attachments"),
@@ -267,6 +269,7 @@ function sanitizeAgentSessionListItem(value, label) {
       "idle", "running", "completed", "failed", "interrupted", "provider-exited",
     ]),
     selectedModel: optionalString(session.selectedModel, `${label}.selectedModel`, 512) ?? null,
+    selectedEffort: optionalString(session.selectedEffort, `${label}.selectedEffort`, 160) ?? null,
     selectedMode: optionalString(session.selectedMode, `${label}.selectedMode`, 160) ?? null,
     lastSequence: nonNegativeInteger(session.lastSequence, `${label}.lastSequence`),
     archivedAt: session.archivedAt == null ? undefined : isoTimestamp(session.archivedAt, `${label}.archivedAt`),

@@ -42,7 +42,10 @@ describe("Desktop Agent reference ingestion", () => {
 
     act(() => boundary.dispatchEvent(dragEvent("dragenter", transfer)));
     await act(async () => boundary.dispatchEvent(dragEvent("drop", transfer)));
-    await vi.waitFor(() => expect(controller.addWorkspacePaths).toHaveBeenCalledWith(["README.md", "src"]));
+    await vi.waitFor(() => expect(controller.addWorkspacePaths).toHaveBeenCalledWith(
+      ["README.md", "src"],
+      expect.any(Map),
+    ));
     expect(controller.submit).not.toHaveBeenCalled();
     expect(container.querySelector("[role='status']")?.textContent).toContain("2 references");
   });
@@ -77,17 +80,49 @@ describe("Desktop Agent reference ingestion", () => {
       typedWorkspaceTransfer("workspace-1", [resource]),
     )));
 
-    await vi.waitFor(() => expect(controller.addWorkspacePaths).toHaveBeenCalledWith(["guanqun.md"]));
+    await vi.waitFor(() => expect(controller.addWorkspacePaths).toHaveBeenCalledWith(
+      ["guanqun.md"],
+      expect.any(Map),
+    ));
     expect(resolveWorkspaceReference).toHaveBeenCalledWith(resource);
     expect(controller.addWorkspacePaths).not.toHaveBeenCalledWith([resource]);
+  });
+
+  it("loads an authorized visual preview for a workspace image without putting its URL in the path", async () => {
+    const controller = controllerFixture();
+    const resource = "puppyone-local://workspace/folder-1/capture.png";
+    const loadVisualPreview = vi.fn(async () => ({ url: "puppyone-local://preview/capture" }));
+    const resolveWorkspaceReference: AgentWorkspaceReferenceResolver = vi.fn(async () => ({
+      workspaceRoot: "/workspace",
+      referencePath: "capture.png",
+      loadVisualPreview,
+    }));
+    const container = render(<IngestionHarness
+      controller={controller}
+      resolveWorkspaceReference={resolveWorkspaceReference}
+    />);
+    const boundary = container.querySelector<HTMLElement>(".desktop-agent-boundary")!;
+
+    await act(async () => boundary.dispatchEvent(dragEvent(
+      "drop",
+      typedWorkspaceTransfer("workspace-1", [resource]),
+    )));
+
+    await vi.waitFor(() => expect(controller.addWorkspacePaths).toHaveBeenCalled());
+    const [paths, previews] = controller.addWorkspacePaths.mock.calls[0]!;
+    expect(paths).toEqual(["capture.png"]);
+    expect(previews.get("capture.png")?.url).toBe("puppyone-local://preview/capture");
+    expect(loadVisualPreview).toHaveBeenCalledTimes(1);
   });
 
   it("rejects a resource URI owned by another attached workspace root", async () => {
     const controller = controllerFixture();
     const resource = "puppyone-local://workspace/folder-2/secret.md";
+    const loadVisualPreview = vi.fn(async () => ({ url: "puppyone-local://preview/secret" }));
     const resolveWorkspaceReference: AgentWorkspaceReferenceResolver = vi.fn(() => ({
       workspaceRoot: "/another-root",
       referencePath: "secret.md",
+      loadVisualPreview,
     }));
     const container = render(<IngestionHarness
       controller={controller}
@@ -101,6 +136,7 @@ describe("Desktop Agent reference ingestion", () => {
     )));
 
     expect(controller.addWorkspacePaths).not.toHaveBeenCalled();
+    expect(loadVisualPreview).not.toHaveBeenCalled();
     expect(container.querySelector("[role='status']")?.textContent).toContain("another workspace");
   });
 
@@ -161,17 +197,18 @@ describe("Desktop Agent reference ingestion", () => {
     expect(document.querySelector('[role="menu"]')).toBeNull();
 
     const retry = container.querySelector<HTMLButtonElement>('button[aria-label*="Retry reference"]')!;
-    const failedChip = container.querySelector(".desktop-agent-reference-chips > .is-error");
-    expect(failedChip?.getAttribute("title")).toContain("This workspace item could not be added");
-    expect(failedChip?.getAttribute("title")).toContain("File no longer exists");
+    const failedCard = container.querySelector(".desktop-agent-reference-card.is-error");
+    expect(failedCard?.getAttribute("title")).toContain("This workspace item could not be added");
+    expect(failedCard?.getAttribute("title")).toContain("File no longer exists");
     expect(container.textContent).not.toContain("File no longer exists");
-    expect(container.querySelector(".desktop-agent-reference-chip-copy small")).toBeNull();
+    expect(container.querySelector(".desktop-agent-reference-card-copy small")?.textContent)
+      .toContain("This workspace item could not be added");
     act(() => retry.click());
     expect(onRetryReference).toHaveBeenCalledWith("failed-ref");
     expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("renders staged images as compact tokens after the draft and before the toolbar", () => {
+  it("renders Markdown and images as distinct cards above the draft inside the Composer", () => {
     const container = render(<AgentComposer
       draft="Describe this image"
       onDraftChange={vi.fn()}
@@ -179,28 +216,68 @@ describe("Desktop Agent reference ingestion", () => {
       running={false}
       stopping={false}
       submitting={false}
-      referenceCapabilities={capabilities()}
-      references={[{
-        id: "image-ref",
-        kind: "staged-attachment",
-        displayName: "capture.png",
-        mime: "image/png",
-        size: 5,
-        status: "ready",
+      models={[{
+        id: "gpt-5.6",
+        model: "gpt-5.6",
+        displayName: "GPT-5.6",
+        description: "OpenAI · GPT-5.6",
+        variants: ["low", "high"],
+        defaultVariant: "high",
       }]}
+      selectedModel="gpt-5.6"
+      onSelectModel={vi.fn()}
+      efforts={["low", "high"]}
+      selectedEffort="high"
+      onSelectEffort={vi.fn()}
+      referenceCapabilities={capabilities()}
+      references={[
+        {
+          id: "markdown-ref",
+          kind: "workspace-entry",
+          entryType: "file",
+          path: "SECURITY.md",
+          relativePath: "SECURITY.md",
+          displayName: "SECURITY.md",
+          mime: "text/markdown",
+          size: 12,
+          status: "ready",
+        },
+        {
+          id: "image-ref",
+          kind: "staged-attachment",
+          displayName: "capture.png",
+          mime: "image/png",
+          size: 5,
+          status: "ready",
+        },
+      ]}
+      getReferencePreviewUrl={(id) => id === "image-ref" ? "blob:agent-preview" : null}
       onRemoveReference={vi.fn()}
       onSubmit={vi.fn(async () => true)}
       onStop={vi.fn()}
     />);
 
     const composer = container.querySelector(".desktop-agent-composer")!;
-    const preview = composer.querySelector(".desktop-agent-reference-chip-preview.is-image");
+    const cards = composer.querySelector(".desktop-agent-reference-cards")!;
+    const fileCard = composer.querySelector(".desktop-agent-reference-card.is-file-card")!;
+    const imageCard = composer.querySelector(".desktop-agent-reference-card.is-image-card")!;
+    const preview = imageCard.querySelector<HTMLImageElement>(".desktop-agent-reference-image-preview img");
     const textarea = composer.querySelector("textarea")!;
     const toolbar = composer.querySelector(".desktop-agent-composer-trailing")!;
-    expect(preview).not.toBeNull();
-    expect(composer.querySelector(".desktop-agent-reference-chips")?.textContent).toContain("capture.png");
-    expect(textarea.compareDocumentPosition(preview!) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
-    expect(preview?.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    const leading = toolbar.querySelector(".desktop-agent-composer-leading")!;
+    const actions = toolbar.querySelector(".desktop-agent-composer-actions")!;
+    const attachment = toolbar.querySelector(".desktop-agent-reference-trigger")!;
+    const modelPicker = actions.querySelector(".desktop-agent-composer-picker.is-model")!;
+    const effortPicker = actions.querySelector(".desktop-agent-composer-picker.is-effort")!;
+    const send = actions.querySelector(".desktop-agent-composer-action")!;
+    expect(fileCard.textContent).toContain("SECURITY.md");
+    expect(fileCard.textContent).toContain("MD");
+    expect(preview?.getAttribute("src")).toBe("blob:agent-preview");
+    expect(cards.compareDocumentPosition(textarea) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(textarea.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(leading.contains(attachment)).toBe(true);
+    expect(modelPicker.compareDocumentPosition(effortPicker) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(effortPicker.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 
   it("announces partial batches while retaining the rejected item as an actionable error", async () => {
@@ -267,7 +344,10 @@ function controllerFixture() {
   return {
     workspaceRoot: "/workspace",
     getSnapshot: vi.fn(() => ({ references: [] as Array<{ id: string; status: string; error?: { message: string } }> })),
-    addWorkspacePaths: vi.fn(async (paths: string[]) => paths.length),
+    addWorkspacePaths: vi.fn(async (
+      paths: string[],
+      _previews: ReadonlyMap<string, { url: string }> = new Map(),
+    ) => paths.length),
     addPathTextOrDraft: vi.fn(async () => false),
     stageExternalFiles: vi.fn(async (files: File[]) => files.length),
     pickWorkspaceReferences: vi.fn(async () => 1),

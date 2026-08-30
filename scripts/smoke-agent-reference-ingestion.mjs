@@ -163,39 +163,42 @@ async function runProductionLayoutSmoke() {
     url.searchParams.set("theme", theme);
     url.hash = "agent-visual-smoke";
     await window.loadURL(url.href);
-    await waitForRenderer(window, "document.querySelectorAll('.desktop-agent-reference-chips > span').length", (value) => value === 3);
+    await waitForRenderer(window, "document.querySelectorAll('.desktop-agent-reference-cards > .desktop-agent-reference-card').length", (value) => value === 3);
     for (const width of [420, 560, 760]) {
       window.setContentSize(width, 820);
       await new Promise((resolve) => setTimeout(resolve, 50));
       const snapshot = await window.webContents.executeJavaScript(`(() => {
         const boundary = document.querySelector('.desktop-agent-boundary');
         const trigger = document.querySelector('.desktop-agent-reference-trigger');
-        const error = document.querySelector('.desktop-agent-reference-chips .is-error small');
+        const error = document.querySelector('.desktop-agent-reference-card.is-error small');
         return {
           theme: document.querySelector('[data-smoke-theme]')?.getAttribute('data-smoke-theme'),
           width: Math.round(boundary?.getBoundingClientRect().width || 0),
           viewport: window.innerWidth,
           overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-          draftChips: document.querySelectorAll('.desktop-agent-reference-chips > span').length,
+          draftCards: document.querySelectorAll('.desktop-agent-reference-cards > .desktop-agent-reference-card').length,
+          markdownCards: document.querySelectorAll('.desktop-agent-reference-card.is-file-card').length,
+          imageCards: document.querySelectorAll('.desktop-agent-reference-card.is-image-card img').length,
           transcriptChips: document.querySelectorAll('.desktop-agent-message-references > span').length,
           addLabel: trigger?.getAttribute('aria-label') || '',
           visibleError: error?.textContent || '',
         };
       })()`, true);
       if (snapshot.theme !== theme || snapshot.width <= 0 || snapshot.width > snapshot.viewport
-        || snapshot.overflow || snapshot.draftChips !== 3 || snapshot.transcriptChips < 2
+        || snapshot.overflow || snapshot.draftCards !== 3 || snapshot.markdownCards < 1
+        || snapshot.imageCards !== 1 || snapshot.transcriptChips < 2
         || !snapshot.addLabel || !snapshot.visibleError) {
         throw new Error(`Production Agent reference layout smoke failed: ${JSON.stringify(snapshot)}`);
       }
       matrix.push(`${theme}:${width}`);
     }
-    await window.webContents.executeJavaScript("document.querySelector('.desktop-agent-reference-trigger').click()", true);
-    await waitForRenderer(window, "Boolean(document.querySelector('[role=menu]'))", Boolean);
-    await window.webContents.executeJavaScript(
-      "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))",
-      true,
-    );
-    await waitForRenderer(window, "Boolean(document.querySelector('[role=menu]'))", (value) => !value);
+    const directPicker = await window.webContents.executeJavaScript(`(() => ({
+      input: Boolean(document.querySelector('.desktop-agent-attachment-control input[type=file]')),
+      menu: Boolean(document.querySelector('[role=menu]')),
+    }))()`, true);
+    if (!directPicker.input || directPicker.menu) {
+      throw new Error(`Production Agent direct picker contract failed: ${JSON.stringify(directPicker)}`);
+    }
     const image = await window.capturePage();
     if (image.isEmpty()) throw new Error(`Production Agent reference ${theme} capture was empty.`);
   }

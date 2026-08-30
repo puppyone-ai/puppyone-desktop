@@ -41,6 +41,7 @@ export class AgentTurnSubmissionCoordinator {
       referenceEpoch: this.options.references.referenceEpoch,
       prompt: text,
       model: state.selectedModel,
+      effort: state.selectedEffort,
       mode: state.selectedMode,
       references: state.references,
     });
@@ -59,6 +60,7 @@ export class AgentTurnSubmissionCoordinator {
           referenceEpoch: intent.referenceEpoch,
           references: intent.references,
         });
+        this.options.references.releasePreviews(intent.references);
         this.options.patch({ draft: "", references: [], error: null });
         this.options.writeDraft("");
         return true;
@@ -118,14 +120,17 @@ export class AgentTurnSubmissionCoordinator {
         sessionId: session.id,
         prompt: intent.prompt,
         model: intent.model,
+        effort: intent.effort,
         mode: intent.mode,
         referenceEpoch: intent.referenceEpoch,
         references: intent.references,
       });
+      this.options.references.releasePreviews(intent.references);
       this.options.patch({ phase: "running" });
       return true;
     } catch (error) {
       const accepted = Boolean(this.options.readState().projection.runningTurnId);
+      if (accepted) this.options.references.releasePreviews(intent.references);
       if (!captureCurrentDraft && !accepted) {
         const state = this.options.readState();
         const restoredDraft = mergeFailedPrompt(intent.prompt, state.draft);
@@ -197,6 +202,7 @@ function createSubmissionIntent({
   referenceEpoch,
   prompt,
   model,
+  effort,
   mode,
   references,
 }: Omit<AgentSubmissionIntent, "id">): AgentSubmissionIntent {
@@ -206,6 +212,7 @@ function createSubmissionIntent({
     referenceEpoch,
     prompt,
     model,
+    effort,
     mode,
     references: references.map((reference: AgentDraftReference) => ({
       ...reference,

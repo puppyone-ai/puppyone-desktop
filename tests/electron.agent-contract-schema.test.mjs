@@ -31,12 +31,14 @@ describe("shared Agent contract", () => {
       rootPath: "/workspace",
       sessionId: "session-1",
       prompt: "  keep whitespace  ",
+      effort: "high",
       unknownPrivilegedField: { shell: true },
       attachments: [{ path: "/workspace/a.md", name: "a.md", bytes: "not-authorized" }],
     })).toEqual({
       rootPath: "/workspace",
       sessionId: "session-1",
       prompt: "  keep whitespace  ",
+      effort: "high",
       attachments: [{ path: "/workspace/a.md", name: "a.md" }],
     });
     expect(() => parseAgentIpcRequest("agent:approval-resolve", {

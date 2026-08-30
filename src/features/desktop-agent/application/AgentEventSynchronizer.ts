@@ -255,6 +255,7 @@ function rejectedProviderPatch(state: AgentControllerState, projection: AgentCon
   return {
     selectedProviderId: null,
     selectedModel: null,
+    selectedEffort: null,
     inspection: {
       ...state.inspection,
       providers,

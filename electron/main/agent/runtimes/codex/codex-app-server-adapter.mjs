@@ -194,7 +194,7 @@ export class CodexAppServerAdapter {
     };
   }
 
-  async createSession({ model = null }) {
+  async createSession({ model = null, effort = null } = {}) {
     await this.connect();
     this.sessionLifecycleType = "session.started";
     const result = await this.connection.request("thread/start", {
@@ -206,10 +206,10 @@ export class CodexAppServerAdapter {
       ...(model ? { model } : {}),
     }).finally(() => { this.sessionLifecycleType = null; });
     this.threadId = requireString(result?.thread?.id, "Codex thread/start did not return a thread id.");
-    return normalizeProviderSession(result);
+    return { ...normalizeProviderSession(result), effort };
   }
 
-  async resumeSession({ threadId, model = null }) {
+  async resumeSession({ threadId, model = null, effort = null }) {
     await this.connect();
     this.sessionLifecycleType = "session.resumed";
     let result;
@@ -231,7 +231,7 @@ export class CodexAppServerAdapter {
       this.sessionLifecycleType = null;
     }
     this.threadId = requireString(result?.thread?.id, "Codex thread/resume did not return a thread id.");
-    return normalizeProviderSession(result);
+    return { ...normalizeProviderSession(result), effort };
   }
 
   async readThread() {
@@ -247,10 +247,10 @@ export class CodexAppServerAdapter {
     return normalizeHistoricalThread(await this.readThread());
   }
 
-  async startTurn({ prompt, model = null, references = [], attachments = [], contextReferences = [] }) {
+  async startTurn({ prompt, model = null, effort: requestedEffort = null, references = [], attachments = [], contextReferences = [] }) {
     if (!this.threadId) throw new Error("No Codex thread is active.");
     const clientUserMessageId = randomUUID();
-    const effort = compatibleReasoningEffort(this.modelProfiles.get(model));
+    const effort = compatibleReasoningEffort(this.modelProfiles.get(model), requestedEffort);
     const input = buildCodexTurnInput(prompt, references.length > 0
       ? references
       : [...contextReferences, ...attachments]);
@@ -830,8 +830,16 @@ function normalizeCodexReasoningEffort(value) {
   return CODEX_REASONING_EFFORTS.has(compatible) ? compatible : null;
 }
 
-function compatibleReasoningEffort(model) {
-  if (!model || !Array.isArray(model.variants) || model.variants.length === 0) return null;
+function compatibleReasoningEffort(model, requested = null) {
+  if (!model || !Array.isArray(model.variants) || model.variants.length === 0) {
+    if (requested) throw new Error("The selected Codex model does not support configurable reasoning effort.");
+    return null;
+  }
+  if (requested) {
+    const normalized = normalizeCodexReasoningEffort(requested);
+    if (normalized && model.variants.includes(normalized)) return normalized;
+    throw new Error("The selected Codex reasoning effort is no longer available for this model.");
+  }
   if (model.defaultVariant && model.variants.includes(model.defaultVariant)) return model.defaultVariant;
   return model.variants.includes("medium") ? "medium" : model.variants[0] ?? null;
 }

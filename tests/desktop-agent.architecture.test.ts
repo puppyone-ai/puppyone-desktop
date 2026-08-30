@@ -39,6 +39,7 @@ describe("Desktop Agent architecture boundaries", () => {
     const timeline = source("src/features/desktop-agent/ui/AgentTranscript.tsx");
     const markdown = source("src/features/desktop-agent/ui/SafeMarkdown.tsx");
     const composer = source("src/features/desktop-agent/ui/AgentComposer.tsx");
+    const composerToolbar = source("src/features/desktop-agent/ui/composer/AgentComposerToolbar.tsx");
     const attachmentButton = source("src/features/desktop-agent/ui/composer/AgentAttachmentButton.tsx");
     const commandSuggestions = source("src/features/desktop-agent/ui/composer/AgentCommandSuggestions.tsx");
     const draftReferences = source("src/features/desktop-agent/ui/composer/AgentDraftReferenceList.tsx");
@@ -58,7 +59,7 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(foundation).toMatch(/\.desktop-agent-boundary\s*\{[^}]*container:\s*desktop-agent \/ inline-size/s);
     expect(foundation).not.toMatch(/\.desktop-agent-panel\s*\{[^}]*container:/s);
     expect(foundation).toMatch(/\.desktop-agent-panel\s*\{[^}]*display:\s*grid[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\) auto/s);
-    expect(foundation).toContain("--agent-radius-composer: var(--desktop-sidebar-row-radius, 6px)");
+    expect(foundation).toContain("--agent-radius-composer: 12px");
     expect(foundation).toContain("--agent-inline-inset: var(--desktop-sidebar-row-left-gap, 12px)");
     expect(pickers).toMatch(
       /\.desktop-agent-picker\.is-header \.desktop-agent-picker-trigger\s*\{[^}]*color:\s*var\(--desktop-titlebar-text-muted, var\(--po-text-muted\)\);[^}]*font-size:\s*var\(--po-font-size-chrome, 13px\);[^}]*font-weight:\s*var\(--po-font-weight-chrome, 500\);[^}]*line-height:\s*18px;/s,
@@ -73,7 +74,11 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(composer).not.toContain("function ReferenceChip");
     expect(composer).toContain("<AgentCommandSuggestions");
     expect(composer).toContain("<AgentDraftReferenceList");
-    expect(composer).toContain("<AgentAttachmentButton");
+    expect(composer).toContain("<AgentComposerToolbar");
+    expect(composerToolbar).toContain("<AgentAttachmentButton");
+    expect(composerToolbar).toContain("<AgentModelPicker");
+    expect(composerToolbar).toContain("<AgentEffortPicker");
+    expect(composerToolbar.split("\n").length).toBeLessThan(130);
     expect(attachmentButton).not.toMatch(/useState|DesktopOverlayLayer|role="menu"/);
     expect(commandSuggestions).not.toMatch(/useState|AgentSessionController/);
     expect(draftReferences).not.toMatch(/useState|AgentSessionController/);

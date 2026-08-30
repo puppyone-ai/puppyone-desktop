@@ -25,7 +25,7 @@ import {
   hasFreshAgentRuntimeInspection,
 } from "./agent-runtime-discovery-cache";
 import { planAgentRuntimeSwitch } from "./agent-runtime-selection";
-import { chooseAgentMode } from "./agent-controller-values";
+import { chooseAgentEffort, chooseAgentMode } from "./agent-controller-values";
 import { AgentReferenceDraftManager } from "./AgentReferenceDraftManager";
 import {
   AgentTurnSubmissionCoordinator,
@@ -63,6 +63,7 @@ export class AgentSessionController {
       selectedRuntimeId: null,
       selectedProviderId: null,
       selectedModel: null,
+      selectedEffort: null,
       selectedMode: null,
       localConnections: [],
       localConnectionsPhase: "idle",
@@ -152,7 +153,7 @@ export class AgentSessionController {
       ...(this.state.pendingIntent?.references ?? []),
     ]);
     this.submission.clearQueue();
-    this.referenceDrafts.clearRetryMaterial();
+    this.referenceDrafts.disposeRendererResources();
     this.listeners.clear();
   }
 
@@ -270,6 +271,7 @@ export class AgentSessionController {
         selectedProviderId: agentProviderIdForModel(selectedModelEntry)
           || chooseAgentProvider(inspection, null, selectedModel),
         selectedModel,
+        selectedEffort: chooseAgentEffort(selectedModelEntry, null),
         selectedMode: chooseAgentMode(inspection, null),
         initialized: true,
         phase: "restoring",
@@ -324,7 +326,8 @@ export class AgentSessionController {
       const selectedProviderId = agentProviderIdForModel(selectedModelEntry)
         || chooseAgentProvider(inspection, this.state.selectedProviderId, selectedModel);
       const selectedMode = chooseAgentMode(inspection, this.state.selectedMode);
-      this.patch({ inspection, selectedRuntimeId: runtimeId, selectedProviderId, selectedModel, selectedMode, initialized: true });
+      const selectedEffort = chooseAgentEffort(selectedModelEntry, this.state.selectedEffort);
+      this.patch({ inspection, selectedRuntimeId: runtimeId, selectedProviderId, selectedModel, selectedEffort, selectedMode, initialized: true });
       if (!runtimeId || !inspection.readiness || inspection.readiness.status !== "ready") {
         this.patch({ phase: "ready", sessionPreparation: "idle" });
         return;
@@ -356,7 +359,13 @@ export class AgentSessionController {
       ? providerId
       : null;
     const selectedModel = chooseAgentModel(this.state.inspection, null, selectedProviderId);
-    this.patch({ selectedProviderId, selectedModel, error: null });
+    const selectedModelEntry = this.state.inspection?.models.find((model) => model.model === selectedModel);
+    this.patch({
+      selectedProviderId,
+      selectedModel,
+      selectedEffort: chooseAgentEffort(selectedModelEntry, null),
+      error: null,
+    });
     return selectedModel;
   }
 
@@ -366,11 +375,19 @@ export class AgentSessionController {
       ? this.state.inspection?.models.find((candidate) => candidate.model === model) ?? null
       : null;
     const selectedModel = selectedModelEntry?.model ?? null;
+    const preserveEffort = selectedModel === this.state.selectedModel ? this.state.selectedEffort : null;
     this.patch({
       selectedProviderId: selectedModelEntry ? agentProviderIdForModel(selectedModelEntry) : this.state.selectedProviderId,
       selectedModel,
+      selectedEffort: chooseAgentEffort(selectedModelEntry, preserveEffort),
       error: null,
     });
+  }
+
+  selectEffort(effort: string | null) {
+    if (this.state.projection.runningTurnId || this.state.sessionPreparation === "preparing" || this.state.pendingPrompt) return;
+    const selectedModel = this.state.inspection?.models.find((model) => model.model === this.state.selectedModel);
+    this.patch({ selectedEffort: chooseAgentEffort(selectedModel, effort), error: null });
   }
 
   selectMode(mode: string | null) {
@@ -383,9 +400,14 @@ export class AgentSessionController {
     this.writeCurrentSessionUi({ draft });
   }
 
-  async addWorkspacePaths(paths: string[]) {
-    return this.referenceDrafts.addWorkspacePaths(paths);
+  async addWorkspacePaths(
+    paths: string[],
+    visualPreviews?: Parameters<AgentReferenceDraftManager["addWorkspacePaths"]>[1],
+  ) {
+    return this.referenceDrafts.addWorkspacePaths(paths, visualPreviews);
   }
+
+  getReferencePreviewUrl = (id: string) => this.referenceDrafts.previewUrl(id);
 
   async pickWorkspaceReferences() {
     return this.referenceDrafts.pickWorkspaceReferences();
@@ -520,6 +542,7 @@ export class AgentSessionController {
       rootPath: this.workspaceRoot,
       runtimeId: this.state.selectedRuntimeId,
       model: this.state.selectedModel,
+      effort: this.state.selectedEffort,
       mode: this.state.selectedMode,
     });
   }
@@ -536,9 +559,10 @@ export class AgentSessionController {
       commands: snapshot.commands ?? this.state.inspection.commands ?? [],
       capabilities: snapshot.capabilities,
     } : null;
-    const selectedModel = snapshot.session.selectedModel
+    const requestedModel = snapshot.session.selectedModel
       || this.state.selectedModel
       || chooseAgentModel(inspection, null, null);
+    const selectedModel = chooseAgentModel(inspection, requestedModel, null);
     const selectedModelEntry = inspection?.models.find((model) => model.model === selectedModel);
     const selectedProviderId = agentProviderIdForModel(selectedModelEntry)
       || chooseAgentProvider(inspection, this.state.selectedProviderId, selectedModel);
@@ -547,7 +571,11 @@ export class AgentSessionController {
       inspection,
       selectedRuntimeId: snapshot.session.runtimeId || snapshot.session.provider || this.state.selectedRuntimeId,
       selectedProviderId,
-      selectedModel: chooseAgentModel(inspection, selectedModel, null),
+      selectedModel,
+      selectedEffort: chooseAgentEffort(
+        selectedModelEntry,
+        snapshot.session.selectedEffort || this.state.selectedEffort,
+      ),
       selectedMode: snapshot.session.selectedMode || this.state.selectedMode || chooseAgentMode(inspection, null),
       projection: applyAgentEvents(createAgentProjection({ partialHistory: snapshot.partial }), snapshot.events, { partialHistory: snapshot.partial }),
       stopping: false,

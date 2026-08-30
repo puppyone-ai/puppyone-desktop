@@ -6,6 +6,11 @@ import type { AgentClientPort, AgentClientProvider } from "./AgentClientPort";
 import type { AgentControllerState } from "./agent-controller-state";
 import { AgentKnownError, formatAgentError } from "./agent-error";
 import { mergeAgentReferences } from "./agent-controller-values";
+import {
+  AgentReferencePreviewStore,
+  createAgentFileVisualPreview,
+  type AgentReferenceVisualPreview,
+} from "./AgentReferencePreviewStore";
 
 type AgentReferenceDraftManagerOptions = {
   workspaceRoot: string;
@@ -18,6 +23,7 @@ type AgentReferenceDraftManagerOptions = {
 /** Owns draft reference acquisition, validation, retry material and grant release. */
 export class AgentReferenceDraftManager {
   private retryFiles = new Map<string, File>();
+  private readonly previews = new AgentReferencePreviewStore();
   private epoch = createReferenceEpoch();
 
   constructor(private readonly options: AgentReferenceDraftManagerOptions) {}
@@ -26,18 +32,40 @@ export class AgentReferenceDraftManager {
     return this.epoch;
   }
 
-  async addWorkspacePaths(paths: string[]) {
-    const bridge = this.requireBridge("resolveAgentWorkspaceReferences");
+  previewUrl(id: string) {
+    return this.previews.getUrl(id);
+  }
+
+  async addWorkspacePaths(
+    paths: string[],
+    visualPreviews: ReadonlyMap<string, AgentReferenceVisualPreview> = new Map(),
+  ) {
     const uniquePaths = Array.from(new Set(paths.filter(Boolean))).slice(0, 32);
+    const acceptedPaths = new Set(uniquePaths);
+    let bridge: AgentClientPort;
+    try {
+      bridge = this.requireBridge("resolveAgentWorkspaceReferences");
+    } catch (error) {
+      visualPreviews.forEach(safeReleaseVisualPreview);
+      throw error;
+    }
+    for (const [path, preview] of visualPreviews) {
+      if (!acceptedPaths.has(path)) safeReleaseVisualPreview(preview);
+    }
     const resolved = await Promise.all(uniquePaths.map(async (path) => {
       try {
         const references = await bridge.resolveAgentWorkspaceReferences({
           rootPath: this.options.workspaceRoot,
           paths: [path],
         });
+        const preview = visualPreviews.get(path);
+        if (preview && references.length > 0) this.previews.set(references[0]!.id, preview);
+        else safeReleaseVisualPreview(preview);
         return references.map((reference) => this.withCapabilityStatus(reference));
       } catch (error) {
-        return [workspaceReferenceError(path, error)];
+        const reference = workspaceReferenceError(path, error);
+        this.previews.set(reference.id, visualPreviews.get(path));
+        return [reference];
       }
     }));
     const references = resolved.flat();
@@ -89,6 +117,9 @@ export class AgentReferenceDraftManager {
     const bridge = this.requireBridge("stageAgentAttachments");
     const selected = files.slice(0, 32);
     const pending = selected.map((file) => pendingAttachment(file));
+    pending.forEach((reference, index) => {
+      this.previews.set(reference.id, createAgentFileVisualPreview(selected[index]!));
+    });
     const state = this.options.readState();
     const existingIds = new Set(state.references.map((reference) => reference.id));
     this.options.patch({ references: this.mergeAndValidate(state.references, pending), error: null });
@@ -103,11 +134,16 @@ export class AgentReferenceDraftManager {
         const supported = this.withCapabilityStatus(reference);
         if (supported.status === "error" && reference.kind === "staged-attachment" && reference.token) {
           await bridge.revokeAgentAttachments?.({ rootPath: this.options.workspaceRoot, tokens: [reference.token] });
-          return { ...supported, token: undefined };
+          const failed = { ...supported, token: undefined };
+          this.previews.move(pending[index]!.id, failed.id);
+          return failed;
         }
+        this.previews.move(pending[index]!.id, supported.id);
         return supported;
       } catch (error) {
-        return attachmentReferenceError(file, error);
+        const failed = attachmentReferenceError(file, error);
+        this.previews.move(pending[index]!.id, failed.id);
+        return failed;
       } finally {
         const pendingId = pending[index]?.id;
         if (pendingId) {
@@ -171,6 +207,7 @@ export class AgentReferenceDraftManager {
   }
 
   async revoke(references: AgentDraftReference[]) {
+    this.releasePreviews(references);
     const tokens = Array.from(new Set(references.flatMap((reference) => (
       reference.kind === "staged-attachment" && reference.token ? [reference.token] : []
     ))));
@@ -183,6 +220,7 @@ export class AgentReferenceDraftManager {
   async rotate(references: AgentDraftReference[]) {
     await this.revoke(references);
     this.retryFiles.clear();
+    this.previews.clear();
     this.epoch = createReferenceEpoch();
   }
 
@@ -191,8 +229,13 @@ export class AgentReferenceDraftManager {
     this.options.patch({ references: [], pendingIntent: null });
   }
 
-  clearRetryMaterial() {
+  releasePreviews(references: AgentDraftReference[]) {
+    this.previews.deleteMany(references.map((reference) => reference.id));
+  }
+
+  disposeRendererResources() {
     this.retryFiles.clear();
+    this.previews.clear();
   }
 
   private withCapabilityStatus(reference: AgentDraftReference): AgentDraftReference {
@@ -300,4 +343,12 @@ function safeReferenceError(error: unknown) {
     .replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/i, "")
     .replace(/[\r\n]+/g, " ")
     .slice(0, 500) || "The reference could not be added.";
+}
+
+function safeReleaseVisualPreview(preview: AgentReferenceVisualPreview | undefined) {
+  try {
+    preview?.release?.();
+  } catch {
+    // Preview cleanup must not turn a recoverable reference into a draft error.
+  }
 }

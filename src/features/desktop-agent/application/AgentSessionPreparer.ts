@@ -95,5 +95,5 @@ function canPrepareSession(state: AgentControllerState) {
 }
 
 function sessionSelection(state: AgentControllerState) {
-  return [state.selectedRuntimeId, state.selectedModel, state.selectedMode].join("\u0000");
+  return [state.selectedRuntimeId, state.selectedModel, state.selectedEffort, state.selectedMode].join("\u0000");
 }

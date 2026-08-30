@@ -258,13 +258,27 @@ function AppContent() {
   const resolveWorkspaceResource = useCallback((path: string | null) => (
     workbenchDataService?.resolveResource(path) ?? null
   ), [workbenchDataService]);
-  const resolveAgentWorkspaceReference = useCallback((resource: string) => {
+  const resolveAgentWorkspaceReference = useCallback(async (resource: string) => {
     if (!workbenchDataService || !isDataResourceUri(resource)) return null;
     try {
       const resolved = workbenchDataService.resolveResource(resource);
+      const loadVisualPreview = resolved.providerPath
+        && isPreviewableAgentImagePath(resolved.providerPath)
+        && workbenchDataService.dataPort.getFileUrl
+        ? async () => {
+            const url = await workbenchDataService.dataPort.getFileUrl!(resource, { purpose: "file-preview" });
+            return {
+              url,
+              release: () => {
+                void Promise.resolve(workbenchDataService.dataPort.revokeFileUrl?.(url)).catch(() => undefined);
+              },
+            };
+          }
+        : undefined;
       return {
         workspaceRoot: resolved.folder.workspace.path,
         referencePath: resolved.providerPath ?? ".",
+        ...(loadVisualPreview ? { loadVisualPreview } : {}),
       };
     } catch {
       return null;
@@ -1294,6 +1308,10 @@ function AppContent() {
       </DesktopOverlayPortal>
     </div>
   );
+}
+
+function isPreviewableAgentImagePath(path: string) {
+  return /\.(?:png|jpe?g|gif|webp|avif)$/i.test(path);
 }
 
 function hasSameActiveDataNodeIdentity(left: DataNode | null, right: DataNode | null): boolean {

@@ -103,10 +103,12 @@ export function AgentChatTabPanel({
     active: commandTarget, controller, state, runtimeModels, preferredRuntimeId, preferredRoute, preferredModel,
     onPreferredRuntimeChange, onPreferredRouteChange, onPreferredModelChange,
   });
+  const selectedModelProfile = runtimeModels.find((model) => model.model === state.selectedModel);
+  const runtimeEfforts = selectedModelProfile?.variants ?? [];
   const modelSelectionAvailable = Boolean(capabilities?.modelSelection);
   const routingReady = Boolean(agentRuntimeSelected && (!modelSelectionAvailable || (
     state.selectedModel && runtimeModels.some((model) => model.model === state.selectedModel)
-  )));
+  )) && routingPreferences.preferencesReady);
   const preparingSession = state.sessionPreparation === "preparing";
   const submissionPending = state.submitting || Boolean(state.pendingPrompt);
   const submissionStage: AgentSubmissionStage = state.pendingPrompt && !state.projection.runningTurnId
@@ -219,8 +221,12 @@ export function AgentChatTabPanel({
         placeholder={composerPlaceholder} runtimeLabel={runtimeLabel}
         configurationDisabled={loading || preparingSession || submissionPending}
         models={capabilities?.modelSelection ? runtimeModels : []} selectedModel={state.selectedModel}
-        onSelectModel={routingPreferences.selectModel} commands={capabilities?.slashCommands ? inspection?.commands ?? [] : []}
-        references={state.references} referenceCapabilities={capabilities?.referenceInputs}
+        onSelectModel={routingPreferences.selectModel}
+        efforts={runtimeEfforts} selectedEffort={state.selectedEffort}
+        onSelectEffort={routingPreferences.selectEffort}
+        commands={capabilities?.slashCommands ? inspection?.commands ?? [] : []}
+        references={state.references} getReferencePreviewUrl={controller.getReferencePreviewUrl}
+        referenceCapabilities={capabilities?.referenceInputs}
         steerAvailable={Boolean(capabilities?.steer)} queueAvailable={Boolean(capabilities?.queue)}
         onRemoveReference={(id) => controller.removeReference(id)} onRetryReference={(id) => controller.retryReference(id)}
         onAddExternalFiles={referenceIngestion.addExternalFiles} onPaste={referenceIngestion.onPaste}

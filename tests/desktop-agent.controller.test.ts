@@ -216,8 +216,8 @@ describe("AgentSessionController", () => {
         { id: "openai", displayName: "OpenAI", defaultModel: "openai/gpt-5", modelCount: 1 },
       ],
       models: [
-        { id: "anthropic/claude-sonnet", model: "anthropic/claude-sonnet", providerId: "anthropic", displayName: "Claude Sonnet", description: "Anthropic · Claude", isDefault: false },
-        { id: "openai/gpt-5", model: "openai/gpt-5", providerId: "openai", displayName: "GPT-5", description: "OpenAI · GPT-5", isDefault: true },
+        { id: "anthropic/claude-sonnet", model: "anthropic/claude-sonnet", providerId: "anthropic", displayName: "Claude Sonnet", description: "Anthropic · Claude", isDefault: false, variants: ["low", "high"], defaultVariant: "high" },
+        { id: "openai/gpt-5", model: "openai/gpt-5", providerId: "openai", displayName: "GPT-5", description: "OpenAI · GPT-5", isDefault: true, variants: ["low", "medium"], defaultVariant: "medium" },
       ],
       modes: [],
       commands: [],
@@ -229,11 +229,21 @@ describe("AgentSessionController", () => {
 
     await controller.initialize();
 
-    expect(controller.getSnapshot()).toMatchObject({ selectedProviderId: "anthropic", selectedModel: "anthropic/claude-sonnet" });
+    expect(controller.getSnapshot()).toMatchObject({
+      selectedProviderId: "anthropic",
+      selectedModel: "anthropic/claude-sonnet",
+      selectedEffort: "high",
+    });
     const discoveryCalls = bridge.discoverAgentRuntimes.mock.calls.length;
     const resumeCalls = bridge.resumeAgentSession.mock.calls.length;
     controller.selectModel("openai/gpt-5");
-    expect(controller.getSnapshot()).toMatchObject({ selectedProviderId: "openai", selectedModel: "openai/gpt-5" });
+    expect(controller.getSnapshot()).toMatchObject({
+      selectedProviderId: "openai",
+      selectedModel: "openai/gpt-5",
+      selectedEffort: "medium",
+    });
+    controller.selectEffort("low");
+    expect(controller.getSnapshot().selectedEffort).toBe("low");
     expect(bridge.discoverAgentRuntimes).toHaveBeenCalledTimes(discoveryCalls);
     expect(bridge.resumeAgentSession).toHaveBeenCalledTimes(resumeCalls);
     expect(bridge.createAgentSession).not.toHaveBeenCalled();
@@ -691,6 +701,27 @@ describe("AgentSessionController", () => {
       rootPath: "/workspace",
       tokens: ["stage-token"],
     }));
+  });
+
+  it("keeps image previews renderer-local and revokes their object URLs on removal", async () => {
+    const createObjectUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:agent-image-preview");
+    const revokeObjectUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const bridge = bridgeFixture(() => {});
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+
+    await expect(controller.stageExternalFiles([
+      new File(["png"], "capture.png", { type: "image/png" }),
+    ])).resolves.toBe(1);
+    const [reference] = controller.getSnapshot().references;
+    expect(controller.getReferencePreviewUrl(reference.id)).toBe("blob:agent-image-preview");
+    expect(reference).not.toHaveProperty("previewUrl");
+
+    controller.removeReference(reference.id);
+    expect(controller.getReferencePreviewUrl(reference.id)).toBeNull();
+    expect(revokeObjectUrl).toHaveBeenCalledWith("blob:agent-image-preview");
+    createObjectUrl.mockRestore();
+    revokeObjectUrl.mockRestore();
   });
 
   it("keeps valid entries from a partial external-file batch and exposes retryable errors for the rest", async () => {

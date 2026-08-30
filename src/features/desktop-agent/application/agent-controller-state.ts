@@ -30,6 +30,7 @@ export type AgentControllerState = {
   selectedRuntimeId: AgentRuntimeId | null;
   selectedProviderId: string | null;
   selectedModel: string | null;
+  selectedEffort: string | null;
   selectedMode: string | null;
   localConnections: AgentLocalConnection[];
   localConnectionsPhase: "idle" | "loading" | "ready" | "error";

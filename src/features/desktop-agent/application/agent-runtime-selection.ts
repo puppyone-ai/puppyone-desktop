@@ -35,6 +35,7 @@ export function planAgentRuntimeSwitch(
       selectedRuntimeId: runtimeId,
       selectedProviderId: null,
       selectedModel: null,
+      selectedEffort: null,
       selectedMode: null,
       draft: "",
       pendingPrompt: null,

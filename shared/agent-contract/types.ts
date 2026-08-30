@@ -208,6 +208,7 @@ export type AgentSessionMetadata = {
   updatedAt: string;
   terminalState: AgentTurnTerminalState | "idle" | "running" | "provider-exited";
   selectedModel: string | null;
+  selectedEffort?: string | null;
   selectedMode?: string | null;
   activeTurnId: string | null;
   lastSequence: number;
@@ -424,6 +425,7 @@ export type AgentSessionCreateRequest = {
   rootPath: string;
   runtimeId?: AgentRuntimeId | null;
   model?: string | null;
+  effort?: string | null;
   mode?: string | null;
 };
 
@@ -511,6 +513,7 @@ export type AgentSubmissionIntent = {
   referenceEpoch: string;
   prompt: string;
   model: string | null;
+  effort: string | null;
   mode: string | null;
   references: AgentDraftReference[];
 };
@@ -520,6 +523,7 @@ export type AgentTurnStartRequest = {
   sessionId: string;
   prompt: string;
   model?: string | null;
+  effort?: string | null;
   mode?: string | null;
   referenceEpoch?: string;
   attachments?: AgentFileReference[];

@@ -4,6 +4,7 @@ import {
   resolveAcpEfforts,
   resolveAcpModels,
   resolveAcpModes,
+  resolveRequestedAcpEffort,
   resolveRequestedAcpMode,
 } from "../electron/main/agent/protocols/acp/acp-session-config.mjs";
 
@@ -102,6 +103,8 @@ describe("OpenCode ACP normalization", () => {
     expect(resolveAcpModes({ configOptions })).toMatchObject({ configId: "mode", currentId: "build" });
     expect(resolveAcpEfforts({ configOptions })).toMatchObject({ configId: "thought", currentId: "high" });
     expect(resolveRequestedAcpMode("plan", resolveAcpModes({ configOptions }))).toBe("plan");
+    expect(resolveRequestedAcpEffort("low", resolveAcpEfforts({ configOptions }))).toBe("low");
+    expect(resolveRequestedAcpEffort("unsupported", resolveAcpEfforts({ configOptions }))).toBeNull();
   });
 });
 

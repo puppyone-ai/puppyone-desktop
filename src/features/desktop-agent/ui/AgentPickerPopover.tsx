@@ -24,7 +24,7 @@ export type AgentPickerOption = {
   keywords?: string;
   selectable: boolean;
   selected?: boolean;
-  kind?: "agent" | "provider" | "local" | "model" | "status";
+  kind?: "agent" | "provider" | "local" | "model" | "effort" | "status";
   icon?: ReactNode;
 };
 

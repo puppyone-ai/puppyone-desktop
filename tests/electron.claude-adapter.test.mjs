@@ -100,10 +100,16 @@ describe("Claude Agent SDK runtime adapter", () => {
 
   it("keeps one native SDK query alive across follow-up turns", async () => {
     const controller = persistentQueryController();
-    const sdk = { query: vi.fn((request) => controller.connect(request.prompt)) };
+    const inspection = inspectionQuery();
+    const sdk = {
+      query: vi.fn((request) => sdk.query.mock.calls.length === 1
+        ? inspection
+        : controller.connect(request.prompt)),
+    };
     const onEvent = vi.fn();
     const adapter = createAdapter({ sdk, onEvent });
-    await adapter.createSession({ model: "claude-sonnet", mode: "agent" });
+    await adapter.inspect();
+    await adapter.createSession({ model: "claude-sonnet", effort: "high", mode: "agent" });
 
     await expect(adapter.startTurn({
       prompt: "Unsafe",
@@ -117,6 +123,7 @@ describe("Claude Agent SDK runtime adapter", () => {
     const first = await adapter.startTurn({
       prompt: "First",
       model: "claude-sonnet",
+      effort: "high",
       mode: "agent",
       contextReferences: [{ path: "/workspace/src/app.ts" }],
     });
@@ -124,12 +131,13 @@ describe("Claude Agent SDK runtime adapter", () => {
     controller.finish("First answer");
     await vi.waitFor(() => expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "turn.completed", turnId: first.turnId })));
 
-    const second = await adapter.startTurn({ prompt: "Second", model: "claude-sonnet", mode: "agent" });
+    const second = await adapter.startTurn({ prompt: "Second", model: "claude-sonnet", effort: "high", mode: "agent" });
     await vi.waitFor(() => expect(controller.messages).toHaveLength(2));
     controller.finish("Second answer");
     await vi.waitFor(() => expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "turn.completed", turnId: second.turnId })));
 
-    expect(sdk.query).toHaveBeenCalledTimes(1);
+    expect(sdk.query).toHaveBeenCalledTimes(2);
+    expect(sdk.query.mock.calls[1][0].options.effort).toBe("high");
     expect(controller.query.initializationResult).toHaveBeenCalledTimes(1);
     expect(controller.query.setModel).toHaveBeenCalledWith("claude-sonnet");
     expect(controller.messages[0].message.content).toContain("/workspace/src/app.ts");
