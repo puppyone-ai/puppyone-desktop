@@ -3,6 +3,8 @@
   "actions": "Terminal actions",
   "new": "New terminal",
   "empty": "No open terminals",
+  "workbench.itemLoadFailed": "Could not open {item}. Try again.",
+  "workbench.dismissError": "Dismiss error",
   "tabs.more": "More terminal tabs ({count})",
   "launcher.kicker": "Terminal workspace",
   "launcher.title": "start with an agent",

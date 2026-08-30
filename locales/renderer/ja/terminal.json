@@ -3,6 +3,8 @@
   "actions": "ターミナル操作",
   "new": "新しいターミナル",
   "empty": "開いているターミナルはありません",
+  "workbench.itemLoadFailed": "{item} を開けませんでした。もう一度お試しください。",
+  "workbench.dismissError": "エラーを閉じる",
   "tabs.more": "その他のターミナルタブ（{count}）",
   "launcher.kicker": "ターミナルワークスペース",
   "launcher.title": "Agent を起動",

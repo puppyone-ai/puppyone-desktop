@@ -3,6 +3,8 @@
   "actions": "终端操作",
   "new": "新建终端",
   "empty": "没有打开的终端",
+  "workbench.itemLoadFailed": "无法打开 {item}。请重试。",
+  "workbench.dismissError": "关闭错误提示",
   "tabs.more": "更多终端标签页（{count}）",
   "launcher.kicker": "终端工作区",
   "launcher.title": "启动一个 Agent",

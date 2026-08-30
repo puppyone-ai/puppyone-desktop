@@ -3,6 +3,8 @@
   "actions": "Ações do terminal",
   "new": "Novo terminal",
   "empty": "Nenhum terminal aberto",
+  "workbench.itemLoadFailed": "Não foi possível abrir {item}. Tente novamente.",
+  "workbench.dismissError": "Dispensar erro",
   "tabs.more": "Mais abas do terminal ({count})",
   "launcher.kicker": "Espaço do terminal",
   "launcher.title": "Iniciar um Agent",

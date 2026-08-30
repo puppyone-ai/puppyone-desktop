@@ -181,6 +181,35 @@ describe("Desktop Terminal launcher", () => {
     expect(container.textContent).toContain("start with an agent");
   });
 
+  it("supports a standalone Chat contribution without exposing terminal launchers", () => {
+    const onCreateChat = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(withTestLocalization(
+      <TerminalLauncher
+        discoveryPhase="ready"
+        availableAgentIds={[]}
+        terminalEnabled={false}
+        onCreateChat={onCreateChat}
+        onLaunch={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    )));
+
+    const launcher = container.querySelector<HTMLElement>(".desktop-terminal-launcher");
+    const labelledBy = launcher?.getAttribute("aria-labelledby");
+    expect(container.querySelector(".desktop-terminal-launcher-group.is-chat")).not.toBeNull();
+    expect(container.querySelector(".desktop-terminal-launcher-group.is-agents")).toBeNull();
+    expect(container.querySelector(".desktop-terminal-launcher-group.is-shell")).toBeNull();
+    expect(labelledBy).toBe("desktop-terminal-launcher-title");
+    expect(container.querySelector(`#${labelledBy}`)).not.toBeNull();
+
+    clickButton(container, "New chat");
+    expect(onCreateChat).toHaveBeenCalledOnce();
+  });
+
   it("moves only future catalog growth into the quiet overflow section", () => {
     const values = Array.from({ length: 8 }, (_, index) => `agent-${index}`);
     expect(partitionTerminalAgentLaunchers(values)).toEqual({

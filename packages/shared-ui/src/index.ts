@@ -180,6 +180,32 @@ export type {
   WorkbenchSplitRatioBounds,
 } from "./workbench/split-tree";
 export {
+  assertAuxiliaryWorkbenchState,
+  auxiliaryWorkbenchReducer,
+  auxiliaryWorkbenchStateErrors,
+  canInsertAuxiliaryWorkbenchItem,
+  canMergeAuxiliaryWorkbenchGroup,
+  canMoveAuxiliaryWorkbenchGroup,
+  canSplitAuxiliaryWorkbenchItem,
+  clampAuxiliaryWorkbenchSplitRatio,
+  createAuxiliaryWorkbenchState,
+  findAuxiliaryWorkbenchItemGroup,
+  getActiveAuxiliaryWorkbenchGroup,
+  getActiveAuxiliaryWorkbenchItemId,
+  getAuxiliaryWorkbenchLayoutGroupIds,
+  getOrderedAuxiliaryWorkbenchItems,
+  getPresentedAuxiliaryWorkbenchItemIds,
+} from "./workbench/auxiliary-workbench";
+export type {
+  AuxiliaryWorkbenchAction,
+  AuxiliaryWorkbenchGroup,
+  AuxiliaryWorkbenchItem,
+  AuxiliaryWorkbenchLayoutLeaf,
+  AuxiliaryWorkbenchLayoutNode,
+  AuxiliaryWorkbenchLayoutSplit,
+  AuxiliaryWorkbenchState,
+} from "./workbench/auxiliary-workbench";
+export {
   EMPTY_EDITOR_GROUP,
   activateEditor,
   closeEditor,

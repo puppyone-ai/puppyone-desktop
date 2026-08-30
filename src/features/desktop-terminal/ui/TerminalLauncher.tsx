@@ -1,4 +1,4 @@
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, MessageSquare, RefreshCw } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
 import type {
   AvailableTerminalAgentId,
@@ -19,7 +19,9 @@ type TerminalLauncherProps = {
   availableAgentIds: readonly AvailableTerminalAgentId[];
   launchError?: string | null;
   launching?: boolean;
+  terminalEnabled?: boolean;
   titleId?: string;
+  onCreateChat?: () => void;
   onLaunch: (launcherId: DesktopTerminalLauncherId) => void;
   onRefresh: () => void;
 };
@@ -30,7 +32,9 @@ export function TerminalLauncher({
   launchError = null,
   launching = false,
   onLaunch,
+  onCreateChat,
   onRefresh,
+  terminalEnabled = true,
   titleId = "desktop-terminal-launcher-title",
 }: TerminalLauncherProps) {
   const { t } = useLocalization();
@@ -55,7 +59,7 @@ export function TerminalLauncher({
       aria-labelledby={titleId}
     >
       <div className="desktop-terminal-launcher-content">
-        <div
+        {terminalEnabled && <div
           className="desktop-terminal-launcher-group is-agents"
           data-discovery-phase={discoveryPhase}
         >
@@ -124,9 +128,28 @@ export function TerminalLauncher({
               <span>{t(availabilityMessage)}</span>
             </div>
           )}
-        </div>
+        </div>}
 
-        {shell && (
+        {onCreateChat && (
+          <div className="desktop-terminal-launcher-group is-chat">
+            <header className="desktop-terminal-launcher-heading">
+              <h2 id={terminalEnabled ? undefined : titleId}>
+                <span>{t("agent.panel.chat", { agent: t("agent.name") })}</span>
+              </h2>
+            </header>
+            <button
+              type="button"
+              className="desktop-terminal-launcher-shell desktop-terminal-launcher-chat"
+              onClick={onCreateChat}
+              disabled={launching}
+            >
+              <MessageSquare size={15} strokeWidth={1.8} aria-hidden="true" />
+              <span>{t("agent.header.newChat")}</span>
+            </button>
+          </div>
+        )}
+
+        {terminalEnabled && shell && (
           <div className="desktop-terminal-launcher-group is-shell">
             <header className="desktop-terminal-launcher-heading">
               <h2 id="desktop-terminal-launcher-shell-title">

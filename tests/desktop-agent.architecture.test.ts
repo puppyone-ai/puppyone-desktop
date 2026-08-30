@@ -5,6 +5,9 @@ describe("Desktop Agent architecture boundaries", () => {
   it("keeps RightAgentPanel as composition and the controller framework independent", () => {
     const panel = source("src/features/desktop-agent/ui/RightAgentPanel.tsx");
     const tabPanel = source("src/features/desktop-agent/ui/AgentChatTabPanel.tsx");
+    const workbenchItem = source(
+      "src/features/desktop-agent/workbench/AgentChatWorkbenchItem.tsx",
+    );
     const layout = source("src/features/desktop-agent/ui/AgentPanelLayout.tsx");
     const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
     const preparer = source("src/features/desktop-agent/application/AgentSessionPreparer.ts");
@@ -13,6 +16,11 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(panel).toContain("<AgentSessionTabs");
     expect(panel).toContain("<AgentChatTabPanel");
     expect(tabPanel).toContain("<AgentPanelLayout");
+    expect(tabPanel).toContain("const presented = presentedProp ?? active");
+    expect(tabPanel).toContain("const commandTarget = commandTargetProp ?? active");
+    expect(tabPanel).toContain("active: commandTarget, controller");
+    expect(workbenchItem).toContain("commandTarget={presentation.commandTarget}");
+    expect(workbenchItem).toContain("presented={presentation.presented}");
     expect(layout).toContain('className="desktop-agent-boundary"');
     expect(layout).toContain('className="desktop-agent-panel"');
     expect(layout).toContain('className="desktop-agent-conversation-region"');
@@ -89,9 +97,14 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(benchmark).toContain("64 KiB command output and 240-line diff");
     expect(benchmark).toContain("500-model searchable picker");
     expect(benchmark).toContain("2,000-row transcript with bounded DOM");
-    expect(app).toContain('import { isDesktopAgentChatEnabled, loadRightAgentPanel } from "./features/desktop-agent/lazy"');
-    expect(app).toContain("lazy(loadRightAgentPanel)");
-    expect(source("src/features/desktop-agent/lazy.ts")).toContain('import("./ui/RightAgentPanel")');
+    expect(app).toContain("loadAgentChatWorkbenchItem");
+    expect(app).toContain("lazy(loadAgentChatWorkbenchItem)");
+    expect(source("src/features/desktop-agent/lazy.ts")).toContain(
+      'import("./workbench/AgentChatWorkbenchItem")',
+    );
+    expect(source("src/features/desktop-agent/workbench/AgentChatWorkbenchItem.tsx"))
+      .toContain("<AgentChatTabPanel");
+    expect(app).toContain("contributions={auxiliaryWorkbenchContributions}");
     expect(app).not.toContain('RightAgentPanel } from "./features/desktop-agent"');
   });
 

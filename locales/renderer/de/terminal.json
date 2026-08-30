@@ -3,6 +3,8 @@
   "actions": "Terminalaktionen",
   "new": "Neues Terminal",
   "empty": "Keine geöffneten Terminals",
+  "workbench.itemLoadFailed": "{item} konnte nicht geöffnet werden. Versuche es erneut.",
+  "workbench.dismissError": "Fehler ausblenden",
   "tabs.more": "Weitere Terminal-Tabs ({count})",
   "launcher.kicker": "Terminal-Arbeitsbereich",
   "launcher.title": "Agent starten",
