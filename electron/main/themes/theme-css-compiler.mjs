@@ -180,8 +180,8 @@ export async function compileThemeCss({
     depth: 0,
   });
   root.walkAtRules("charset", (rule) => rule.remove());
-  validateModeContract(root, supportedModes);
   validateAtRules(root);
+  validateModeContract(root, supportedModes);
   scopeRules(root, { themeId, target });
   await rewriteAssetUrls(root, resolveAssetUrl);
   validateDeclarations(root, { target });
@@ -203,12 +203,36 @@ function validateModeContract(root, supportedModes) {
       throw new TypeError("Sub Themes must use their declared light/dark variants, not prefers-color-scheme.");
     }
   });
-  if (!modes || modes.has("dark")) return;
+  if (!modes) return;
+  const containsDarkSelector = [...collectRules(root)].some((rule) => (
+    rule.selector.split(",").some((selector) => hasDarkSelector(selector))
+  ));
+  const containsDeclarations = [...collectDeclarations(root)].length > 0;
+  if (modes.has("light") && modes.has("dark") && containsDeclarations && !containsDarkSelector) {
+    throw new TypeError("A dual-mode Sub Theme target must declare explicit dark root tokens.");
+  }
+  if (modes.has("dark")) return;
   root.walkRules((rule) => {
-    if (rule.selector.split(",").some((selector) => /(?:^|[^a-z0-9_-])\.dark(?:[^a-z0-9_-]|$)/i.test(selector))) {
+    if (rule.selector.split(",").some((selector) => hasDarkSelector(selector))) {
       throw new TypeError("A light-only Sub Theme cannot declare dark selectors.");
     }
   });
+}
+
+function collectRules(root) {
+  const rules = [];
+  root.walkRules((rule) => rules.push(rule));
+  return rules;
+}
+
+function collectDeclarations(root) {
+  const declarations = [];
+  root.walkDecls((declaration) => declarations.push(declaration));
+  return declarations;
+}
+
+function hasDarkSelector(selector) {
+  return /(?:^|[^a-z0-9_-])\.dark(?:[^a-z0-9_-]|$)/i.test(selector);
 }
 
 async function parseAndInlineImports(css, { sourcePath, loadImport, ancestry, depth }) {
