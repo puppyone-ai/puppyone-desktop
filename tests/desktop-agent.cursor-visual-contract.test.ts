@@ -39,7 +39,8 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/--agent-radius-message:\s*var\(--agent-radius-composer\)/);
     expect(css).toMatch(/\.desktop-agent-transcript\s*\{[^}]*padding:\s*12px var\(--agent-inline-inset\) 24px/s);
     expect(css).toMatch(/\.desktop-agent-live-tail\s*\{[^}]*gap:\s*var\(--agent-message-turn-gap\)[^}]*padding:\s*0 0 20px/s);
-    expect(css).toMatch(/\.desktop-agent-message\.is-user\s*\{[^}]*box-sizing:\s*border-box[^}]*width:\s*100%[^}]*max-width:\s*none[^}]*margin:\s*0[^}]*padding:\s*8px var\(--agent-message-content-inset\)[^}]*border:\s*0[^}]*background:\s*var\(--agent-composer-surface\)[^}]*box-shadow:\s*none/s);
+    expect(css).toMatch(/--agent-user-message-surface:\s*color-mix\(in srgb, var\(--agent-composer-surface\) 48%, var\(--agent-canvas\)\)/);
+    expect(css).toMatch(/\.desktop-agent-message\.is-user\s*\{[^}]*box-sizing:\s*border-box[^}]*width:\s*100%[^}]*max-width:\s*none[^}]*margin:\s*0[^}]*padding:\s*8px var\(--agent-message-content-inset\)[^}]*border:\s*0[^}]*background:\s*var\(--agent-user-message-surface\)[^}]*box-shadow:\s*none/s);
     expect(css).toMatch(/\.desktop-agent-virtual-row\s*\{[^}]*padding-bottom:\s*2px/s);
     expect(css).toMatch(/\.desktop-agent-virtual-row\[data-kind="user"\]\s*\{[^}]*padding-bottom:\s*var\(--agent-message-turn-gap\)/s);
     expect(css).toMatch(/\.desktop-agent-virtual-row\[data-kind="assistant"\]\s*\{[^}]*padding:\s*2px 0 var\(--agent-work-handoff-gap\)/s);
