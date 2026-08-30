@@ -16,6 +16,7 @@ const interfaceSkinContractStyles = read("src/styles/interface-skin-contract.css
 const windowChromeOwner = path.join(repoRoot, "src", "styles", "window-chrome.css");
 const sharedUiRoot = path.join(repoRoot, "packages", "shared-ui", "src");
 const interfaceStyleRoot = path.join(repoRoot, "src", "styles", "interfaces");
+const builtinSubThemeRoot = path.join(repoRoot, "sub-themes");
 const viewerSurfaceTokenContract = JSON.parse(read("src/styles/viewer-surface-token-contract.json"));
 const concreteStylePattern = /\bwindows-xp\b/;
 const editorInternalSelectorPattern = /\.(?:cm-|markdown-codemirror-editor\b|csv-table-editor\b|desktop-terminal-xterm\b|puppyflow-[a-z0-9-]+\b|editor-mode-toggle\b|plain-text-editor\b|code-codemirror-editor\b)/;
@@ -143,13 +144,19 @@ for (const filePath of walkRendererSource(sharedUiRoot)) {
   }
 }
 
-for (const relativePath of ["src/styles/github.css", "src/styles/newspaper.css"]) {
-  const source = read(relativePath);
+for (const filePath of readdirSync(builtinSubThemeRoot, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => path.join(builtinSubThemeRoot, entry.name, "theme.css"))) {
+  const relativePath = path.relative(repoRoot, filePath);
+  const source = readAbsolute(filePath);
   if (editorInternalSelectorPattern.test(source)) {
     errors.push(`${relativePath} targets Editor internals; built-in Sub Themes must use the public token contract.`);
   }
-  if (!source.includes("[data-po-appearance-root][data-sub-theme-id=")) {
-    errors.push(`${relativePath} does not scope itself to the Desktop Sub Theme boundary.`);
+  if (!source.includes("@puppyone-theme") || !source.includes("@puppyone ")) {
+    errors.push(`${relativePath} is not a self-describing single-file Sub Theme package.`);
+  }
+  if (/--po-host-(?:md|csv)-/.test(source)) {
+    errors.push(`${relativePath} authors private host tokens; use the public Sub Theme token contract.`);
   }
 }
 

@@ -15,6 +15,7 @@ import {
 
 type InterfacePaletteSettingsProps = {
   interfaceStyle: InterfaceStyle;
+  subThemeId: string;
   decision: AppearanceSettingDecision<ThemeMode>;
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
@@ -29,6 +30,7 @@ const THEME_MODE_OPTIONS = {
 
 export function InterfacePaletteSettings({
   interfaceStyle,
+  subThemeId,
   decision,
   lightThemePreset,
   darkThemePreset,
@@ -61,6 +63,7 @@ export function InterfacePaletteSettings({
               >
                 <ThemePreview
                   mode={mode}
+                  subThemeId={subThemeId}
                   lightThemePreset={lightThemePreset}
                   darkThemePreset={darkThemePreset}
                 />

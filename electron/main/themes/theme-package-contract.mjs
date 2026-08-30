@@ -3,19 +3,23 @@ const THEME_COLOR_MODES = Object.freeze(["light", "dark"]);
 const targetSet = new Set(THEME_TARGETS);
 const colorModeSet = new Set(THEME_COLOR_MODES);
 const themeIdPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$/;
+const reservedBuiltinThemeIdPattern = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/;
 const rootThemeIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const entrypointPattern = /^[A-Za-z0-9][A-Za-z0-9._-]*\.css$/;
 
 export { THEME_COLOR_MODES, THEME_TARGETS };
 
-export function parseThemeManifest(value) {
+export function parseThemeManifest(value, { allowReservedBuiltinId = false } = {}) {
   if (!isRecord(value)) throw new TypeError("Theme manifest must be an object.");
   if (value.schemaVersion !== 1) {
     throw new TypeError("Unsupported theme schema version; expected version 1.");
   }
 
   const id = requireString(value.id, "Theme id is required.");
-  if (!themeIdPattern.test(id)) {
+  if (
+    !themeIdPattern.test(id)
+    && !(allowReservedBuiltinId && reservedBuiltinThemeIdPattern.test(id))
+  ) {
     throw new TypeError("Theme id must be a reverse-domain identifier using lowercase letters, digits, dots, and hyphens.");
   }
 

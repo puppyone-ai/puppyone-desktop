@@ -4,6 +4,7 @@ import { THEME_TARGETS } from "./theme-package-contract.mjs";
 
 const targetSet = new Set(THEME_TARGETS);
 const themeIdPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$/;
+const reservedBuiltinThemeIdPattern = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/;
 const allowedContainerAtRules = new Set(["media", "supports"]);
 const allowedDataUrlPattern = /^data:(?:image\/(?:png|jpeg|gif|webp|svg\+xml)|font\/(?:woff2?|ttf|otf));/i;
 const rootAliases = [".theme-root", ":root", "html", "body", "#write"];
@@ -54,6 +55,52 @@ const applicationColorTokens = new Set([
   "--po-backdrop",
   "--po-backdrop-strong",
   "--po-shadow",
+  "--po-text-fill-hover",
+  "--po-skeleton-base",
+  "--po-skeleton-shimmer",
+  "--po-skeleton-edge",
+  "--po-switch-border-on",
+  "--po-switch-border-off",
+  "--po-switch-thumb",
+  "--po-switch-thumb-shadow",
+  "--po-access-active-bg",
+  "--po-access-active-hover",
+  "--po-access-active-border",
+  "--po-access-active-text",
+  "--po-purple",
+  "--po-project-card-tab",
+  "--po-project-card-hover-bg",
+  "--po-filetree-rail",
+  "--po-tree-guide",
+  "--po-file-icon-body",
+  "--po-file-icon-fold",
+  "--po-file-icon-stroke",
+  "--po-file-icon-shadow",
+  "--po-file-accent-default",
+  "--po-file-accent-markdown",
+  "--po-file-accent-json",
+  "--po-file-accent-html",
+  "--po-file-accent-pdf",
+  "--po-file-accent-image",
+  "--po-file-accent-audio",
+  "--po-file-accent-video",
+  "--po-file-accent-code",
+  "--po-file-accent-word",
+  "--po-file-accent-sheet",
+  "--po-file-accent-presentation",
+  "--po-diff-added-bg",
+  "--po-diff-added-text",
+  "--po-diff-removed-bg",
+  "--po-diff-removed-text",
+  "--po-editor-line",
+  "--po-json-key",
+  "--po-json-string",
+  "--po-json-number",
+  "--po-json-boolean",
+  "--po-json-null",
+  "--po-json-icon",
+  "--po-scrollbar-thumb",
+  "--po-scrollbar-thumb-hover",
 ]);
 const markdownTokenMap = new Map([
   ["--po-md-surface-background", "--po-host-md-surface-background"],
@@ -114,9 +161,15 @@ export async function compileThemeCss({
   sourcePath = "theme.css",
   loadImport,
   resolveAssetUrl,
+  allowReservedBuiltinId = false,
 }) {
   if (typeof css !== "string") throw new TypeError("Theme CSS must be a string.");
-  if (!themeIdPattern.test(themeId)) throw new TypeError("Theme id is invalid.");
+  if (
+    !themeIdPattern.test(themeId)
+    && !(allowReservedBuiltinId && reservedBuiltinThemeIdPattern.test(themeId))
+  ) {
+    throw new TypeError("Theme id is invalid.");
+  }
   if (!targetSet.has(target)) throw new TypeError(`Unsupported theme target: ${String(target)}.`);
 
   const root = await parseAndInlineImports(css, {

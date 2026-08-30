@@ -3,14 +3,7 @@
 import { act } from "react";
 import { readFileSync } from "node:fs";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("../src/styles/github.css?raw", () => ({
-  default: '[data-po-appearance-root][data-sub-theme-id="default.github"] { --po-host-md-content-color: #24292f; }',
-}));
-vi.mock("../src/styles/newspaper.css?raw", () => ({
-  default: '[data-po-appearance-root][data-sub-theme-id="default.newspaper"] { --po-host-md-content-color: #342f29; }',
-}));
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { SubThemeStyleHost } from "../src/features/themes/SubThemeStyleHost";
 import {
@@ -52,13 +45,26 @@ describe("renderer Sub Theme style host", () => {
     ]);
   });
 
-  it("keeps built-in Sub Theme CSS at the public host-token boundary", () => {
-    for (const relativePath of ["src/styles/github.css", "src/styles/newspaper.css"]) {
+  it("authors built-ins as self-describing public-token packages and compiles the host boundary", () => {
+    for (const relativePath of [
+      "sub-themes/default-neutral/theme.css",
+      "sub-themes/default-warm/theme.css",
+      "sub-themes/default-graphite/theme.css",
+      "sub-themes/default-github/theme.css",
+      "sub-themes/default-newspaper/theme.css",
+      "sub-themes/windows-xp-luna-blue/theme.css",
+    ]) {
       const css = readFileSync(`${process.cwd()}/${relativePath}`, "utf8");
-      expect(css).toContain("[data-po-appearance-root][data-sub-theme-id=");
-      expect(css).toMatch(/--po-host-(?:md|csv)-/);
+      expect(css).toContain("@puppyone-theme");
+      expect(css).not.toMatch(/--po-host-(?:md|csv)-/);
       expect(css).not.toMatch(/\.cm-|\.markdown-codemirror-editor|\.csv-table-editor/);
     }
+    const github = BUILTIN_SUB_THEMES.find(({ id }) => id === "default.github");
+    expect(github?.compiledCss.application).toContain(
+      '[data-po-appearance-root][data-sub-theme-id="default.github"]',
+    );
+    expect(github?.compiledCss.markdown).toContain("--po-host-md-content-color");
+    expect(github?.compiledCss.csv).toContain("--po-host-csv-surface-background");
   });
 
   it("injects selected CSS inside the sub-theme cascade layer", () => {

@@ -281,6 +281,7 @@ export function SettingsView({
               />
               <InterfacePaletteSettings
                 interfaceStyle={interfaceStyle}
+                subThemeId={resolvedAppearance.subThemeId}
                 decision={resolvedAppearance.decisions.themeMode}
                 lightThemePreset={lightThemePreset}
                 darkThemePreset={darkThemePreset}

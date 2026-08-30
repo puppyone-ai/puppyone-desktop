@@ -51,30 +51,43 @@ describe("appearance surface boundary", () => {
   it("loads built-in Sub Theme CSS through the runtime host without private editor selectors", () => {
     const styles = source("src/styles.css");
     const registry = source("src/features/themes/builtinSubThemes.ts");
-    const themeFiles = ["github", "newspaper"].map((name) => `src/styles/${name}.css`);
+    const generated = source("src/features/themes/builtinSubThemes.generated.ts");
+    const themeFiles = [
+      "default-neutral",
+      "default-warm",
+      "default-graphite",
+      "default-github",
+      "default-newspaper",
+      "windows-xp-luna-blue",
+    ].map((name) => `sub-themes/${name}/theme.css`);
 
     expect(themeFiles.map((path) => existsSync(new URL(`../${path}`, import.meta.url))))
-      .toEqual([true, true]);
+      .toEqual([true, true, true, true, true, true]);
     expect(existsSync(new URL("../src/styles/default.css", import.meta.url))).toBe(false);
-    for (const name of ["github", "newspaper"]) {
-      expect(styles).not.toContain(`./styles/${name}.css`);
-    }
-    expect(registry).toContain("../../styles/github.css?raw");
-    expect(registry).toContain("../../styles/newspaper.css?raw");
+    expect(existsSync(new URL("../src/styles/github.css", import.meta.url))).toBe(false);
+    expect(existsSync(new URL("../src/styles/newspaper.css", import.meta.url))).toBe(false);
+    expect(styles).not.toContain("github.css");
+    expect(styles).not.toContain("newspaper.css");
+    expect(registry).toContain("./builtinSubThemes.generated");
+    expect(registry).not.toContain("?raw");
 
-    for (const [name, id] of [["github", "default.github"], ["newspaper", "default.newspaper"]]) {
-      const css = source(`src/styles/${name}.css`);
-      expect(css).toContain(`data-sub-theme-id="${id}"`);
-      expect(css).toContain("data-po-appearance-root");
+    for (const path of themeFiles) {
+      const css = source(path);
+      expect(css).toContain("@puppyone-theme");
+      expect(css).toContain("@puppyone ");
       expect(css).not.toMatch(/\.cm-|\.markdown-codemirror-editor|\.csv-table-editor/);
-      expect(css).not.toContain("@puppyone");
+      expect(css).not.toContain("--po-host-");
     }
+    expect(generated).toContain('[data-po-appearance-root][data-sub-theme-id=\\"default.github\\"]');
+    expect(generated).toContain("--po-host-md-content-color");
   });
 
-  it("keeps built-in font assets relative to the packaged renderer document", () => {
-    for (const css of [source("src/styles/github.css"), source("src/styles/newspaper.css")]) {
-      expect(css).not.toContain('url("/fonts/');
-      expect(css).toContain('url("./fonts/');
+  it("keeps product fonts outside the untrusted Sub Theme CSS contract", () => {
+    const foundations = source("src/styles/typography/foundations.css");
+    expect(foundations).toContain('font-family: "PuppyOne Open Sans"');
+    expect(foundations).toContain('font-family: "PuppyOne PT Serif"');
+    for (const name of ["default-github", "default-newspaper"]) {
+      expect(source(`sub-themes/${name}/theme.css`)).not.toContain("@font-face");
     }
   });
 });

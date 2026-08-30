@@ -87,22 +87,22 @@ describe("Interface style registry", () => {
     expect(nativeFirstPaint).toContain('"background": "#161413"');
   });
 
-  it("uses Neutral as the attribute-free CSS fallback and scopes Warm explicitly", () => {
+  it("uses Neutral as the attribute-free fallback and packages Warm independently", () => {
     const tokens = source("src/styles/tokens.css");
+    const warm = source("sub-themes/default-warm/theme.css");
     const rootBlock = tokens.match(/^:root \{([\s\S]*?)^\}/m)?.[1] ?? "";
 
     expect(rootBlock).toContain("--po-surface-panel: #fafafa");
     expect(rootBlock).not.toContain("--po-surface-panel: #fbf6ed");
     expect(tokens).toContain("--po-header: #ebebeb;");
     expect(tokens).toContain("--po-sidebar: #ebebeb;");
-    expect(tokens).toContain("--po-surface-panel: #fbfaf7;");
-    expect(tokens).toContain("--po-header: #f1eee8;");
-    expect(tokens).toContain("--po-sidebar: #f1eee8;");
+    expect(warm).toContain("--po-surface-panel: #fbfaf7;");
+    expect(warm).toContain("--po-header: #f1eee8;");
+    expect(warm).toContain("--po-sidebar: #f1eee8;");
     expect(tokens).not.toContain("#f1eadf");
     expect(tokens).not.toContain("#fbf6ed");
-    expect(tokens).toContain(
-      ':where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface)[data-light-theme-preset="warm"]:not(.dark)',
-    );
+    expect(tokens).not.toContain("data-light-theme-preset=");
+    expect(warm).toContain("@puppyone application");
   });
 
   it("paints the persisted editor palette before React instead of flashing the warm fallback", () => {

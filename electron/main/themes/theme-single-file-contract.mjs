@@ -9,9 +9,18 @@ const metadataProperties = new Set([
   "modes",
   "compatible-root-themes",
 ]);
+const builtinCompatibilityMetadataProperties = new Set([
+  "builtin-order",
+  "legacy-light-preset",
+  "legacy-dark-preset",
+]);
 const targetSet = new Set(THEME_TARGETS);
 
-export function parseSingleFileThemeCss(css, { sourcePath = "theme.css" } = {}) {
+export function parseSingleFileThemeCss(css, {
+  sourcePath = "theme.css",
+  allowReservedBuiltinId = false,
+  allowBuiltinCompatibilityMetadata = false,
+} = {}) {
   if (typeof css !== "string") throw new TypeError("Theme CSS must be a string.");
 
   let root;
@@ -59,7 +68,9 @@ export function parseSingleFileThemeCss(css, { sourcePath = "theme.css" } = {}) 
     }
   });
 
-  const rawMetadata = parseMetadataDeclarations(metadataRule);
+  const rawMetadata = parseMetadataDeclarations(metadataRule, {
+    allowBuiltinCompatibilityMetadata,
+  });
   const targets = THEME_TARGETS.filter((target) => targetRules.has(target));
   if (targets.length === 0) {
     throw new TypeError("A single-file theme must declare at least one target.");
@@ -73,7 +84,13 @@ export function parseSingleFileThemeCss(css, { sourcePath = "theme.css" } = {}) 
       .filter(Boolean),
     targets,
     entrypoints: Object.fromEntries(targets.map((target) => [target, `${target}.css`])),
-  });
+  }, { allowReservedBuiltinId });
+  const legacyPresets = allowBuiltinCompatibilityMetadata
+    ? parseBuiltinLegacyPresets(rawMetadata)
+    : undefined;
+  const builtinOrder = allowBuiltinCompatibilityMetadata
+    ? parseBuiltinOrder(rawMetadata["builtin-order"])
+    : undefined;
 
   const stylesheets = Object.freeze(Object.fromEntries(targets.map((target) => {
     const nodes = targetRules.get(target).nodes.map((node) => node.clone());
@@ -90,10 +107,12 @@ export function parseSingleFileThemeCss(css, { sourcePath = "theme.css" } = {}) 
     modes: manifest.modes,
     targets: manifest.targets,
     stylesheets,
+    ...(legacyPresets === undefined ? {} : { legacyPresets }),
+    ...(builtinOrder === undefined ? {} : { builtinOrder }),
   });
 }
 
-function parseMetadataDeclarations(rule) {
+function parseMetadataDeclarations(rule, { allowBuiltinCompatibilityMetadata }) {
   const metadata = {};
   for (const node of rule.nodes) {
     if (node.type === "comment") continue;
@@ -101,7 +120,10 @@ function parseMetadataDeclarations(rule) {
       throw new TypeError("@puppyone-theme may contain metadata declarations only.");
     }
     const property = node.prop.trim().toLowerCase();
-    if (!metadataProperties.has(property)) {
+    if (
+      !metadataProperties.has(property)
+      && !(allowBuiltinCompatibilityMetadata && builtinCompatibilityMetadataProperties.has(property))
+    ) {
       throw new TypeError(`Unsupported theme metadata property: ${property}.`);
     }
     if (Object.hasOwn(metadata, property)) {
@@ -110,6 +132,34 @@ function parseMetadataDeclarations(rule) {
     metadata[property] = node.value.trim();
   }
   return metadata;
+}
+
+function parseBuiltinLegacyPresets(metadata) {
+  const light = metadata["legacy-light-preset"];
+  const dark = metadata["legacy-dark-preset"];
+  if (light !== undefined && !["neutral", "warm", "graphite"].includes(light)) {
+    throw new TypeError(`Unsupported built-in legacy light preset: ${light}.`);
+  }
+  if (dark !== undefined && !["default", "warm", "graphite"].includes(dark)) {
+    throw new TypeError(`Unsupported built-in legacy dark preset: ${dark}.`);
+  }
+  if (light === undefined && dark === undefined) return undefined;
+  return Object.freeze({
+    ...(light === undefined ? {} : { light }),
+    ...(dark === undefined ? {} : { dark }),
+  });
+}
+
+function parseBuiltinOrder(value) {
+  if (value === undefined) return undefined;
+  if (!/^\d+$/.test(value)) {
+    throw new TypeError("Built-in Sub Theme order must be a non-negative integer.");
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(parsed) || parsed > 10_000) {
+    throw new TypeError("Built-in Sub Theme order is outside the supported range.");
+  }
+  return parsed;
 }
 
 function formatError(error) {
