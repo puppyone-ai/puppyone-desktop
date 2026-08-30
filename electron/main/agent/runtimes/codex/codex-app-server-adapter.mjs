@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { buildCodexTurnInput } from "./codex-reference-input.mjs";
+import {
+  buildCodexTurnInput,
+  CODEX_NATIVE_IMAGE_MIME_TYPES,
+} from "./codex-reference-input.mjs";
 import { JsonlRpcConnection } from "../../transports/jsonl-rpc-connection.mjs";
 import { boundRendererValue, redactSecrets, redactSecretText } from "../../agent-events.mjs";
 import { AgentProviderSessionUnavailableError } from "../../runtime/agent-runtime-port.mjs";
@@ -41,7 +44,7 @@ export const CODEX_CAPABILITIES = Object.freeze({
     workspaceDirectories: true,
     images: "local-snapshot",
     genericFiles: "none",
-    acceptedMimeTypes: Object.freeze(["image/png", "image/jpeg", "image/gif", "image/webp"]),
+    acceptedMimeTypes: CODEX_NATIVE_IMAGE_MIME_TYPES,
     maxReferences: 32,
     maxReferenceBytes: 25 * 1024 * 1024,
     maxTotalReferenceBytes: 25 * 1024 * 1024,
@@ -251,9 +254,11 @@ export class CodexAppServerAdapter {
     if (!this.threadId) throw new Error("No Codex thread is active.");
     const clientUserMessageId = randomUUID();
     const effort = compatibleReasoningEffort(this.modelProfiles.get(model), requestedEffort);
-    const input = buildCodexTurnInput(prompt, references.length > 0
-      ? references
-      : [...contextReferences, ...attachments]);
+    const input = buildCodexTurnInput(
+      prompt,
+      references.length > 0 ? references : [...contextReferences, ...attachments],
+      this.workspaceRoot,
+    );
     const result = await this.connection.request("turn/start", {
       threadId: this.threadId,
       clientUserMessageId,

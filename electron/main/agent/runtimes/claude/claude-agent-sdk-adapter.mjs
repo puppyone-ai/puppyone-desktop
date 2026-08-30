@@ -14,6 +14,7 @@ import { CLAUDE_RUNTIME_DESCRIPTOR } from "./claude-identity.mjs";
 import { ClaudeMessageChannel, createClaudeUserMessage } from "./claude-message-channel.mjs";
 import { createClaudeSpawn } from "./claude-spawn.mjs";
 import { AgentProviderSessionUnavailableError } from "../../runtime/agent-runtime-port.mjs";
+import { formatAuthorizedWorkspaceReferencePrompt } from "../../security/authorized-workspace-reference-prompt.mjs";
 
 const INSPECTION_TIMEOUT_MS = 30_000;
 const CLAUDE_PROJECT_INSTRUCTION_NAMES = Object.freeze(["CLAUDE.md", "AGENTS.md", "CONTEXT.md"]);
@@ -656,12 +657,7 @@ function questionAnswerMap(questions, answers) {
 }
 
 export function formatClaudePrompt(prompt, references, workspaceRoot) {
-  const paths = Array.from(new Set(references
-    .map((entry) => typeof entry?.path === "string" ? path.resolve(entry.path) : null)
-    .filter((filename) => filename && isInsideWorkspace(workspaceRoot, filename))));
-  return paths.length
-    ? `${prompt}\n\nAuthorized context files for this turn:\n${paths.map((filename) => `- ${filename}`).join("\n")}`
-    : prompt;
+  return formatAuthorizedWorkspaceReferencePrompt(prompt, references, workspaceRoot);
 }
 
 function projectInstructionIdentity(value) {

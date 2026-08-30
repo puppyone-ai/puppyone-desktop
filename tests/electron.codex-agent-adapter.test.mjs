@@ -52,22 +52,87 @@ describe("Codex app-server normalization", () => {
     adapter.dispose();
   });
 
-  it("maps workspace mentions and staged images to the exact app-server UserInput schema", () => {
-    expect(buildCodexTurnInput("Inspect", [
+  it("renders ordinary workspace references as text and sends only native images as media input", () => {
+    const input = buildCodexTurnInput("Inspect", [
       { id: "workspace-a", kind: "workspace-entry", entryType: "file", path: "/workspace/a.md", displayName: "a.md" },
+      { id: "workspace-image", kind: "workspace-entry", entryType: "file", path: "/workspace/diagram.png", displayName: "diagram.png", mime: "image/png" },
       { id: "image-b", kind: "staged-attachment", path: "/private/staging/b.snapshot", displayName: "b.png", mime: "image/png" },
-    ])).toEqual([
-      { type: "text", text: "Inspect", text_elements: [] },
-      { type: "mention", name: "a.md", path: "/workspace/a.md" },
+      { id: "workspace-pdf", kind: "workspace-entry", entryType: "file", path: "/workspace/report.pdf", displayName: "report.pdf", mime: "application/pdf" },
+      { id: "workspace-a-duplicate", kind: "workspace-entry", entryType: "file", path: "/workspace/a.md", displayName: "a.md" },
+    ], "/workspace");
+    expect(input).toEqual([
+      {
+        type: "text",
+        text: [
+          "Inspect",
+          "",
+          "Authorized context files for this turn:",
+          "- /workspace/a.md",
+          "- /workspace/report.pdf",
+        ].join("\n"),
+        text_elements: [],
+      },
+      { type: "localImage", path: "/workspace/diagram.png" },
       { type: "localImage", path: "/private/staging/b.snapshot" },
     ]);
+    expect(JSON.stringify(input)).not.toContain('"type":"mention"');
     expect(() => buildCodexTurnInput("Inspect", [{
       kind: "staged-attachment",
       path: "/private/staging/report.pdf",
       mime: "application/pdf",
-    }])).toThrow(/does not support/i);
+    }], "/workspace")).toThrow(/does not support/i);
+    expect(() => buildCodexTurnInput("Inspect", [{
+      kind: "workspace-entry",
+      path: "/workspace/a.md",
+    }])).toThrow(/workspace root/i);
+    expect(() => buildCodexTurnInput("Inspect", [{
+      kind: "workspace-entry",
+      path: "/outside/a.md",
+      mime: "image/png",
+    }], "/workspace")).toThrow(/outside.*workspace root/i);
     expect(() => buildCodexTurnInput("Inspect", [{ kind: "workspace-entry" }]))
       .toThrow(/invalid reference/i);
+  });
+
+  it("delivers the minimal reference contract in the native turn/start request", async () => {
+    const connection = new FakeConnection();
+    connection.results.set("thread/start", {
+      thread: { id: "thread-1", preview: "Session", createdAt: 1, updatedAt: 1 },
+    });
+    connection.results.set("turn/start", { turn: { id: "turn-1" } });
+    const adapter = new CodexAppServerAdapter({
+      executablePath: "/usr/local/bin/codex",
+      environment: {},
+      workspaceRoot: "/workspace",
+      appVersion: "test",
+      connectionFactory: () => connection,
+    });
+
+    await adapter.createSession();
+    await adapter.startTurn({
+      prompt: "Review these",
+      references: [
+        { kind: "workspace-entry", entryType: "file", path: "/workspace/notes.md", mime: "text/markdown" },
+        { kind: "workspace-entry", entryType: "directory", path: "/workspace/src" },
+        { kind: "staged-attachment", path: "/private/staging/screenshot.webp", mime: "image/webp" },
+      ],
+    });
+
+    expect(connection.requests.find((request) => request.method === "turn/start")?.params.input).toEqual([
+      {
+        type: "text",
+        text: [
+          "Review these",
+          "",
+          "Authorized context files for this turn:",
+          "- /workspace/notes.md",
+          "- /workspace/src",
+        ].join("\n"),
+        text_elements: [],
+      },
+      { type: "localImage", path: "/private/staging/screenshot.webp" },
+    ]);
+    adapter.dispose();
   });
 
   it("keeps the tested Codex 0.144.1 generated-schema fixture compatible", () => {
