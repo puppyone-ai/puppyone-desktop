@@ -90,9 +90,9 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/--agent-row-hover-surface:\s*color-mix\(in srgb, var\(--po-hover\) 86%, transparent\)/);
     expect(css).toMatch(/--agent-row-selected-surface:\s*linear-gradient\(\s*90deg,\s*color-mix\(in srgb, var\(--po-selected\) 96%, transparent\) 0%,\s*color-mix\(in srgb, var\(--po-selected\) 88%, transparent\) calc\(100% - 36px\),\s*color-mix\(in srgb, var\(--po-selected\) 62%, transparent\) 100%\s*\)/s);
     expect(css).toMatch(/\.dark \.desktop-agent-boundary,[^{]*\{[^}]*--agent-row-hover-surface:\s*color-mix\(in srgb, rgba\(211, 208, 197, 0\.075\) 86%, transparent\)[^}]*--agent-row-selected-surface:\s*linear-gradient/s);
-    expect(css).toMatch(/\.desktop-agent-composer\s*\{[^}]*padding:\s*0[^}]*border:\s*1px solid transparent[^}]*border-radius:\s*var\(--agent-radius-composer\)[^}]*background:\s*var\(--agent-composer-surface\)[^}]*cursor:\s*text/s);
+    expect(css).toMatch(/\.desktop-agent-composer\s*\{[^}]*padding:\s*0[^}]*border:\s*1px solid var\(--agent-border-subtle\)[^}]*border-radius:\s*var\(--agent-radius-composer\)[^}]*background:\s*var\(--agent-composer-surface\)[^}]*cursor:\s*text/s);
     expect(css).toMatch(/\.desktop-agent-composer\[data-input-disabled="true"\]\s*\{[^}]*cursor:\s*default/s);
-    expect(css).toMatch(/\.desktop-agent-composer:hover:not\(\[data-input-disabled="true"\]\)\s*\{[^}]*border-color:\s*var\(--agent-border-subtle\)[^}]*background:\s*var\(--agent-composer-surface\)/s);
+    expect(css).toMatch(/\.desktop-agent-composer:hover:not\(\[data-input-disabled="true"\]\)\s*\{[^}]*border-color:\s*var\(--agent-border\)[^}]*background:\s*var\(--agent-composer-surface\)/s);
     expect(css).toMatch(/\.desktop-agent-composer:focus-within\s*\{[^}]*border-color:\s*var\(--agent-border\)[^}]*background:\s*var\(--agent-composer-surface\)/s);
     expect(css).not.toMatch(/\.desktop-agent-composer:(?:hover|focus-within)[^{]*\{[^}]*background:\s*var\(--agent-row-selected-surface\)/s);
     expect(css).toMatch(/\.desktop-agent-picker-option\.is-selected\s*\{[^}]*background:\s*var\(--agent-row-hover-surface\)/s);
