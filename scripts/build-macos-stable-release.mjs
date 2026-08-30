@@ -24,7 +24,6 @@ try {
   if (unknownArguments.length > 0) {
     throw new Error(`Unknown stable release arguments: ${unknownArguments.join(", ")}`);
   }
-  assertMacReleaseReadiness({ packageMetadata, env: process.env, platform: process.platform });
   if (!packageOnly) {
     await prepareDesktopBuild({
       repositoryRoot: repoRoot,
@@ -33,6 +32,15 @@ try {
       commitSha: process.env.GITHUB_SHA,
       expectedTag: process.env.PUPPYONE_RELEASE_TAG ?? `v${packageMetadata.version}`,
     });
+  }
+  const builderConfig = JSON.parse(await fs.readFile(builderConfigPath, "utf8"));
+  assertMacReleaseReadiness({
+    packageMetadata,
+    builderConfig,
+    env: process.env,
+    platform: process.platform,
+  });
+  if (!packageOnly) {
     await fs.rm(releaseDirectory, { recursive: true, force: true });
     for (const script of ["prepare:mac:release"]) {
       await runCommand("npm", ["run", script], { cwd: repoRoot });

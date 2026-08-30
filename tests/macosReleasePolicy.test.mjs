@@ -24,46 +24,42 @@ const signingEnvironment = {
   APPLE_API_KEY_ID: "KEY123",
   APPLE_API_ISSUER: "issuer-id",
 };
-const stablePackageMetadata = {
-  ...packageMetadata,
-  build: createDesktopElectronBuilderConfig({
-    packageMetadata,
-    buildInfo: resolveDesktopBuildIdentity({
-      baseVersion: packageMetadata.version,
-      buildNumber: 42,
-      builtAt: "2026-08-29T00:00:00.000Z",
-      channel: "stable",
-      commitSha: "a".repeat(40),
-    }),
-    target: getDesktopTargetDefinition("macos-arm64"),
+const stableBuilderConfig = createDesktopElectronBuilderConfig({
+  packageMetadata,
+  buildInfo: resolveDesktopBuildIdentity({
+    baseVersion: packageMetadata.version,
+    buildNumber: 42,
+    builtAt: "2026-08-29T00:00:00.000Z",
+    channel: "stable",
+    commitSha: "a".repeat(40),
   }),
-};
+  target: getDesktopTargetDefinition("macos-arm64"),
+});
 
 describe("macOS stable release policy", () => {
   it("accepts the production package config with complete signing and notarization credentials", () => {
     expect(inspectMacReleaseReadiness({
-      packageMetadata: stablePackageMetadata,
+      packageMetadata,
+      builderConfig: stableBuilderConfig,
       env: signingEnvironment,
       platform: "darwin",
     })).toEqual([]);
   });
 
   it("rejects internal signing overrides and partial notarization credentials", () => {
-    const unsafePackage = {
-      ...stablePackageMetadata,
-      build: {
-        ...stablePackageMetadata.build,
-        mac: {
-          ...stablePackageMetadata.build.mac,
-          identity: "-",
-          hardenedRuntime: false,
-          notarize: false,
-          strictVerify: false,
-        },
+    const unsafeBuilderConfig = {
+      ...stableBuilderConfig,
+      mac: {
+        ...stableBuilderConfig.mac,
+        identity: "-",
+        hardenedRuntime: false,
+        notarize: false,
+        strictVerify: false,
       },
     };
     const errors = inspectMacReleaseReadiness({
-      packageMetadata: unsafePackage,
+      packageMetadata,
+      builderConfig: unsafeBuilderConfig,
       env: {
         CSC_IDENTITY_AUTO_DISCOVERY: "false",
         APPLE_ID: "release@example.com",
@@ -81,7 +77,8 @@ describe("macOS stable release policy", () => {
 
   it("requires upload credentials and a tag matching the package version", () => {
     const errors = inspectMacReleaseReadiness({
-      packageMetadata: stablePackageMetadata,
+      packageMetadata,
+      builderConfig: stableBuilderConfig,
       env: {
         ...signingEnvironment,
         PUPPYONE_RELEASE_TAG: "v9.9.9",
@@ -100,7 +97,7 @@ describe("macOS stable release policy", () => {
 
   it("uses immutable version and mutable latest R2 prefixes", () => {
     const coordinates = getStableReleaseCoordinates({
-      packageMetadata: stablePackageMetadata,
+      packageMetadata,
       env: {
         CLOUDFLARE_ACCOUNT_ID: "account",
         PUPPYONE_RELEASE_TAG: `v${packageMetadata.version}`,
@@ -113,7 +110,7 @@ describe("macOS stable release policy", () => {
       tag: `v${packageMetadata.version}`,
       versionPrefix: `desktop/stable/mac/v${packageMetadata.version}`,
     });
-    expect(new URL(stablePackageMetadata.build.publish[0].url).pathname).toBe(`/${coordinates.latestPrefix}`);
+    expect(new URL(stableBuilderConfig.publish[0].url).pathname).toBe(`/${coordinates.latestPrefix}`);
   });
 });
 

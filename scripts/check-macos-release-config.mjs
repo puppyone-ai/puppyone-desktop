@@ -32,7 +32,8 @@ const stableMacConfig = createDesktopElectronBuilderConfig({
   target: getDesktopTargetDefinition("macos-arm64"),
 });
 const errors = inspectMacReleaseReadiness({
-  packageMetadata: { ...packageMetadata, build: stableMacConfig },
+  packageMetadata,
+  builderConfig: stableMacConfig,
   platform: "darwin",
   env: {
     CSC_LINK: "configured-by-ci",

@@ -5,15 +5,16 @@ import {
 
 export function inspectMacReleaseReadiness({
   packageMetadata,
+  builderConfig,
   env = process.env,
   platform = process.platform,
   requireUploadCredentials = false,
 }) {
   const errors = [];
-  const mac = packageMetadata?.build?.mac ?? {};
-  const publish = Array.isArray(packageMetadata?.build?.publish)
-    ? packageMetadata.build.publish
-    : [packageMetadata?.build?.publish].filter(Boolean);
+  const mac = builderConfig?.mac ?? {};
+  const publish = Array.isArray(builderConfig?.publish)
+    ? builderConfig.publish
+    : [builderConfig?.publish].filter(Boolean);
   const version = packageMetadata?.version;
 
   if (platform !== "darwin") {
