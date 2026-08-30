@@ -151,12 +151,15 @@ describe("host-owned CSS theme service", () => {
       }
       @puppyone application {
         .theme-root { --po-accent: #2f6f52; }
+        .dark .theme-root { --po-accent: #70b899; }
       }
       @puppyone markdown {
         :root { --po-md-content-color: #27352f; }
+        .dark .theme-root { --po-md-content-color: #d4e2dc; }
       }
       @puppyone csv {
         .theme-root { --po-csv-surface-color: #27352f; }
+        .dark .theme-root { --po-csv-surface-color: #d4e2dc; }
       }
     `, "utf8");
 
@@ -193,6 +196,7 @@ describe("host-owned CSS theme service", () => {
       }
       @puppyone application {
         .theme-root { --po-accent: #2f6f52; }
+        .dark .theme-root { --po-accent: #70b899; }
       }
       @puppyone markdown {
         @font-face {
@@ -203,6 +207,7 @@ describe("host-owned CSS theme service", () => {
       }
       @puppyone csv {
         .theme-root { --po-csv-surface-color: #27352f; }
+        .dark .theme-root { --po-csv-surface-color: #d4e2dc; }
       }
     `, "utf8");
 
@@ -342,6 +347,7 @@ describe("host-owned CSS theme service", () => {
     const firstCss = path.join(userDataPath, "themes", "custom-theme", "theme.css");
     const secondCss = path.join(userDataPath, "themes", "custom-theme-2", "theme.css");
     expect(await readFile(firstCss, "utf8")).toContain("id: local.user.custom-theme;");
+    expect(await readFile(firstCss, "utf8")).toContain(".dark .theme-root");
     expect(await readFile(secondCss, "utf8")).toContain("name: Custom Theme 2;");
     expect(shell.showItemInFolder).toHaveBeenNthCalledWith(1, await realpath(firstCss));
     expect(shell.showItemInFolder).toHaveBeenNthCalledWith(2, await realpath(secondCss));
@@ -541,8 +547,17 @@ async function createSingleFilePack(themeRoot, filename, id, name) {
       version: 1.0.0;
       modes: light dark;
     }
-    @puppyone application { .theme-root { --po-accent: #2563eb } }
-    @puppyone markdown { :root { --po-md-content-color: #222 } }
-    @puppyone csv { .theme-root { --po-csv-surface-color: #222 } }
+    @puppyone application {
+      .theme-root { --po-accent: #2563eb }
+      .dark .theme-root { --po-accent: #60a5fa }
+    }
+    @puppyone markdown {
+      :root { --po-md-content-color: #222 }
+      .dark .theme-root { --po-md-content-color: #eee }
+    }
+    @puppyone csv {
+      .theme-root { --po-csv-surface-color: #222 }
+      .dark .theme-root { --po-csv-surface-color: #eee }
+    }
   `, "utf8");
 }

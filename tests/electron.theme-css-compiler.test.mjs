@@ -87,6 +87,13 @@ describe("Sub Theme CSS compiler", () => {
       target: "application",
       supportedModes: ["light", "dark"],
     })).rejects.toThrow("declared light/dark variants");
+
+    await expect(compileThemeCss({
+      css: ":root { --po-surface-canvas: #ffffff; --po-text: #111111 }",
+      themeId: "com.example.incomplete-dual-mode",
+      target: "application",
+      supportedModes: ["light", "dark"],
+    })).rejects.toThrow("must declare explicit dark root tokens");
   });
 
   it.each([

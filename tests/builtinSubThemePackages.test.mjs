@@ -74,6 +74,30 @@ describe("built-in Sub Theme package architecture", () => {
     )).not.toThrow();
   });
 
+  it("keeps Neutral's declared Dark mode complete at the application boundary", async () => {
+    const sourcePath = "sub-themes/default-neutral/theme.css";
+    const theme = parseSingleFileThemeCss(
+      readFileSync(path.join(repoRoot, sourcePath), "utf8"),
+      {
+        sourcePath,
+        allowReservedBuiltinId: true,
+        allowBuiltinCompatibilityMetadata: true,
+      },
+    );
+    const result = await compileThemeCss({
+      css: theme.stylesheets.application,
+      themeId: theme.id,
+      target: "application",
+      supportedModes: theme.modes,
+      allowReservedBuiltinId: true,
+    });
+    const darkHost = `[data-po-appearance-root][data-sub-theme-id="default.neutral"]:where(.dark)`;
+    expect(result.css).toContain(`${darkHost} {`);
+    expect(result.css).toContain("--po-header: color-mix(");
+    expect(result.css).toContain("--po-sidebar: color-mix(");
+    expect(result.css).toContain("--po-text: #fafafa");
+  });
+
   it("removes legacy preset palettes from the global token layer", () => {
     const globalTokens = readFileSync(path.join(repoRoot, "src/styles/tokens.css"), "utf8");
     expect(globalTokens).not.toContain("data-light-theme-preset=");

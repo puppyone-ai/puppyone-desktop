@@ -220,6 +220,10 @@ function createStarterThemeCss({ themeId, themeName }) {
   :root {
     --po-accent: #2563eb;
   }
+
+  .dark .theme-root {
+    --po-accent: #60a5fa;
+  }
 }
 
 @puppyone markdown {}
