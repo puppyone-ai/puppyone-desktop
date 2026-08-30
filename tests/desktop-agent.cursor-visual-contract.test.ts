@@ -120,7 +120,8 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/--agent-composer-surface:\s*var\(--po-active\)/);
     expect(css).toMatch(/\.desktop-agent-composer-action:disabled\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--agent-text\) 14%, transparent\)[^}]*color:\s*color-mix\(in srgb, var\(--agent-text\) 48%, transparent\)[^}]*opacity:\s*1/s);
     expect(composerToolbar).toContain('<ArrowUp size={17} strokeWidth={1.6} />');
-    expect(attachmentButton).toContain('<Plus size={17} strokeWidth={1.6} aria-hidden="true" />');
+    expect(attachmentButton).toContain('<Paperclip size={16} strokeWidth={1.7} aria-hidden="true" />');
+    expect(attachmentButton).not.toContain("<Plus");
     expect(css).toMatch(/\.desktop-agent-composer textarea\s*\{[^}]*min-height:\s*var\(--agent-composer-text-min-height\)[^}]*max-height:\s*var\(--agent-composer-text-max-height\)[^}]*field-sizing:\s*content[^}]*overflow-y:\s*auto[^}]*padding:\s*0[^}]*cursor:\s*text[^}]*font-size:\s*var\(--agent-font-size\)[^}]*line-height:\s*var\(--agent-composer-line-height\)/s);
     expect(css).toMatch(/\.desktop-agent-composer-picker \.desktop-agent-picker-trigger\s*\{[^}]*padding-block:\s*0[^}]*padding-inline:\s*var\(--agent-composer-picker-padding-inline\)[^}]*border:\s*0[^}]*color:\s*var\(--agent-text-subtle\)[^}]*font-weight:\s*400/s);
     expect(css).not.toMatch(/\.desktop-agent-composer-picker\.is-effort \.desktop-agent-picker-trigger\s*\{[^}]*padding-inline-(?:start|end):/s);

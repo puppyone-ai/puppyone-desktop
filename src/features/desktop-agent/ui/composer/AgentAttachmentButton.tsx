@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Paperclip } from "lucide-react";
 import { useRef, type ChangeEvent } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentReferenceInputCapabilities } from "../../domain/agent-contract";
@@ -48,7 +48,7 @@ export function AgentAttachmentButton({
         disabled={disabled || !available}
         onClick={choose}
       >
-        <Plus size={17} strokeWidth={1.6} aria-hidden="true" />
+        <Paperclip size={16} strokeWidth={1.7} aria-hidden="true" />
       </button>
       <input
         ref={inputRef}

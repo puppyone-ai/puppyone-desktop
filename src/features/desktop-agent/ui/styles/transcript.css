@@ -169,6 +169,7 @@
   margin-top: 6px;
 }
 .desktop-agent-message-references:first-child { margin-top: 0; }
+.desktop-agent-message-references + .desktop-agent-message-text { margin-top: 6px; }
 .desktop-agent-message-references > span {
   display: inline-flex;
   max-width: 100%;
