@@ -91,6 +91,11 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Test Terminal P0 lifecycle and split identity in Electron
+        env:
+          ELECTRON_DISABLE_SANDBOX: "1"
+        run: xvfb-run --auto-servernum npm run smoke:terminal-p0
+
       - name: Test representative Appearance matrix in Chromium
         env:
           ELECTRON_DISABLE_SANDBOX: "1"
