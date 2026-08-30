@@ -10,6 +10,48 @@ import {
 import { AgentProviderSessionUnavailableError } from "../electron/main/agent/runtime/agent-runtime-port.mjs";
 
 describe("Codex app-server normalization", () => {
+  it("discovers workspace threads from the native state index without scanning rollout transcripts", async () => {
+    const connection = new FakeConnection();
+    connection.results.set("thread/list", {
+      data: [{
+        id: "thread-native",
+        cwd: "/workspace",
+        name: "Fix history",
+        preview: "Fix history",
+        createdAt: 1_788_000_000,
+        updatedAt: 1_788_000_100,
+        modelProvider: "openai",
+        ephemeral: false,
+      }],
+      nextCursor: "next-page",
+    });
+    const adapter = new CodexAppServerAdapter({
+      executablePath: "/usr/local/bin/codex",
+      environment: {},
+      workspaceRoot: "/workspace",
+      appVersion: "test",
+      connectionFactory: () => connection,
+    });
+
+    await expect(adapter.discoverSessions({ cursor: "page-1", limit: 25 })).resolves.toEqual({
+      supported: true,
+      sessions: [expect.objectContaining({ providerSessionId: "thread-native", title: "Fix history" })],
+      nextCursor: "next-page",
+    });
+    expect(connection.requests).toContainEqual({
+      method: "thread/list",
+      params: expect.objectContaining({
+        cwd: "/workspace",
+        cursor: "page-1",
+        limit: 25,
+        sortKey: "updated_at",
+        sortDirection: "desc",
+        useStateDbOnly: true,
+      }),
+    });
+    adapter.dispose();
+  });
+
   it("maps workspace mentions and staged images to the exact app-server UserInput schema", () => {
     expect(buildCodexTurnInput("Inspect", [
       { id: "workspace-a", kind: "workspace-entry", entryType: "file", path: "/workspace/a.md", displayName: "a.md" },

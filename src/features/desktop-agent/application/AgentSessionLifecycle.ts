@@ -16,7 +16,7 @@ type AgentSessionLifecycleOptions = {
   deleteSessionUi: (sessionId: string) => void;
 };
 
-/** Owns the current live session only; PuppyOne does not own Chat History. */
+/** Owns one tab's live connection; durable locator indexing remains main-owned. */
 export class AgentSessionLifecycle {
   constructor(private readonly options: AgentSessionLifecycleOptions) {}
 
@@ -28,7 +28,7 @@ export class AgentSessionLifecycle {
     }
     const previousSessionId = state.session?.id ?? null;
     try {
-      await this.closeActiveSession(true);
+      await this.closeActiveSession(false);
       if (previousSessionId) this.options.deleteSessionUi(previousSessionId);
       this.options.patch({
         phase: "creating",
@@ -72,7 +72,7 @@ export class AgentSessionLifecycle {
       return false;
     }
     try {
-      await this.closeActiveSession(true);
+      await this.closeActiveSession(false);
       return true;
     } catch (error) {
       this.options.patch({ error: formatAgentError(error) });

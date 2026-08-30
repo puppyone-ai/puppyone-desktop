@@ -165,6 +165,35 @@ export class CodexAppServerAdapter {
     };
   }
 
+  async discoverSessions({ cursor = null, limit = 50 } = {}) {
+    await this.connect();
+    const result = await this.connection.request("thread/list", {
+      cwd: this.workspaceRoot,
+      cursor,
+      limit: boundedPageSize(limit),
+      archived: false,
+      sortKey: "updated_at",
+      sortDirection: "desc",
+      // History discovery must query Codex's native metadata index only. It
+      // must never trigger a rollout scan merely because the launcher opened.
+      useStateDbOnly: true,
+    });
+    return {
+      supported: true,
+      sessions: (Array.isArray(result?.data) ? result.data : [])
+        .filter((thread) => !thread?.ephemeral && thread?.cwd === this.workspaceRoot)
+        .slice(0, boundedPageSize(limit))
+        .map((thread) => ({
+          providerSessionId: requireString(thread.id, "Codex thread/list returned an invalid thread id."),
+          title: stringOrNull(thread.name) || stringOrNull(thread.preview) || "Codex session",
+          createdAt: toIsoFromSeconds(thread.createdAt),
+          updatedAt: toIsoFromSeconds(thread.updatedAt),
+          selectedProviderId: stringOrNull(thread.modelProvider),
+        })),
+      nextCursor: stringOrNull(result?.nextCursor),
+    };
+  }
+
   async createSession({ model = null }) {
     await this.connect();
     this.sessionLifecycleType = "session.started";
@@ -886,4 +915,8 @@ function stringOrNull(value) {
 
 function toIsoFromSeconds(value) {
   return Number.isFinite(value) ? new Date(value * 1000).toISOString() : new Date().toISOString();
+}
+
+function boundedPageSize(value) {
+  return Number.isSafeInteger(value) && value > 0 ? Math.min(value, 100) : 50;
 }

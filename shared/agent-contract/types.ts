@@ -22,6 +22,30 @@ export type AgentRuntimeDescriptor = {
   source?: string | null;
   compatibility?: string | null;
   distribution?: "bundled" | "sdk-bundled" | "user-installed" | string;
+  execution?: {
+    kind: string;
+    distribution: string;
+    controller: string;
+  };
+  protocol?: {
+    kind: string;
+    transport: string;
+  };
+  integration?: {
+    kind: string;
+    adapter: string;
+  };
+  trust?: {
+    level: string;
+    publisher: string;
+  };
+  ownership?: {
+    harness: string;
+    credentials: string[];
+    models: string;
+    billing: string[];
+    session: string;
+  };
 };
 
 export type AgentRuntimeReadiness = {
@@ -171,6 +195,22 @@ export type AgentSessionMetadata = {
 export type AgentSessionListItem = Omit<AgentSessionMetadata, "activeTurnId"> & {
   archivedAt?: string | null;
   partial?: boolean;
+  /** Who first recorded the locator; never implies transcript ownership. */
+  origin?: "puppyone" | "native-discovery";
+};
+
+export type AgentSessionDiscoveryStatus = "not-requested" | "unsupported" | "partial" | "complete" | "failed";
+
+export type AgentSessionsListResponse = {
+  sessions: AgentSessionListItem[];
+  discovery: {
+    runtimeId: AgentRuntimeId | null;
+    status: AgentSessionDiscoveryStatus;
+    nextCursor: string | null;
+    indexed: number;
+    warnings: string[];
+  };
+  warnings: string[];
 };
 
 export type AgentTurnTerminalState = "completed" | "failed" | "interrupted";
@@ -376,6 +416,10 @@ export type AgentSessionsListRequest = {
   rootPath: string;
   runtimeId?: AgentRuntimeId | null;
   includeArchived?: boolean;
+  /** Explicit user-requested native metadata discovery; false never starts a harness. */
+  discoverNative?: boolean;
+  cursor?: string | null;
+  limit?: number;
 };
 
 export type AgentSessionCloseRequest = {

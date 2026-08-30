@@ -17,6 +17,7 @@ import {
 import { abandonAgentTurnReferences, beginAgentTurnReferences, prepareAgentSteerReferenceInput, revokeActiveAgentReferences, scrubPrivateReferencePaths, withAgentSteerReferenceTokens } from "./agent-reference-policy.mjs";
 import { createAgentRuntimeCatalog } from "./agent-runtime-catalog.mjs";
 import { createAgentEventJournal } from "./agent-event-journal.mjs";
+import { createNativeConversationIndexer } from "./native-conversation-indexer.mjs";
 import { AgentSessionStore } from "./agent-session-store.mjs";
 import { createAgentProcessSupervisor } from "./processes/agent-process-supervisor.mjs";
 import {
@@ -57,6 +58,11 @@ export function createAgentService({
   const sessionStore = new AgentSessionStore({ onOwnerDestroyed: closeSessionsForWindow });
   const sessionCreations = new Set();
   const runtimeCatalog = createAgentRuntimeCatalog({ runtimeRegistry, processSupervisor });
+  const nativeConversationIndexer = createNativeConversationIndexer({
+    runtimeRegistry,
+    sessionRepository: cache,
+    processSupervisor,
+  });
   const { emit, persistNow, persistSoon, sendSessionExit } = createAgentEventJournal({ sessionCache: cache, logger });
   const runRuntimeStart = (session, operation, start) => processSupervisor.runStart({
     label: `${session.runtimeId}:${operation}`,
@@ -70,54 +76,46 @@ export function createAgentService({
     const ownerId = requireSenderId(sender);
     requireWorkspaceRoot(workspaceRoot);
     discardRetiredSessions(ownerId, workspaceRoot);
-    if (findOwnedSession(ownerId, workspaceRoot, { connectedOnly: true })) {
-      throw new Error("This workspace already has an active Agent session.");
-    }
-    const creationKey = `${ownerId}\0${workspaceRoot}`;
-    if (sessionCreations.has(creationKey)) throw new Error("An Agent session is already starting for this workspace.");
-    sessionCreations.add(creationKey);
+    // Each Chat tab owns an independent controller and may prepare in parallel.
+    // Renderer single-flight guards duplicate preparation within one tab.
+    const catalog = await runtimeRegistry.discover({ refresh: false });
+    const selected = selectRequestedRuntime(catalog, request?.runtimeId);
+    assertReady(selected?.readiness, selected?.descriptor?.displayName);
+    const session = createSessionRecord({
+      id: randomUUID(),
+      ownerId,
+      sender,
+      workspaceRoot,
+      runtimeId: selected.descriptor.id,
+      runtime: selected.descriptor,
+      model: normalizeOptionalString(request?.model),
+      mode: normalizeOptionalString(request?.mode),
+    });
+    sessionStore.add(session);
     try {
-      const catalog = await runtimeRegistry.discover({ refresh: false });
-      const selected = selectRequestedRuntime(catalog, request?.runtimeId);
-      assertReady(selected?.readiness, selected?.descriptor?.displayName);
-      const session = createSessionRecord({
-        id: randomUUID(),
-        ownerId,
-        sender,
-        workspaceRoot,
-        runtimeId: selected.descriptor.id,
-        runtime: selected.descriptor,
-        model: normalizeOptionalString(request?.model),
-        mode: normalizeOptionalString(request?.mode),
-      });
-      sessionStore.add(session);
-      try {
-        session.adapter = createAdapterForSession(session, selected.readiness);
-        const inspected = await runRuntimeStart(session, "inspect", () => session.adapter.inspect());
-        const inspection = assertAgentRuntimeInspection(session.adapter, inspected, session.runtimeId);
-        assertAuthenticated(inspection.account, selected.descriptor.displayName);
-        applyInspection(session, inspection);
-        requireAvailableModel(session, session.selectedModel);
-        const providerSession = await runRuntimeStart(session, "create", () => session.adapter.createSession({
-          model: session.selectedModel,
-          mode: session.selectedMode,
-        }));
-        applyProviderSession(session, providerSession);
-        if (!session.lifecycleEventSeen) {
-          emit(session, {
-            type: "session.started",
-            providerSessionId: session.providerSessionId,
-            payload: sessionMetadata(session),
-          });
-        }
-        persistSoon(session);
-        return sessionSnapshot(session);
-      } catch (error) {
-        await closeSessionRecord(session, { persist: false });
-        throw new Error(redactSecretText(error instanceof Error ? error.message : String(error)));
+      session.adapter = createAdapterForSession(session, selected.readiness);
+      const inspected = await runRuntimeStart(session, "inspect", () => session.adapter.inspect());
+      const inspection = assertAgentRuntimeInspection(session.adapter, inspected, session.runtimeId);
+      assertAuthenticated(inspection.account, selected.descriptor.displayName);
+      applyInspection(session, inspection);
+      requireAvailableModel(session, session.selectedModel);
+      const providerSession = await runRuntimeStart(session, "create", () => session.adapter.createSession({
+        model: session.selectedModel,
+        mode: session.selectedMode,
+      }));
+      applyProviderSession(session, providerSession);
+      if (!session.lifecycleEventSeen) {
+        emit(session, {
+          type: "session.started",
+          providerSessionId: session.providerSessionId,
+          payload: sessionMetadata(session),
+        });
       }
-    } finally {
-      sessionCreations.delete(creationKey);
+      persistSoon(session);
+      return sessionSnapshot(session);
+    } catch (error) {
+      await closeSessionRecord(session, { persist: false });
+      throw new Error(redactSecretText(error instanceof Error ? error.message : String(error)));
     }
   }
 
@@ -126,9 +124,12 @@ export function createAgentService({
     requireWorkspaceRoot(workspaceRoot);
     const connected = findOwnedSession(ownerId, workspaceRoot, { connectedOnly: true });
     const requestedSessionId = normalizeOptionalId(request?.sessionId);
-    if (connected && (!requestedSessionId || connected.id === requestedSessionId)) return sessionSnapshot(connected);
-    if (connected) await closeSessionRecord(connected, { persist: true });
-    const creationKey = `${ownerId}\0${workspaceRoot}`;
+    const requestedLive = requestedSessionId ? sessionStore.get(requestedSessionId) : null;
+    if (requestedLive && !requestedLive.providerExited) {
+      return sessionSnapshot(requireOwnedSession(sender, requestedSessionId));
+    }
+    if (connected && !requestedSessionId) return sessionSnapshot(connected);
+    const creationKey = `${ownerId}\0${workspaceRoot}\0resume\0${requestedSessionId || normalizeRuntimeId(request?.runtimeId) || "latest"}`;
     if (sessionCreations.has(creationKey)) throw new Error("An Agent session is already starting for this workspace.");
     sessionCreations.add(creationKey);
     try {
@@ -379,11 +380,29 @@ export function createAgentService({
   async function listSessions(_sender, request, workspaceRoot) {
     requireWorkspaceRoot(workspaceRoot);
     const runtimeId = normalizeRuntimeId(request?.runtimeId);
+    const discovery = request?.discoverNative && runtimeId
+      ? await nativeConversationIndexer.refresh({
+        workspaceRoot,
+        runtimeId,
+        cursor: request?.cursor ?? null,
+        limit: request?.limit,
+      })
+      : {
+        runtimeId: runtimeId ?? null,
+        status: "not-requested",
+        nextCursor: null,
+        indexed: 0,
+        warnings: [],
+      };
     const records = await cache.list(workspaceRoot, { runtimeId, includeArchived: Boolean(request?.includeArchived) });
-    return records.map((record) => publicSessionRecord({
-      ...record,
-      runtimeId: resolvePersistedRuntimeId(record, runtimeId),
-    }));
+    return {
+      sessions: records.map((record) => publicSessionRecord({
+        ...record,
+        runtimeId: resolvePersistedRuntimeId(record, runtimeId),
+      })),
+      discovery,
+      warnings: discovery.warnings,
+    };
   }
 
   async function forkSession(sender, request, workspaceRoot = null) {

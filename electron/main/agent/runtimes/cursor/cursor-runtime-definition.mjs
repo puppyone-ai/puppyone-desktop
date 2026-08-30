@@ -1,8 +1,8 @@
 import { createCursorDiscovery } from "./cursor-discovery.mjs";
 import { CursorAcpAdapter } from "./cursor-acp-adapter.mjs";
-import { CURSOR_RUNTIME_DESCRIPTOR } from "./cursor-identity.mjs";
+import { CURSOR_RUNTIME_DESCRIPTOR, CURSOR_RUNTIME_MANIFEST } from "./cursor-identity.mjs";
 
-export { CURSOR_RUNTIME_DESCRIPTOR } from "./cursor-identity.mjs";
+export { CURSOR_RUNTIME_DESCRIPTOR, CURSOR_RUNTIME_MANIFEST } from "./cursor-identity.mjs";
 
 export function createCursorRuntimeDefinition({
   discovery = createCursorDiscovery(),
@@ -12,7 +12,7 @@ export function createCursorRuntimeDefinition({
 } = {}) {
   const adapters = new Set();
   return {
-    descriptor: CURSOR_RUNTIME_DESCRIPTOR,
+    manifest: CURSOR_RUNTIME_MANIFEST,
     discovery,
     createAdapter: ({ readiness, ...options }) => {
       let adapter;

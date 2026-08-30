@@ -1,4 +1,35 @@
 {
+  "manifest": {
+    "schemaVersion": 1,
+    "id": "fixture-harness",
+    "displayName": "Fixture Harness",
+    "description": "Second runtime contract fixture",
+    "priority": 1,
+    "execution": {
+      "kind": "local-process",
+      "distribution": "user-installed",
+      "controller": "bundled-adapter"
+    },
+    "protocol": {
+      "kind": "rpc",
+      "transport": "stdio-json-rpc"
+    },
+    "integration": {
+      "kind": "specialized-native",
+      "adapter": "specialized"
+    },
+    "trust": {
+      "level": "first-party",
+      "publisher": "Fixture"
+    },
+    "ownership": {
+      "harness": "runtime",
+      "credentials": ["runtime"],
+      "models": "runtime",
+      "billing": ["runtime"],
+      "session": "runtime"
+    }
+  },
   "descriptor": {
     "id": "fixture-harness",
     "displayName": "Fixture Harness",
@@ -36,4 +67,3 @@
     }
   }
 }
-

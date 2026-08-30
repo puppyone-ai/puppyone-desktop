@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentSessionController } from "../application/AgentSessionController";
@@ -14,6 +14,7 @@ import { AgentPanelStatus } from "./AgentPanelStatus";
 import { AgentQuestionDock } from "./AgentQuestionDock";
 import { AgentRuntimeLauncher } from "./AgentRuntimeLauncher";
 import { AgentTranscript } from "./AgentTranscript";
+import { useAgentConversationHistory } from "./useAgentConversationHistory";
 import { readinessStatusCode, sessionStatusCode } from "./agentPanelPresentation";
 import { useAgentReferenceIngestion } from "./useAgentReferenceIngestion";
 import { useAgentRoutingPreferences } from "./useAgentRoutingPreferences";
@@ -33,6 +34,7 @@ type AgentChatTabPanelProps = {
   preferredModel: string | null;
   onPreferredModelChange?: (model: string) => void;
   enabledRuntimeIds: readonly string[] | null;
+  openSessionIds: readonly string[];
 };
 
 export function AgentChatTabPanel({
@@ -49,8 +51,10 @@ export function AgentChatTabPanel({
   preferredModel,
   onPreferredModelChange,
   enabledRuntimeIds,
+  openSessionIds,
 }: AgentChatTabPanelProps) {
   const { t } = useLocalization();
+  const [historyOpen, setHistoryOpen] = useState(false);
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const referenceIngestion = useAgentReferenceIngestion({ controller, workspaceId, capabilities: state.inspection?.capabilities?.referenceInputs });
   const inspection = state.inspection;
@@ -98,15 +102,23 @@ export function AgentChatTabPanel({
   const statusCode = state.session ? sessionStatusCode(sessionStatus) : readinessStatusCode(readiness?.status);
   const title = state.session?.title || (agentRuntimeSelected ? runtimeLabel : t("agent.header.newChat"));
   const hasStatus = unavailable || failed || Boolean(state.error);
+  const history = useAgentConversationHistory({
+    active,
+    enabled: historyOpen && state.initialized && Boolean(inspection) && !agentRuntimeSelected && !loading && !failed,
+    controller,
+    runtimes: agentRuntimes,
+    excludedSessionIds: openSessionIds,
+  });
 
   useEffect(() => {
     onPresentationChange({
       title,
       runtimeLabel: agentRuntimeSelected ? runtimeLabel : null,
+      sessionId: state.session?.id ?? null,
       statusCode,
       running: Boolean(state.projection.runningTurnId),
     });
-  }, [agentRuntimeSelected, onPresentationChange, runtimeLabel, state.projection.runningTurnId, statusCode, title]);
+  }, [agentRuntimeSelected, onPresentationChange, runtimeLabel, state.projection.runningTurnId, state.session?.id, statusCode, title]);
 
   const handleViewportChange = useCallback((scrollTop: number, measurements: Record<string, number>, pinned: boolean) => {
     controller.rememberViewport(scrollTop, measurements, pinned);
@@ -120,8 +132,26 @@ export function AgentChatTabPanel({
       phase="selecting-runtime"
       conversation={<AgentRuntimeLauncher
         agentRuntimes={agentRuntimes}
-        onLaunch={routingPreferences.selectRuntime}
+        onLaunch={(runtimeId) => {
+          setHistoryOpen(false);
+          routingPreferences.selectRuntime(runtimeId);
+        }}
         onRefresh={() => void controller.initialize(true)}
+        historyOpen={historyOpen}
+        historySessions={history.sessions}
+        historyLoading={history.loading || !history.loaded}
+        historyRefreshing={history.refreshing}
+        historyLoadingMore={history.loadingMore}
+        historyHasMore={history.hasMore}
+        historyError={history.error}
+        onShowHistory={() => setHistoryOpen(true)}
+        onHideHistory={() => setHistoryOpen(false)}
+        onOpenSession={(session) => {
+          setHistoryOpen(false);
+          void controller.openSavedSession(session.id, session.runtimeId || session.runtime?.id || "");
+        }}
+        onRefreshHistory={() => void history.refreshNative()}
+        onLoadMoreHistory={() => void history.loadMoreNative()}
       />}
     />;
   }

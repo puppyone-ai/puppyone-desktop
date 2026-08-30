@@ -27,22 +27,20 @@
   cursor: var(--po-clickable-cursor, pointer);
 }
 
-.desktop-agent-picker-trigger:hover:not(:disabled),
-.desktop-agent-picker-trigger[aria-expanded="true"] {
+.desktop-agent-picker-trigger:hover:not(:disabled) {
   border-color: var(--agent-sidebar-border);
   background: transparent;
   color: var(--agent-text);
 }
 
 .desktop-agent-picker-trigger:disabled { cursor: default; opacity: 0.45; }
-.desktop-agent-picker-trigger > span {
+.desktop-agent-picker-trigger-value {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.desktop-agent-picker-trigger svg { flex: 0 0 auto; transition: transform 120ms ease; }
-.desktop-agent-picker-trigger[aria-expanded="true"] > svg { transform: rotate(180deg); }
+.desktop-agent-picker-trigger svg { flex: 0 0 auto; }
 .desktop-agent-picker-trigger.is-compact {
   width: var(--agent-control-size);
   padding: 0;
@@ -65,8 +63,7 @@
   font-weight: var(--po-font-weight-chrome, 500);
   line-height: 18px;
 }
-.desktop-agent-picker.is-header .desktop-agent-picker-trigger:hover:not(:disabled),
-.desktop-agent-picker.is-header .desktop-agent-picker-trigger[aria-expanded="true"] {
+.desktop-agent-picker.is-header .desktop-agent-picker-trigger:hover:not(:disabled) {
   border-color: transparent;
   background: var(--agent-row-hover-surface);
   color: var(--desktop-titlebar-text, var(--po-text));
@@ -89,7 +86,6 @@
   color: var(--agent-text);
   font-family: var(--po-font-sans);
   visibility: hidden;
-  backdrop-filter: blur(18px) saturate(1.08);
 }
 .desktop-agent-picker-popover[data-positioned="true"] { visibility: visible; }
 .desktop-agent-picker-popover[data-placement="above"] { transform-origin: left bottom; }
@@ -139,6 +135,7 @@
   text-align: start;
   cursor: var(--po-clickable-cursor, pointer);
 }
+.desktop-agent-picker-option.has-no-icon { grid-template-columns: minmax(0, 1fr) auto; }
 .desktop-agent-picker-option:not([aria-disabled="true"]):hover,
 .desktop-agent-picker-option:not([aria-disabled="true"]):focus-visible { background: var(--agent-row-hover-surface); }
 .desktop-agent-picker-option.is-selected { background: var(--agent-row-hover-surface); }

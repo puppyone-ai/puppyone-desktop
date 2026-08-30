@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { AgentRuntimeRegistry } from "../electron/main/agent/runtime/agent-runtime-registry.mjs";
+import { defineAgentRuntimeManifest } from "../electron/main/agent/runtime/agent-runtime-manifest.mjs";
 
 describe("Agent runtime registry", () => {
   it("selects the configured default without readiness fallback and keeps lifecycle dispatch neutral", async () => {
@@ -23,7 +24,23 @@ describe("Agent runtime registry", () => {
     expect(registry.select(catalog, "missing")).toBeNull();
     expect(registry.createAdapter("direct", { workspaceRoot: "/workspace" })).toBe(adapter);
     expect(registry.descriptors().map((entry) => entry.id)).toEqual(["offline", "harness", "direct"]);
+    expect(registry.manifests().map((entry) => entry.id)).toEqual(["offline", "harness", "direct"]);
     expect(registry.hasActiveResources()).toBe(false);
+  });
+
+  it("requires one manifest source of truth instead of a separately maintained descriptor", () => {
+    expect(() => new AgentRuntimeRegistry([{
+      descriptor: { id: "legacy", displayName: "Legacy" },
+      discovery: { discover: vi.fn() },
+      createAdapter: vi.fn(),
+    }])).toThrow(/requires a manifest/i);
+
+    expect(() => new AgentRuntimeRegistry([{
+      manifest: manifest("duplicate-source", 1),
+      descriptor: { id: "duplicate-source", displayName: "Stale label" },
+      discovery: { discover: vi.fn() },
+      createAdapter: vi.fn(),
+    }])).toThrow(/derived from manifests/i);
   });
 
   it("attempts cleanup for every backend even when one cleanup fails", async () => {
@@ -45,8 +62,27 @@ describe("Agent runtime registry", () => {
 
 function definition(id, priority, status, adapter) {
   return {
-    descriptor: { id, priority, displayName: id, kind: "test" },
+    manifest: manifest(id, priority),
     discovery: { discover: vi.fn(async () => ({ runtimeId: id, status, executablePath: status === "ready" ? `/${id}` : null })) },
     createAdapter: vi.fn(() => adapter),
   };
+}
+
+function manifest(id, priority) {
+  return defineAgentRuntimeManifest({
+    id,
+    priority,
+    displayName: id,
+    execution: { kind: "local-process", distribution: "user-installed", controller: "bundled-adapter" },
+    protocol: { kind: "rpc", transport: "stdio-json-rpc" },
+    integration: { kind: "specialized-native", adapter: "specialized" },
+    trust: { level: "first-party", publisher: "Fixture" },
+    ownership: {
+      harness: "runtime",
+      credentials: ["runtime"],
+      models: "runtime",
+      billing: ["runtime"],
+      session: "runtime",
+    },
+  });
 }

@@ -12,7 +12,7 @@ describe("Agent Chat tabs", () => {
     state = agentChatTabsReducer(state, {
       type: "present",
       tabId: "chat-a",
-      presentation: { title: "Fix auth", runtimeLabel: "Codex", statusCode: "ready", running: false },
+      presentation: { title: "Fix auth", runtimeLabel: "Codex", sessionId: "session-a", statusCode: "ready", running: false },
     });
 
     expect(state.tabs.map(({ id, ordinal, title }) => ({ id, ordinal, title }))).toEqual([

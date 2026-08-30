@@ -43,19 +43,40 @@ export function createAgentConversationCatalog({ filePath, logger = console } = 
     return writeChain;
   }
 
+  async function saveRecord(record) {
+    await load();
+    const normalized = normalizeRecord(record);
+    if (!normalized) throw new TypeError("Agent conversation metadata is invalid.");
+    const index = records.findIndex((entry) => entry.sessionId === normalized.sessionId);
+    if (index >= 0) records.splice(index, 1);
+    records.unshift(normalized);
+    records = records
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .slice(0, MAX_RECORDS);
+    await schedulePersist();
+    return clone(normalized);
+  }
+
   return {
-    async save(record) {
+    save(record) {
+      return saveRecord({ ...record, origin: record?.origin ?? "puppyone" });
+    },
+
+    async upsertNative(record) {
       await load();
-      const normalized = normalizeRecord(record);
-      if (!normalized) throw new TypeError("Agent conversation metadata is invalid.");
-      const index = records.findIndex((entry) => entry.sessionId === normalized.sessionId);
-      if (index >= 0) records.splice(index, 1);
-      records.unshift(normalized);
-      records = records
-        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-        .slice(0, MAX_RECORDS);
-      await schedulePersist();
-      return clone(normalized);
+      const workspaceRoot = absolutePath(record?.workspaceRoot);
+      const runtimeId = safeId(record?.runtimeId ?? record?.runtime?.id);
+      const providerSessionId = safeId(record?.providerSessionId);
+      const existing = records.find((entry) => (
+        entry.workspaceRoot === workspaceRoot
+        && entry.runtimeId === runtimeId
+        && entry.providerSessionId === providerSessionId
+      ));
+      return saveRecord({
+        ...record,
+        sessionId: existing?.sessionId ?? randomUUID(),
+        origin: "native-discovery",
+      });
     },
 
     async findById(sessionId, workspaceRoot = null) {
@@ -126,7 +147,7 @@ function normalizeRecord(value) {
     createdAt,
     updatedAt,
     archivedAt: isoDate(value.archivedAt),
-    terminalState: bounded(value.terminalState, 40) || "idle",
+    terminalState: terminalState(value.terminalState),
     lastSequence: Number.isSafeInteger(value.lastSequence) && value.lastSequence >= 0 ? value.lastSequence : 0,
     partial: true,
     selectedProviderId: safeId(value.selectedProviderId) ?? providerIdFromModel(value.selectedModel ?? value.model),
@@ -135,6 +156,7 @@ function normalizeRecord(value) {
     selectedEffort: bounded(value.selectedEffort ?? value.effort, 160),
     selectedMode: bounded(value.selectedMode ?? value.mode, 160),
     capabilityRevision: bounded(value.capabilityRevision, 160),
+    origin: value.origin === "native-discovery" ? "native-discovery" : "puppyone",
   });
 }
 
@@ -151,7 +173,13 @@ function normalizeRuntime(value, runtimeId) {
 }
 
 function safeId(value) {
-  return typeof value === "string" && /^[A-Za-z0-9:._/-]{1,512}$/.test(value) ? value : null;
+  return typeof value === "string" && /^[A-Za-z0-9:._-]{1,256}$/.test(value) ? value : null;
+}
+
+function terminalState(value) {
+  return ["idle", "running", "completed", "failed", "interrupted", "provider-exited"].includes(value)
+    ? value
+    : "idle";
 }
 
 function providerIdFromModel(value) {

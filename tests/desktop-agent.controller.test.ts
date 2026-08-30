@@ -43,7 +43,7 @@ describe("AgentSessionController", () => {
     expect(bridge.createAgentSession).not.toHaveBeenCalled();
   });
 
-  it("rebuilds a deterministic projection, repairs sequence gaps, and discards the old session on New Chat", async () => {
+  it("rebuilds a deterministic projection, repairs sequence gaps, and preserves the old locator on New Chat", async () => {
     let eventListener: ((event: AgentEvent) => void) | null = null;
     const bridge = bridgeFixture((listener) => { eventListener = listener; });
     const controller = new AgentSessionController("/workspace", () => bridge as never);
@@ -72,7 +72,7 @@ describe("AgentSessionController", () => {
     });
 
     await controller.newSession();
-    expect(bridge.closeAgentSession).toHaveBeenCalledWith({ rootPath: "/workspace", sessionId: "session-1", removePersistence: true });
+    expect(bridge.closeAgentSession).toHaveBeenCalledWith({ rootPath: "/workspace", sessionId: "session-1", removePersistence: false });
     expect(controller.getSnapshot().session?.id).toBe("session-2");
   });
 
@@ -88,10 +88,33 @@ describe("AgentSessionController", () => {
     expect(firstBridge.closeAgentSession).toHaveBeenCalledWith({
       rootPath: "/workspace",
       sessionId: "session-1",
-      removePersistence: true,
+      removePersistence: false,
     });
     expect(secondBridge.closeAgentSession).not.toHaveBeenCalled();
     expect(second.getSnapshot().session?.id).toBe("session-1");
+  });
+
+  it("opens an explicitly selected saved conversation instead of implicitly resuming the latest session", async () => {
+    const bridge = bridgeFixture(() => {});
+    bridge.resumeAgentSession
+      .mockResolvedValueOnce(snapshot("session-1", []))
+      .mockResolvedValueOnce(snapshot("saved-session", [
+        event(1, "turn.started", { prompt: "Past prompt" }, "past-turn", null, "saved-session"),
+        event(2, "assistant.completed", { text: "Past answer" }, "past-turn", "past-answer", "saved-session"),
+      ]));
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+
+    await controller.initialize();
+    await controller.openSavedSession("saved-session", "opencode");
+
+    expect(bridge.resumeAgentSession).toHaveBeenCalledWith({
+      rootPath: "/workspace",
+      sessionId: "saved-session",
+      runtimeId: "opencode",
+    });
+    expect(controller.getSnapshot().session?.id).toBe("saved-session");
+    expect(controller.getSnapshot().projection.messages.map((message) => message.text))
+      .toEqual(["Past prompt", "Past answer"]);
   });
 
   it("refuses to close a tab while its turn is running", async () => {
@@ -190,7 +213,7 @@ describe("AgentSessionController", () => {
     });
   });
 
-  it("switches Coding Agent providers by discarding the old PuppyOne mapping and loading the selected runtime catalog", async () => {
+  it("switches Coding Agent providers into a new chat without implicitly resuming native history", async () => {
     const bridge = bridgeFixture(() => {});
     const runtimes = [
       { descriptor: { id: "codex", displayName: "Codex", iconKey: "codex", distribution: "user-installed" }, readiness: readinessFor("codex") },
@@ -202,8 +225,7 @@ describe("AgentSessionController", () => {
       .mockResolvedValueOnce(runtimeInspection(runtimes, "codex", codexModel))
       .mockResolvedValueOnce(runtimeInspection(runtimes, "claude", claudeModel));
     bridge.resumeAgentSession
-      .mockResolvedValueOnce(runtimeSnapshot("codex-session", "codex", "Codex", codexModel))
-      .mockResolvedValueOnce(runtimeSnapshot("claude-session", "claude", "Claude Code", claudeModel));
+      .mockResolvedValueOnce(runtimeSnapshot("codex-session", "codex", "Codex", codexModel));
     const controller = new AgentSessionController("/workspace", () => bridge as never);
 
     await controller.initialize();
@@ -217,15 +239,16 @@ describe("AgentSessionController", () => {
     expect(bridge.closeAgentSession).toHaveBeenCalledWith({
       rootPath: "/workspace",
       sessionId: "codex-session",
-      removePersistence: true,
+      removePersistence: false,
     });
     expect(bridge.discoverAgentRuntimes).toHaveBeenLastCalledWith({ rootPath: "/workspace", runtimeId: "claude", refresh: false });
     expect(controller.getSnapshot()).toMatchObject({
       selectedRuntimeId: "claude",
       selectedProviderId: null,
       selectedModel: "claude-sonnet",
-      session: { id: "claude-session", runtimeId: "claude" },
+      session: null,
     });
+    expect(bridge.resumeAgentSession).toHaveBeenCalledTimes(1);
     expect(controller.getSnapshot().references).toEqual([]);
     await controller.stageExternalFiles([new File(["png"], "after-switch.png", { type: "image/png" })]);
     expect(bridge.stageAgentAttachments.mock.calls.at(-1)?.[0].epoch).not.toBe(firstEpoch);
@@ -669,7 +692,17 @@ function bridgeFixture(
     }))),
     pickAgentWorkspaceReferences: vi.fn(async () => []),
     steerAgentTurn: vi.fn(async () => ({ sessionId: "session-1", turnId: "turn-running", steered: true })),
-    listAgentSessions: vi.fn(async () => []),
+    listAgentSessions: vi.fn(async () => ({
+      sessions: [],
+      discovery: {
+        runtimeId: null,
+        status: "not-requested" as const,
+        nextCursor: null,
+        indexed: 0,
+        warnings: [],
+      },
+      warnings: [],
+    })),
     onAgentEvent: vi.fn((listener: (event: AgentEvent) => void) => { onEvent(listener); return () => {}; }),
     onAgentSessionExit: vi.fn(() => () => {}),
   };

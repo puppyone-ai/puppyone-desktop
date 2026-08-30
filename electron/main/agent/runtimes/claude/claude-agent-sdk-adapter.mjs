@@ -144,6 +144,28 @@ export class ClaudeAgentSdkAdapter {
     }
   }
 
+  async discoverSessions({ cursor = null, limit = 50 } = {}) {
+    this.#assertUsable();
+    const sdk = await this.#loadSdk();
+    if (typeof sdk.listSessions !== "function") return { supported: false, sessions: [], nextCursor: null };
+    const offset = numericCursor(cursor);
+    const pageSize = boundedPageSize(limit);
+    const sessions = await sdk.listSessions({ dir: this.workspaceRoot, limit: pageSize, offset });
+    const normalized = asArray(sessions).filter((session) => (
+      safeId(session?.sessionId) && (!session?.cwd || path.resolve(session.cwd) === this.workspaceRoot)
+    )).slice(0, pageSize).map((session) => ({
+      providerSessionId: session.sessionId,
+      title: bounded(session.customTitle || session.summary || session.firstPrompt, 500) || "Claude Code session",
+      createdAt: normalizeDate(session.createdAt ?? session.lastModified),
+      updatedAt: normalizeDate(session.lastModified),
+    }));
+    return {
+      supported: true,
+      sessions: normalized,
+      nextCursor: normalized.length === pageSize ? String(offset + normalized.length) : null,
+    };
+  }
+
   async createSession({ model = null, mode = "agent" } = {}) {
     this.#assertIdle();
     await this.#closePersistentQuery("Starting a new Claude Code session.");
@@ -700,4 +722,14 @@ function withTimeout(promise, timeoutMs, message) {
 
 function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function numericCursor(value) {
+  if (value == null || value === "") return 0;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function boundedPageSize(value) {
+  return Number.isSafeInteger(value) && value > 0 ? Math.min(value, 100) : 50;
 }

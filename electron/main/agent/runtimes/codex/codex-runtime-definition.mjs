@@ -1,15 +1,34 @@
 import { CodexAppServerAdapter } from "./codex-app-server-adapter.mjs";
 import { createCodexDiscovery } from "./codex-discovery.mjs";
+import {
+  defineAgentRuntimeManifest,
+  runtimeDescriptorFromManifest,
+} from "../../runtime/agent-runtime-manifest.mjs";
 
-export const CODEX_RUNTIME_DESCRIPTOR = Object.freeze({
+export const CODEX_RUNTIME_MANIFEST = defineAgentRuntimeManifest({
   id: "codex",
   displayName: "Codex",
   description: "Codex's native app-server, login, models, tools, approvals and sessions.",
-  kind: "native-cli",
   iconKey: "codex",
   priority: 50,
-  distribution: "user-installed",
+  execution: {
+    kind: "local-process",
+    distribution: "user-installed",
+    controller: "bundled-adapter",
+  },
+  protocol: { kind: "app-server", transport: "stdio-json-rpc" },
+  integration: { kind: "specialized-native", adapter: "specialized" },
+  trust: { level: "first-party", publisher: "OpenAI" },
+  ownership: {
+    harness: "runtime",
+    credentials: ["runtime"],
+    models: "runtime",
+    billing: ["runtime"],
+    session: "runtime",
+  },
 });
+
+export const CODEX_RUNTIME_DESCRIPTOR = runtimeDescriptorFromManifest(CODEX_RUNTIME_MANIFEST);
 
 export function createCodexRuntimeDefinition({
   appVersion = "0.0.0",
@@ -17,7 +36,7 @@ export function createCodexRuntimeDefinition({
   adapterFactory = (options) => new CodexAppServerAdapter(options),
 } = {}) {
   return {
-    descriptor: CODEX_RUNTIME_DESCRIPTOR,
+    manifest: CODEX_RUNTIME_MANIFEST,
     discovery,
     createAdapter: ({ readiness, ...options }) => adapterFactory({
       ...options,

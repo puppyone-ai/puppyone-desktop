@@ -86,6 +86,63 @@ describe("Electron AgentService ownership and lifecycle", () => {
     await harness.service.closeAll();
   });
 
+  it("supports multiple tab-owned live sessions in one workspace and preserves both locators on close", async () => {
+    const harness = createServiceHarness();
+    const owner = createSender(33);
+
+    const first = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
+    const second = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
+
+    expect(second.session.id).not.toBe(first.session.id);
+    expect(harness.service.getSessionCount()).toBe(2);
+    await harness.service.closeSession(owner, { sessionId: first.session.id }, "/workspace");
+    await harness.service.closeSession(owner, { sessionId: second.session.id }, "/workspace");
+    expect(harness.persistence.remove).not.toHaveBeenCalled();
+    expect((await harness.persistence.list("/workspace"))).toHaveLength(2);
+  });
+
+  it("allows two same-workspace Chat tabs to prepare sessions concurrently", async () => {
+    const harness = createServiceHarness();
+    const owner = createSender(35);
+
+    const [first, second] = await Promise.all([
+      harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace"),
+      harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace"),
+    ]);
+
+    expect(first.session.id).not.toBe(second.session.id);
+    expect(harness.service.getSessionCount()).toBe(2);
+    expect(harness.adapters).toHaveLength(2);
+  });
+
+  it("indexes native session metadata on explicit refresh without persisting transcript payloads", async () => {
+    const harness = createServiceHarness({
+      nativeSessions: [{
+        providerSessionId: "native-external",
+        title: "Existing Codex chat",
+        createdAt: "2026-08-29T00:00:00.000Z",
+        updatedAt: "2026-08-30T00:00:00.000Z",
+        events: [{ payload: { text: "private transcript" } }],
+      }],
+    });
+
+    const result = await harness.service.listSessions(createSender(34), {
+      runtimeId: "codex",
+      discoverNative: true,
+      limit: 25,
+    }, "/workspace");
+
+    expect(result).toMatchObject({
+      discovery: { runtimeId: "codex", status: "complete", nextCursor: null },
+      sessions: [expect.objectContaining({
+        runtimeId: "codex",
+        providerSessionId: "native-external",
+        origin: "native-discovery",
+      })],
+    });
+    expect(harness.persistence.upsertNative).toHaveBeenCalledWith(expect.not.objectContaining({ events: expect.anything() }));
+  });
+
   it("rejects a model that is not in the inspected connected-provider catalog", async () => {
     const harness = createServiceHarness();
     const owner = createSender(32);
@@ -599,6 +656,7 @@ function createServiceHarness({
   capabilities = { manualApprovals: true },
   attachmentStore = null,
   resumeSessionError = null,
+  nativeSessions = [],
 } = {}) {
   const adapters = [];
   const persisted = new Map();
@@ -616,7 +674,7 @@ function createServiceHarness({
       })),
     },
     adapterFactory: (options) => {
-      const adapter = createFakeAdapter(options, capabilities, resumeSessionError);
+      const adapter = createFakeAdapter(options, capabilities, resumeSessionError, nativeSessions);
       adapters.push(adapter);
       return adapter;
     },
@@ -629,6 +687,16 @@ function createServiceHarness({
     }),
     list: vi.fn(async (root) => Array.from(persisted.values()).filter((entry) => entry.workspaceRoot === root)),
     save: vi.fn(async (entry) => persisted.set(entry.sessionId, entry)),
+    upsertNative: vi.fn(async (entry) => {
+      const existing = Array.from(persisted.values()).find((candidate) => (
+        candidate.workspaceRoot === entry.workspaceRoot
+        && candidate.runtimeId === entry.runtimeId
+        && candidate.providerSessionId === entry.providerSessionId
+      ));
+      const saved = { ...entry, sessionId: existing?.sessionId ?? `discovered-${persisted.size + 1}`, origin: "native-discovery" };
+      persisted.set(saved.sessionId, saved);
+      return saved;
+    }),
     archive: vi.fn(async () => undefined),
     remove: vi.fn(async (id) => persisted.delete(id)),
   };
@@ -641,7 +709,7 @@ function createServiceHarness({
   return { service, adapters, persistence };
 }
 
-function createFakeAdapter(options, capabilities, resumeSessionError = null) {
+function createFakeAdapter(options, capabilities, resumeSessionError = null, nativeSessions = []) {
   return {
     disposed: false,
     inspect: vi.fn(async () => ({
@@ -668,6 +736,7 @@ function createFakeAdapter(options, capabilities, resumeSessionError = null) {
       };
     }),
     readHistory: vi.fn(async () => []),
+    discoverSessions: vi.fn(async () => ({ supported: true, sessions: nativeSessions, nextCursor: null })),
     startTurn: vi.fn(async () => {
       options.onEvent({ type: "turn.started", providerSessionId: "thread-1", turnId: "turn-1", payload: { status: "running" } });
       return { turnId: "turn-1" };

@@ -17,11 +17,11 @@ import type {
   AgentSessionCloseRequest,
   AgentSessionCreateRequest,
   AgentSessionExitEvent,
-  AgentSessionListItem,
   AgentSessionMutationRequest,
   AgentSessionResumeRequest,
   AgentSessionSnapshot,
   AgentSessionsListRequest,
+  AgentSessionsListResponse,
   AgentTurnInterruptRequest,
   AgentTurnStartRequest,
   AgentTurnSteerRequest,
@@ -37,7 +37,7 @@ export interface AgentClientPort {
   createAgentSession(request: AgentSessionCreateRequest): Promise<AgentSessionSnapshot>;
   resumeAgentSession(request: AgentSessionResumeRequest): Promise<AgentSessionSnapshot | null>;
   replayAgentSession(request: AgentReplayRequest): Promise<AgentSessionSnapshot>;
-  listAgentSessions(request: AgentSessionsListRequest): Promise<AgentSessionListItem[]>;
+  listAgentSessions(request: AgentSessionsListRequest): Promise<AgentSessionsListResponse>;
   forkAgentSession(request: AgentSessionMutationRequest): Promise<AgentSessionSnapshot>;
   archiveAgentSession(request: AgentSessionMutationRequest): Promise<{ sessionId: string; archived: boolean }>;
   deleteAgentSession(request: AgentSessionMutationRequest): Promise<{ sessionId: string; deleted: boolean; nativeDeleted: boolean }>;

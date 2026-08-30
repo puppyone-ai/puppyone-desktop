@@ -153,6 +153,7 @@ export function publicSessionRecord(record) {
     selectedMode: record.selectedMode ?? null,
     lastSequence: normalizeSequence(record.lastSequence),
     partial: Boolean(record.partial),
+    origin: record.origin === "native-discovery" ? "native-discovery" : "puppyone",
   };
 }
 

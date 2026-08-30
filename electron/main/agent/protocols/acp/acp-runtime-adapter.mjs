@@ -17,6 +17,7 @@ import {
 import { boundRendererValue, redactSecrets, redactSecretText } from "../../agent-events.mjs";
 import { ACP_INLINE_IMAGE_MAX_BYTES } from "./acp-limits.mjs";
 import { buildAcpPromptBlocks, materializeAcpImageReferences } from "./acp-prompt-input.mjs";
+import { AcpHistoryCollector } from "./acp-history-collector.mjs";
 
 const METADATA_SETTLE_MS = 75;
 export { ACP_INLINE_IMAGE_MAX_BYTES } from "./acp-limits.mjs";
@@ -115,6 +116,8 @@ export class AcpRuntimeAdapter {
     this.pendingQuestions = new Map();
     this.exitExpected = false;
     this.disposed = false;
+    this.historicalEvents = [];
+    this.historyCollector = null;
   }
 
   hasActiveProcess() {
@@ -181,14 +184,51 @@ export class AcpRuntimeAdapter {
     };
   }
 
+  async discoverSessions({ cursor = null, limit = 50 } = {}) {
+    this.#assertUsable();
+    await this.#connect("history");
+    try {
+      const native = this.client?.agentCapabilities ?? {};
+      const supported = native.sessionCapabilities?.list != null || native.listSessions === true;
+      if (!supported) return { supported: false, sessions: [], nextCursor: null };
+      const response = await this.client.listSessions({
+        cwd: this.workspaceRoot,
+        ...(cursor ? { cursor } : {}),
+        limit: boundedPageSize(limit),
+      });
+      return {
+        supported: true,
+        sessions: array(response?.sessions).filter((session) => (
+          safeId(session?.sessionId) && (!session?.cwd || path.resolve(session.cwd) === this.workspaceRoot)
+        )).slice(0, boundedPageSize(limit)).map((session) => ({
+          providerSessionId: session.sessionId,
+          title: text(session.title, 500) || this.sessionTitles.resumed,
+          createdAt: normalizeDate(session.createdAt ?? session.updatedAt),
+          updatedAt: normalizeDate(session.updatedAt),
+        })),
+        nextCursor: text(response?.nextCursor, 1_024) || null,
+      };
+    } finally {
+      await this.#disconnect(`${this.runtimeDescriptor.displayName} ACP history discovery completed.`);
+    }
+  }
+
   async resumeSession({ threadId, model = null, mode = null } = {}) {
     this.#assertIdle();
     await this.#connect("session");
-    const response = await this.client.loadSession({
-      cwd: this.workspaceRoot,
-      mcpServers: [],
-      sessionId: requiredId(threadId, `${this.runtimeDescriptor.displayName} ACP session id`),
-    });
+    this.historyCollector = new AcpHistoryCollector();
+    let response;
+    try {
+      response = await this.client.loadSession({
+        cwd: this.workspaceRoot,
+        mcpServers: [],
+        sessionId: requiredId(threadId, `${this.runtimeDescriptor.displayName} ACP session id`),
+      });
+      await delay(METADATA_SETTLE_MS);
+    } finally {
+      this.historicalEvents = this.historyCollector?.events(safeId(response?.sessionId) ?? safeId(threadId)) ?? [];
+      this.historyCollector = null;
+    }
     this.sessionId = requiredId(response?.sessionId ?? threadId, `${this.runtimeDescriptor.displayName} ACP session id`);
     this.#syncSession(response);
     await this.#applySelection({ model, mode });
@@ -204,9 +244,9 @@ export class AcpRuntimeAdapter {
   }
 
   async readHistory() {
-    // Native history remains owned by the selected harness. PuppyOne deliberately does not
-    // create or persist a second transcript authority.
-    return [];
+    // PuppyOne deliberately does not persist this replay or create a second
+    // transcript authority; it is only the initial projection for this process.
+    return this.historicalEvents.slice();
   }
 
   async forkSession({ messageId = null } = {}) {
@@ -487,6 +527,7 @@ export class AcpRuntimeAdapter {
     if (!this.sessionId && safeId(notification.sessionId)) this.sessionId = notification.sessionId;
     if (notification.sessionId !== this.sessionId) return;
     const update = notification.update;
+    if (this.historyCollector) this.historyCollector.accept(notification);
     if (update?.sessionUpdate === "available_commands_update") {
       this.commands = array(update.availableCommands).slice(0, 500).map((command) => ({
         name: text(command?.name, 160).replace(/^\//u, ""),
@@ -722,6 +763,12 @@ function text(value, limit) {
   return typeof value === "string" ? value.trim().slice(0, limit) : "";
 }
 
+function normalizeDate(value) {
+  if (typeof value !== "string") return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 function record(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -736,4 +783,8 @@ function humanize(value) {
 
 function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function boundedPageSize(value) {
+  return Number.isSafeInteger(value) && value > 0 ? Math.min(value, 100) : 50;
 }

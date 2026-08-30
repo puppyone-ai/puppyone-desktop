@@ -1,0 +1,179 @@
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, History, LoaderCircle, RefreshCw, Search } from "lucide-react";
+import { useLocalization } from "@puppyone/localization/react";
+import type {
+  AgentRuntimeCatalogEntry,
+  AgentSessionListItem,
+} from "../domain/agent-contract";
+import { AgentBrandMark } from "./AgentBrandMark";
+
+type Props = {
+  sessions: readonly AgentSessionListItem[];
+  runtimes: readonly AgentRuntimeCatalogEntry[];
+  loading: boolean;
+  refreshing: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
+  error: string | null;
+  onOpen: (session: AgentSessionListItem) => void;
+  onRefresh: () => void;
+  onLoadMore: () => void;
+  onBack: () => void;
+};
+
+/** Dedicated locator-only history browser; transcript data never enters this component. */
+export function AgentConversationHistory({
+  sessions,
+  runtimes,
+  loading,
+  refreshing,
+  loadingMore,
+  hasMore,
+  error,
+  onOpen,
+  onRefresh,
+  onLoadMore,
+  onBack,
+}: Props) {
+  const { t } = useLocalization();
+  const [query, setQuery] = useState("");
+  const runtimeById = useMemo(
+    () => new Map(runtimes.map((entry) => [entry.descriptor.id, entry])),
+    [runtimes],
+  );
+  const matchingSessions = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase();
+    if (!normalized) return sessions;
+    return sessions.filter((session) => {
+      const runtimeId = session.runtimeId || session.runtime?.id || "";
+      const runtimeLabel = session.runtime?.displayName
+        || runtimeById.get(runtimeId)?.descriptor.displayName
+        || runtimeId;
+      return `${session.title}\n${runtimeLabel}`.toLocaleLowerCase().includes(normalized);
+    });
+  }, [query, runtimeById, sessions]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onBack();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onBack]);
+
+  return (
+    <section className="desktop-agent-history-view">
+      <header className="desktop-agent-history-toolbar">
+        <button
+          type="button"
+          className="desktop-agent-history-toolbar-button"
+          aria-label={t("agent.history.back")}
+          title={t("agent.history.back")}
+          onClick={onBack}
+        >
+          <ArrowLeft size={15} strokeWidth={1.7} aria-hidden="true" />
+        </button>
+        <h2 id="desktop-agent-history-title">{t("agent.history.title")}</h2>
+        <button
+          type="button"
+          className="desktop-agent-history-toolbar-button"
+          aria-label={t("agent.history.refresh")}
+          title={t("agent.history.refresh")}
+          disabled={refreshing || loadingMore}
+          onClick={onRefresh}
+        >
+          <RefreshCw
+            className={refreshing ? "is-spinning" : undefined}
+            size={12}
+            strokeWidth={1.7}
+            aria-hidden="true"
+          />
+        </button>
+      </header>
+
+      <label className="desktop-agent-history-search">
+        <Search size={13} strokeWidth={1.7} aria-hidden="true" />
+        <input
+          autoFocus
+          type="search"
+          value={query}
+          aria-label={t("agent.history.search")}
+          placeholder={t("agent.history.search")}
+          onChange={(event) => setQuery(event.currentTarget.value)}
+        />
+      </label>
+
+      {loading ? (
+        <div className="desktop-agent-history-empty" role="status">
+          <LoaderCircle className="is-spinning" size={13} aria-hidden="true" />
+          <span>{t("agent.history.loading")}</span>
+        </div>
+      ) : sessions.length === 0 ? (
+        <div className="desktop-agent-history-empty" role="status">
+          <History size={13} aria-hidden="true" />
+          <span>{t("agent.history.empty")}</span>
+        </div>
+      ) : matchingSessions.length === 0 ? (
+        <div className="desktop-agent-history-empty" role="status">
+          <Search size={13} aria-hidden="true" />
+          <span>{t("agent.history.noMatches")}</span>
+        </div>
+      ) : (
+        <ul className="desktop-agent-history-list">
+          {matchingSessions.map((session) => {
+            const runtimeId = session.runtimeId || session.runtime?.id || "";
+            const runtime = runtimeById.get(runtimeId);
+            const available = runtime?.readiness.status === "ready";
+            const runtimeLabel = session.runtime?.displayName || runtime?.descriptor.displayName || runtimeId;
+            return (
+              <li key={session.id}>
+                <button
+                  type="button"
+                  className="desktop-agent-history-option"
+                  aria-label={t("agent.history.open", { title: session.title })}
+                  title={available ? session.title : t("agent.history.unavailable", { agent: runtimeLabel })}
+                  disabled={!available}
+                  onClick={() => onOpen(session)}
+                >
+                  <AgentBrandMark
+                    iconKey={session.runtime?.iconKey || runtime?.descriptor.iconKey || runtimeId}
+                    label={runtimeLabel}
+                  />
+                  <span className="desktop-agent-history-copy">
+                    <span className="desktop-agent-history-title">{session.title}</span>
+                    <span className="desktop-agent-history-meta">
+                      <span>{runtimeLabel}</span>
+                      <time dateTime={session.updatedAt}>{formatHistoryDate(session.updatedAt)}</time>
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <footer className="desktop-agent-history-footer">
+        {hasMore && (
+          <button
+            type="button"
+            className="desktop-agent-history-more"
+            disabled={loadingMore || refreshing}
+            onClick={onLoadMore}
+          >
+            {loadingMore ? t("agent.history.loadingMore") : t("agent.history.loadMore")}
+          </button>
+        )}
+        {error && <p className="desktop-agent-history-error" role="status">{t("agent.history.refreshFailed")}</p>}
+      </footer>
+    </section>
+  );
+}
+
+function formatHistoryDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return "";
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
+}

@@ -52,4 +52,42 @@ describe("Agent conversation catalog", () => {
     });
     await expect(restarted.list("/workspace")).resolves.toHaveLength(1);
   });
+
+  it("upserts one stable product locator for a native conversation discovered more than once", async () => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "puppyone-agent-catalog-"));
+    temporaryDirectories.push(directory);
+    const filePath = path.join(directory, "catalog.json");
+    const catalog = createAgentConversationCatalog({ filePath });
+
+    const first = await catalog.upsertNative({
+      workspaceRoot: "/workspace",
+      runtimeId: "codex",
+      runtime: { id: "codex", displayName: "Codex" },
+      providerSessionId: "native-thread",
+      title: "Initial title",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:01.000Z",
+      events: [{ payload: { text: "must not be persisted" } }],
+    });
+    const second = await catalog.upsertNative({
+      workspaceRoot: "/workspace",
+      runtimeId: "codex",
+      runtime: { id: "codex", displayName: "Codex" },
+      providerSessionId: "native-thread",
+      title: "Updated title",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-02T00:00:00.000Z",
+    });
+
+    expect(second.sessionId).toBe(first.sessionId);
+    await expect(catalog.list("/workspace", { runtimeId: "codex" })).resolves.toEqual([
+      expect.objectContaining({
+        sessionId: first.sessionId,
+        providerSessionId: "native-thread",
+        title: "Updated title",
+        origin: "native-discovery",
+      }),
+    ]);
+    expect(await fs.promises.readFile(filePath, "utf8")).not.toContain("must not be persisted");
+  });
 });

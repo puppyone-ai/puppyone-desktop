@@ -1,6 +1,7 @@
 export type AgentChatTabPresentation = {
   title: string;
   runtimeLabel: string | null;
+  sessionId: string | null;
   statusCode: string;
   running: boolean;
 };
@@ -87,6 +88,7 @@ function createTab(id: string, ordinal: number, title: string): AgentChatTab {
     ordinal,
     title,
     runtimeLabel: null,
+    sessionId: null,
     statusCode: "checking",
     running: false,
   };
@@ -95,6 +97,7 @@ function createTab(id: string, ordinal: number, title: string): AgentChatTab {
 function presentationEqual(left: AgentChatTab, right: AgentChatTabPresentation) {
   return left.title === right.title
     && left.runtimeLabel === right.runtimeLabel
+    && left.sessionId === right.sessionId
     && left.statusCode === right.statusCode
     && left.running === right.running;
 }

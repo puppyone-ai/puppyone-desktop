@@ -11,6 +11,9 @@ export function createAgentSessionRepository({ eventCache, conversationCatalog }
     async save(record) {
       await Promise.all([eventCache.save(record), conversationCatalog.save(record)]);
     },
+    upsertNative(record) {
+      return conversationCatalog.upsertNative(record);
+    },
     async findById(sessionId, workspaceRoot = null) {
       return await eventCache.findById(sessionId, workspaceRoot)
         ?? conversationCatalog.findById(sessionId, workspaceRoot);

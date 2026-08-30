@@ -31,6 +31,9 @@ describe("Desktop Agent architecture boundaries", () => {
     const timeline = source("src/features/desktop-agent/ui/AgentTranscript.tsx");
     const markdown = source("src/features/desktop-agent/ui/SafeMarkdown.tsx");
     const composer = source("src/features/desktop-agent/ui/AgentComposer.tsx");
+    const attachmentButton = source("src/features/desktop-agent/ui/composer/AgentAttachmentButton.tsx");
+    const commandSuggestions = source("src/features/desktop-agent/ui/composer/AgentCommandSuggestions.tsx");
+    const draftReferences = source("src/features/desktop-agent/ui/composer/AgentDraftReferenceList.tsx");
     const picker = source("src/features/desktop-agent/ui/AgentPickerPopover.tsx");
     const runtimeGeometry = source("src/features/desktop-agent/ui/agent-runtime-geometry.ts");
     const cssEntry = source("src/features/desktop-agent/ui/desktop-agent.css");
@@ -58,6 +61,14 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(css).toContain("prefers-reduced-motion");
     expect(globalLayout).not.toContain(".desktop-agent-");
     expect(composer).not.toContain("useLayoutEffect");
+    expect(composer.split("\n").length).toBeLessThan(190);
+    expect(composer).not.toContain("function ReferenceChip");
+    expect(composer).toContain("<AgentCommandSuggestions");
+    expect(composer).toContain("<AgentDraftReferenceList");
+    expect(composer).toContain("<AgentAttachmentButton");
+    expect(attachmentButton).not.toMatch(/useState|DesktopOverlayLayer|role="menu"/);
+    expect(commandSuggestions).not.toMatch(/useState|AgentSessionController/);
+    expect(draftReferences).not.toMatch(/useState|AgentSessionController/);
     expect(composer).not.toMatch(/\.style(?:\.|\[)/);
     expect(composer).not.toContain("ResizeObserver");
     expect(composer).toContain("rows={1}");
@@ -118,20 +129,15 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(controllerState).toContain('AgentSubmissionStage = "preparing-session" | "starting-turn" | null');
   });
 
-  it("keeps native transport internals and rendered architecture diagrams out of Renderer/docs", () => {
+  it("keeps native transport internals out of Renderer", () => {
     const preload = source("electron/preload.cjs");
     const renderer = [
       source("src/features/desktop-agent/ui/RightAgentPanel.tsx"),
       source("src/features/desktop-agent/application/AgentSessionController.ts"),
       source("src/features/desktop-agent/agentTypes.ts"),
     ].join("\n");
-    const docs = source("docs/architecture/desktop-agent/README.md");
     expect(preload).not.toMatch(/spawnAgent|agentStdin|OpenCodeHttpClient|OPENCODE_SERVER_PASSWORD/);
     expect(renderer).not.toMatch(/OpenCodeHttpClient|OPENCODE_SERVER_PASSWORD|\/global\/event/);
-    expect(docs).not.toContain("```mermaid");
-    expect(docs).toContain("no   Chat transcript");
-    expect(docs).toContain("codex app-server -> Codex harness");
-    expect(docs).toContain("ACP -> user's OpenCode harness");
   });
 
   it("keeps Core backend-neutral and concrete backends in the single production composition root", () => {

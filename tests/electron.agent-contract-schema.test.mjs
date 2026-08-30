@@ -110,6 +110,56 @@ describe("shared Agent contract", () => {
     })).toThrow(/modelCount/i);
   });
 
+  it("bounds native history discovery and strips transcript-shaped list fields", () => {
+    expect(parseAgentIpcRequest("agent:sessions-list", {
+      rootPath: "/workspace",
+      runtimeId: "codex",
+      discoverNative: true,
+      cursor: "page-2",
+      limit: 20,
+      scanPrivateDatabase: true,
+    })).toEqual({
+      rootPath: "/workspace",
+      runtimeId: "codex",
+      discoverNative: true,
+      cursor: "page-2",
+      limit: 20,
+    });
+    const response = assertAgentIpcResponse("agent:sessions-list", {
+      sessions: [{
+        id: "session-1",
+        runtimeId: "codex",
+        provider: "codex",
+        providerSessionId: "thread-1",
+        workspaceRoot: "/workspace",
+        title: "Saved thread",
+        createdAt: "2026-08-29T00:00:00.000Z",
+        updatedAt: "2026-08-30T00:00:00.000Z",
+        terminalState: "idle",
+        selectedModel: null,
+        lastSequence: 0,
+        origin: "native-discovery",
+        transcript: [{ role: "user", text: "must not cross" }],
+        events: [{ payload: { secret: true } }],
+      }],
+      discovery: {
+        runtimeId: "codex",
+        status: "partial",
+        nextCursor: "page-3",
+        indexed: 1,
+        warnings: [],
+      },
+      warnings: [],
+    });
+    expect(response.sessions[0]).not.toHaveProperty("transcript");
+    expect(response.sessions[0]).not.toHaveProperty("events");
+    expect(() => assertAgentIpcResponse("agent:sessions-list", {
+      sessions: [],
+      discovery: { runtimeId: "codex", status: "scanning-everything", nextCursor: null, indexed: 0, warnings: [] },
+      warnings: [],
+    })).toThrow(/discovery.status/i);
+  });
+
   it("requires methods for capabilities a runtime advertises", () => {
     expect(() => assertAgentRuntimeCapabilities({}, { manualApprovals: true }, "fixture")).toThrow(/resolveApproval/i);
     expect(assertAgentRuntimeCapabilities({ resolveApproval: vi.fn() }, { manualApprovals: true }, "fixture").manualApprovals).toBe(true);

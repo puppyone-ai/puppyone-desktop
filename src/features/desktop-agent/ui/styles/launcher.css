@@ -18,6 +18,7 @@
   width: min(100%, 252px);
   min-width: 0;
   flex-direction: column;
+  gap: 10px;
 }
 
 .desktop-agent-runtime-launcher-group {
@@ -93,6 +94,11 @@
 .desktop-agent-runtime-launcher-refresh:hover {
   background: var(--agent-row-hover-surface);
   color: var(--agent-text-muted);
+}
+
+.desktop-agent-runtime-launcher-refresh:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 .desktop-agent-runtime-launcher-refresh:focus-visible {
@@ -183,10 +189,296 @@
   text-align: center;
 }
 
+.desktop-agent-runtime-launcher-history {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--agent-text-subtle);
+  cursor: var(--po-clickable-cursor, pointer);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.desktop-agent-runtime-launcher-history:hover {
+  background: var(--agent-row-hover-surface);
+  color: var(--agent-text-muted);
+}
+
+.desktop-agent-runtime-launcher-history:focus-visible {
+  outline: 1px solid var(--po-focus-ring);
+  outline-offset: 1px;
+}
+
+.desktop-agent-runtime-launcher.is-history {
+  place-items: stretch center;
+  padding: 14px 12px 12px;
+  overflow: hidden;
+}
+
+.desktop-agent-history-view {
+  display: grid;
+  width: min(100%, 380px);
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin-inline: auto;
+  grid-template-rows: 32px 34px minmax(0, 1fr) auto;
+  row-gap: 8px;
+}
+
+.desktop-agent-history-toolbar {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  align-items: center;
+}
+
+.desktop-agent-history-toolbar h2 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--agent-text);
+  font-family: var(--po-font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-agent-history-toolbar-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--agent-text-subtle);
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.desktop-agent-history-toolbar-button:hover:not(:disabled) {
+  background: var(--agent-row-hover-surface);
+  color: var(--agent-text);
+}
+
+.desktop-agent-history-toolbar-button:focus-visible {
+  border-color: var(--po-focus-ring);
+  outline: 0;
+}
+
+.desktop-agent-history-toolbar-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.desktop-agent-history-search {
+  display: grid;
+  min-width: 0;
+  height: 32px;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 1px solid var(--agent-border-subtle);
+  border-radius: 7px;
+  background: var(--agent-control-surface);
+  color: var(--agent-text-subtle);
+}
+
+.desktop-agent-history-search:focus-within {
+  border-color: var(--po-focus-ring);
+}
+
+.desktop-agent-history-search input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--agent-text);
+  font: inherit;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.desktop-agent-history-search input::placeholder {
+  color: var(--agent-text-subtle);
+}
+
+.desktop-agent-history-list {
+  display: flex;
+  min-height: 0;
+  margin: 0;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-gutter: stable;
+}
+
+.desktop-agent-history-list > li {
+  display: block;
+  min-width: 0;
+}
+
+.desktop-agent-history-option {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--agent-text-muted);
+  cursor: var(--po-clickable-cursor, pointer);
+  font: inherit;
+  text-align: start;
+}
+
+.desktop-agent-history-option:hover {
+  background: var(--agent-row-hover-surface);
+  color: var(--agent-text);
+}
+
+.desktop-agent-history-option:focus-visible {
+  border-color: var(--po-focus-ring);
+  outline: 0;
+  box-shadow: inset 0 0 0 1px var(--po-focus-ring);
+}
+
+.desktop-agent-history-option:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.desktop-agent-history-option .desktop-agent-brand-mark {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border-radius: 4px;
+}
+
+.desktop-agent-history-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.desktop-agent-history-title {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-agent-history-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--agent-text-subtle);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.desktop-agent-history-meta > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-agent-history-meta time {
+  flex: 0 0 auto;
+}
+
+.desktop-agent-history-empty {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 3px 8px;
+  color: var(--agent-text-subtle);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.desktop-agent-history-footer {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.desktop-agent-history-more {
+  align-self: center;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--agent-text-subtle);
+  cursor: var(--po-clickable-cursor, pointer);
+  font: inherit;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.desktop-agent-history-more:hover {
+  background: var(--agent-row-hover-surface);
+  color: var(--agent-text-muted);
+}
+
+.desktop-agent-history-more:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.desktop-agent-history-error {
+  margin: 0;
+  color: var(--po-warning, #b7791f);
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+}
+
+.desktop-agent-runtime-launcher .is-spinning {
+  animation: desktop-agent-runtime-launcher-spin 900ms linear infinite;
+}
+
 @keyframes desktop-agent-runtime-launcher-option-enter {
   from {
     opacity: 0;
     transform: translateY(2px);
+  }
+}
+
+@keyframes desktop-agent-runtime-launcher-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -204,6 +496,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .desktop-agent-runtime-launcher-option {
+    animation: none;
+  }
+
+  .desktop-agent-runtime-launcher .is-spinning {
     animation: none;
   }
 }

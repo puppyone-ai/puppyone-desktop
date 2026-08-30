@@ -36,14 +36,19 @@ describe("Desktop Agent and Terminal chrome visual contract", () => {
     expect(launcherCss).toMatch(/\.desktop-agent-runtime-launcher-option \.desktop-agent-brand-mark\s*\{[^}]*width:\s*18px[^}]*height:\s*18px[^}]*border-radius:\s*4px/s);
     expect(launcherCss).not.toMatch(/\.desktop-agent-runtime-launcher-heading h2\s*\{[^}]*font-size:\s*15px/s);
     expect(launcherCss).not.toMatch(/\.desktop-agent-runtime-launcher-option\s*\{[^}]*min-height:\s*38px/s);
-    expect(launcher).toContain('aria-describedby="desktop-agent-runtime-launcher-description"');
+    expect(launcher).toContain('aria-describedby={historyOpen ? undefined : "desktop-agent-runtime-launcher-description"}');
     expect(launcher).toContain('className="desktop-agent-runtime-launcher-description"');
+    expect(launcher).toContain('className="desktop-agent-runtime-launcher-history"');
+    expect(launcher).toContain('historyOpen ? (');
+    expect(launcherCss).toMatch(/\.desktop-agent-history-list\s*\{[^}]*overflow-y:\s*auto/s);
   });
 
   it("matches Terminal tab typography and control geometry", () => {
     expect(terminalTabsCss).toContain("--desktop-terminal-tab-control-height: 28px;");
     expect(terminalTabsCss).toContain("--desktop-terminal-tab-width: 144px;");
-    expect(terminalTabsCss).toMatch(/\.desktop-terminal-subheader\s*\{[^}]*height:\s*38px/s);
+    expect(terminalTabsCss).toMatch(
+      /\.desktop-terminal-subheader\s*\{[^}]*height:\s*var\(--desktop-terminal-group-header-size, 38px\)/s,
+    );
     expect(terminalTabsCss).toMatch(/\.desktop-terminal-tab-select\s*\{[^}]*font-size:\s*var\(--desktop-sidebar-font-size, var\(--po-text-size-sidebar, 13px\)\)[^}]*line-height:\s*var\(--desktop-sidebar-line-height, 18px\)/s);
 
     expect(tabsCss).toContain("--desktop-agent-tab-control-height: 28px;");

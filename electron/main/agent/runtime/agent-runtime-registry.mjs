@@ -1,15 +1,22 @@
 import { assertAgentRuntimePort } from "./agent-runtime-port.mjs";
 import { sanitizeAgentRuntimeDescriptor } from "../../../../shared/agent-contract/runtime-schema.mjs";
+import {
+  defineAgentRuntimeManifest,
+  runtimeDescriptorFromManifest,
+} from "./agent-runtime-manifest.mjs";
 
 export class AgentRuntimeRegistry {
   constructor(definitions, { defaultRuntimeId = null } = {}) {
     this.definitions = new Map();
-    for (const definition of definitions) {
-      validateDefinition(definition);
-      if (this.definitions.has(definition.descriptor.id)) {
-        throw new Error(`Duplicate Agent runtime: ${definition.descriptor.id}`);
+    for (const candidate of definitions) {
+      validateDefinition(candidate);
+      const manifest = defineAgentRuntimeManifest(candidate.manifest);
+      const descriptor = runtimeDescriptorFromManifest(manifest);
+      const definition = Object.freeze({ ...candidate, manifest, descriptor });
+      if (this.definitions.has(manifest.id)) {
+        throw new Error(`Duplicate Agent runtime: ${manifest.id}`);
       }
-      this.definitions.set(definition.descriptor.id, definition);
+      this.definitions.set(manifest.id, definition);
     }
     if (this.definitions.size === 0) throw new Error("At least one Agent runtime must be registered.");
     const defaultId = defaultRuntimeId ?? this.descriptors()[0]?.id ?? null;
@@ -21,6 +28,11 @@ export class AgentRuntimeRegistry {
     return Array.from(this.definitions.values())
       .map((definition) => sanitizeAgentRuntimeDescriptor(definition.descriptor))
       .sort((left, right) => right.priority - left.priority || left.id.localeCompare(right.id));
+  }
+
+  /** Main-process-only manifests. Renderer/API callers receive descriptors. */
+  manifests() {
+    return this.descriptors().map((descriptor) => this.require(descriptor.id).manifest);
   }
 
   async discover({ refresh = false } = {}) {
@@ -91,6 +103,7 @@ export class AgentRuntimeHost {
   }
 
   descriptors() { return this.registry.descriptors(); }
+  manifests() { return this.registry.manifests(); }
   discover(options) { return this.registry.discover(options); }
   select(catalog, runtimeId) { return this.registry.select(catalog, runtimeId); }
   createAdapter(runtimeId, options) { return this.registry.createAdapter(runtimeId, options); }
@@ -116,17 +129,15 @@ export function publicRuntimeReadiness(entry) {
 }
 
 function validateDefinition(definition) {
-  const descriptor = definition?.descriptor;
-  if (!descriptor || !/^[a-z][a-z0-9-]{1,39}$/.test(descriptor.id)) {
-    throw new TypeError("Agent runtime descriptor id is invalid.");
+  if (!definition?.manifest) throw new TypeError("Agent runtime definition requires a manifest.");
+  if (Object.prototype.hasOwnProperty.call(definition, "descriptor")) {
+    throw new TypeError("Agent runtime descriptors are derived from manifests and must not be registered separately.");
   }
-  if (typeof descriptor.displayName !== "string" || !descriptor.displayName.trim()) {
-    throw new TypeError(`Agent runtime ${descriptor.id} requires a display name.`);
-  }
+  const manifest = defineAgentRuntimeManifest(definition.manifest);
   if (!definition.discovery || typeof definition.discovery.discover !== "function") {
-    throw new TypeError(`Agent runtime ${descriptor.id} requires discovery.`);
+    throw new TypeError(`Agent runtime ${manifest.id} requires discovery.`);
   }
   if (typeof definition.createAdapter !== "function") {
-    throw new TypeError(`Agent runtime ${descriptor.id} requires an adapter factory.`);
+    throw new TypeError(`Agent runtime ${manifest.id} requires an adapter factory.`);
   }
 }

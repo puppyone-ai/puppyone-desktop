@@ -95,6 +95,9 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
               preferredModel={preferredModel}
               onPreferredModelChange={onPreferredModelChange}
               enabledRuntimeIds={enabledRuntimeIds}
+              openSessionIds={tabs.tabs.flatMap((candidate) => (
+                candidate.id !== tab.id && candidate.sessionId ? [candidate.sessionId] : []
+              ))}
             />
           </div>
         ))}
@@ -105,6 +108,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
 
 type AgentTabHostProps = Omit<RightAgentPanelProps, "onRunningChange"> & {
   tabId: string;
+  openSessionIds: readonly string[];
   onPresentationChange: (tabId: string, presentation: AgentChatTabPresentation) => void;
 };
 
@@ -113,6 +117,7 @@ function AgentTabHost({
   active,
   workspace,
   onPresentationChange,
+  openSessionIds,
   ...panelProps
 }: AgentTabHostProps) {
   const controller = useMemo(
@@ -133,5 +138,6 @@ function AgentTabHost({
     preferredRoute={panelProps.preferredRoute ?? {}}
     preferredModel={panelProps.preferredModel ?? null}
     enabledRuntimeIds={panelProps.enabledRuntimeIds ?? null}
+    openSessionIds={openSessionIds}
   />;
 }

@@ -27,6 +27,18 @@ describe("Agent production composition", () => {
     expect(host.select(catalog, "codex")?.descriptor.id).toBe("codex");
     expect(host.select(catalog, "missing")).toBeNull();
     expect(host.require("claude").descriptor.displayName).toBe("Claude Agent");
+    expect(host.manifests().map((runtime) => [
+      runtime.id,
+      runtime.integration.kind,
+      runtime.protocol.kind,
+      runtime.trust.level,
+    ])).toEqual([
+      ["puppyone-agent", "managed-harness", "acp", "bundled-verified"],
+      ["codex", "specialized-native", "app-server", "first-party"],
+      ["claude", "specialized-native", "agent-sdk", "first-party"],
+      ["opencode-native", "native-protocol", "acp", "first-party"],
+      ["cursor", "native-protocol", "acp", "first-party"],
+    ]);
     await host.dispose();
   });
 

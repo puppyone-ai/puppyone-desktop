@@ -1,8 +1,8 @@
 import { ClaudeAgentSdkAdapter } from "./claude-agent-sdk-adapter.mjs";
 import { createClaudeDiscovery } from "./claude-discovery.mjs";
-import { CLAUDE_RUNTIME_DESCRIPTOR } from "./claude-identity.mjs";
+import { CLAUDE_RUNTIME_MANIFEST } from "./claude-identity.mjs";
 
-export { CLAUDE_RUNTIME_DESCRIPTOR } from "./claude-identity.mjs";
+export { CLAUDE_RUNTIME_DESCRIPTOR, CLAUDE_RUNTIME_MANIFEST } from "./claude-identity.mjs";
 
 export function createClaudeRuntimeDefinition({
   appVersion = "0.0.0",
@@ -12,7 +12,7 @@ export function createClaudeRuntimeDefinition({
   logger = console,
 } = {}) {
   return {
-    descriptor: CLAUDE_RUNTIME_DESCRIPTOR,
+    manifest: CLAUDE_RUNTIME_MANIFEST,
     discovery,
     createAdapter: (options) => adapterFactory({ ...options, appVersion, sdkLoader, logger }),
   };

@@ -210,7 +210,7 @@ export function AgentPickerPopover({
         onKeyDown={handleTriggerKeyDown}
       >
         {triggerIcon && <span className="desktop-agent-picker-trigger-mark">{triggerIcon}</span>}
-        {!compact && <span>{valueLabel || placeholder}</span>}
+        {!compact && <span className="desktop-agent-picker-trigger-value" dir="auto">{valueLabel || placeholder}</span>}
         {!compact && <ChevronDown size={12} aria-hidden="true" />}
       </button>
       {open && (
@@ -259,13 +259,13 @@ export function AgentPickerPopover({
                 aria-selected={Boolean(option.selected)}
                 aria-disabled={!option.selectable || undefined}
                 tabIndex={option.id === activeOptionId ? 0 : -1}
-                className={`desktop-agent-picker-option is-${option.kind || "status"}${option.selected ? " is-selected" : ""}${option.warning ? " has-warning" : ""}${!option.selectable ? " is-unavailable" : ""}`}
+                className={`desktop-agent-picker-option is-${option.kind || "status"}${option.icon === null ? " has-no-icon" : ""}${option.selected ? " is-selected" : ""}${option.warning ? " has-warning" : ""}${!option.selectable ? " is-unavailable" : ""}`}
                 key={option.id}
                 onClick={() => choose(option)}
                 onFocus={() => setActiveOptionId(option.id)}
                 onKeyDown={(event) => handleOptionKeyDown(event, option)}
               >
-                <span className="desktop-agent-picker-option-icon" aria-hidden="true">{option.icon || initial(option.label)}</span>
+                {option.icon !== null && <span className="desktop-agent-picker-option-icon" aria-hidden="true">{option.icon || initial(option.label)}</span>}
                 <span className="desktop-agent-picker-option-copy">
                   <span><strong dir="auto">{option.label}</strong>{option.meta && <small dir="auto">{option.meta}</small>}</span>
                 </span>

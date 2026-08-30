@@ -59,10 +59,34 @@ describe("Cursor ACP runtime", () => {
     await vi.waitFor(() => expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "turn.completed" })));
     await adapter.dispose();
   });
+
+  it("discovers and hydrates native ACP sessions only when the runtime advertises the capabilities", async () => {
+    const connection = new FakeCursorConnection({ list: true, replayHistory: true });
+    const adapter = new CursorAcpAdapter({
+      readiness: { executablePath: "/tools/agent", environment: {}, version: "2026.08.1", source: "path-installation" },
+      workspaceRoot: "/workspace",
+      appVersion: "0.3.11",
+      connectionFactory: () => connection,
+      fileSystemFactory: () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn() }),
+      projectInstructionLoader: vi.fn(async () => ({ source: null, text: "", bytes: 0 })),
+    });
+
+    await expect(adapter.discoverSessions({ cursor: "opaque", limit: 20 })).resolves.toEqual({
+      supported: true,
+      sessions: [expect.objectContaining({ providerSessionId: "cursor-history", title: "Fix tabs" })],
+      nextCursor: null,
+    });
+    await adapter.resumeSession({ threadId: "cursor-history" });
+    await expect(adapter.readHistory()).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "turn.started", payload: { prompt: "Fix tabs" } }),
+      expect.objectContaining({ type: "assistant.completed", payload: { text: "Done" } }),
+    ]));
+    await adapter.dispose();
+  });
 });
 
 class FakeCursorConnection extends EventEmitter {
-  constructor() {
+  constructor({ list = false, replayHistory = false } = {}) {
     super();
     this.closed = false;
     this.prompt = deferred();
@@ -72,17 +96,27 @@ class FakeCursorConnection extends EventEmitter {
         agentInfo: { name: "Cursor", version: "2026.08.1" },
         agentCapabilities: {
           loadSession: true,
-          sessionCapabilities: { resume: {} },
+          sessionCapabilities: { resume: {}, ...(list ? { list: {} } : {}) },
           promptCapabilities: { image: true },
           _meta: { cursor: { askQuestion: 1 } },
         },
         authMethods: [{ id: "cursor_login" }],
       };
       if (method === "authenticate") return {};
-      if (method === "session/new" || method === "session/load") return {
-        sessionId: "cursor-session",
-        modes: { currentModeId: "agent", availableModes: [{ id: "agent", name: "Agent" }, { id: "plan", name: "Plan" }] },
+      if (method === "session/list") return {
+        sessions: [{ sessionId: "cursor-history", cwd: "/workspace", title: "Fix tabs", updatedAt: "2026-08-30T00:00:00.000Z" }],
       };
+      if (method === "session/new" || method === "session/load") {
+        if (method === "session/load" && replayHistory) queueMicrotask(() => {
+          this.sendUpdate({ sessionUpdate: "user_message_chunk", messageId: "user-1", content: { type: "text", text: "Fix " } }, "cursor-history");
+          this.sendUpdate({ sessionUpdate: "user_message_chunk", messageId: "user-1", content: { type: "text", text: "tabs" } }, "cursor-history");
+          this.sendUpdate({ sessionUpdate: "agent_message_chunk", messageId: "assistant-1", content: { type: "text", text: "Done" } }, "cursor-history");
+        });
+        return {
+          sessionId: method === "session/load" ? "cursor-history" : "cursor-session",
+          modes: { currentModeId: "agent", availableModes: [{ id: "agent", name: "Agent" }, { id: "plan", name: "Plan" }] },
+        };
+      }
       if (method === "session/prompt") return this.prompt.promise;
       if (method === "session/set_mode") return {};
       throw new Error(`Unexpected Cursor ACP request: ${method}`);
@@ -91,7 +125,7 @@ class FakeCursorConnection extends EventEmitter {
     this.respond = vi.fn();
     this.respondError = vi.fn();
   }
-  sendUpdate(update) { this.emit("notification", { method: "session/update", params: { sessionId: "cursor-session", update } }); }
+  sendUpdate(update, sessionId = "cursor-session") { this.emit("notification", { method: "session/update", params: { sessionId, update } }); }
   sendRequest(id, method, params) { this.emit("request", { id, method, params }); }
   finishPrompt(result) { this.prompt.resolve(result); this.prompt = deferred(); }
   dispose(reason, { expected = true } = {}) { this.closed = true; this.emit("exit", { expected, reason }); }
