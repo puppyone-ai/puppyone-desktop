@@ -4,8 +4,7 @@ import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } f
 import type { CreateNewMenuSettings, DarkThemePreset, ExperimentalSettings, FilesVisibilitySettings, GitSidebarLayout, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, LocalAgentsSettings, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
 import type { MarkdownPresentationSettings } from "../markdown/markdownPresentation";
-import type { SurfaceThemePreferences } from "../themes/themePreferences";
-import type { ThemeCatalogController } from "../themes/useThemeCatalog";
+import type { SubThemeCatalogController } from "../themes/useSubThemeCatalog";
 
 export type SettingsSection = "general" | "privacy" | "local-project" | "appearance" | "local-agents" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
 
@@ -26,8 +25,8 @@ export type SettingsViewProps = {
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
   markdownPresentation: MarkdownPresentationSettings;
-  surfaceThemePreferences: SurfaceThemePreferences;
-  themeCatalog: ThemeCatalogController;
+  requestedSubThemeId: string;
+  subThemeCatalog: SubThemeCatalogController;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
   sidebarNavigationVisibilitySettings: SidebarNavigationVisibilitySettings;
@@ -56,7 +55,7 @@ export type SettingsViewProps = {
   onPointerCursorsChange: (enabled: boolean) => void;
   onMarkdownPresentationChange: (settings: MarkdownPresentationSettings) => void;
   onSelectSettingsSection: (section: SettingsSection) => void;
-  onThemePackChange: (themeId: string) => void;
+  onSubThemeChange: (subThemeId: string) => void;
   onFileIconThemeChange: (theme: FileIconThemeId) => void;
   onSidebarNavigationLayoutChange: (layout: SidebarNavigationLayout) => void;
   onSidebarNavigationVisibilitySettingsChange: (settings: SidebarNavigationVisibilitySettings) => void;

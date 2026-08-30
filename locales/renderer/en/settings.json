@@ -2,7 +2,7 @@
   "appearance.title": "Appearance",
   "appearance.detail": "Local display preferences for this device.",
   "appearance.themes.title": "Theme",
-  "appearance.themes.pack": "Theme pack",
+  "appearance.themes.pack": "Visual variant",
   "appearance.themes.add": "Add Theme",
   "appearance.themes.addUnavailable": "Theme gallery URL is not configured yet.",
   "appearance.themes.openFolder": "Open Themes Folder",

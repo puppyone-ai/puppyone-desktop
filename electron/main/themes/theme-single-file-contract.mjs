@@ -1,7 +1,14 @@
 import postcss from "postcss";
 import { parseThemeManifest, THEME_TARGETS } from "./theme-package-contract.mjs";
 
-const metadataProperties = new Set(["id", "name", "version", "author", "modes"]);
+const metadataProperties = new Set([
+  "id",
+  "name",
+  "version",
+  "author",
+  "modes",
+  "compatible-root-themes",
+]);
 const targetSet = new Set(THEME_TARGETS);
 
 export function parseSingleFileThemeCss(css, { sourcePath = "theme.css" } = {}) {
@@ -61,6 +68,9 @@ export function parseSingleFileThemeCss(css, { sourcePath = "theme.css" } = {}) 
     schemaVersion: 1,
     ...rawMetadata,
     modes: rawMetadata.modes?.split(/\s+/).filter(Boolean),
+    compatibleRootThemeIds: rawMetadata["compatible-root-themes"]
+      ?.split(/\s+/)
+      .filter(Boolean),
     targets,
     entrypoints: Object.fromEntries(targets.map((target) => [target, `${target}.css`])),
   });
@@ -74,6 +84,8 @@ export function parseSingleFileThemeCss(css, { sourcePath = "theme.css" } = {}) 
     id: manifest.id,
     name: manifest.name,
     version: manifest.version,
+    contractVersion: manifest.contractVersion,
+    compatibleRootThemeIds: manifest.compatibleRootThemeIds,
     ...(manifest.author === undefined ? {} : { author: manifest.author }),
     modes: manifest.modes,
     targets: manifest.targets,

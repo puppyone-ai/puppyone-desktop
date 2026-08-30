@@ -26,8 +26,7 @@ import type {
 import { SettingsView } from "./SettingsView";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
 import type { MarkdownPresentationSettings } from "../markdown/markdownPresentation";
-import type { SurfaceThemePreferences } from "../themes/themePreferences";
-import type { ThemeCatalogController } from "../themes/useThemeCatalog";
+import type { SubThemeCatalogController } from "../themes/useSubThemeCatalog";
 import { SettingsSidebar } from "./sidebar";
 import type { SettingsSection } from "./types";
 
@@ -43,7 +42,7 @@ export type SettingsPreferencesPort = {
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
   markdownPresentation: MarkdownPresentationSettings;
-  surfaceThemePreferences: SurfaceThemePreferences;
+  requestedSubThemeId: string;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
   sidebarNavigationVisibilitySettings: SidebarNavigationVisibilitySettings;
@@ -62,7 +61,7 @@ export type SettingsPreferencesPort = {
   setTypographyPreferences: (value: TypographyPreferences) => void;
   setPointerCursors: (value: boolean) => void;
   setMarkdownPresentation: (value: MarkdownPresentationSettings) => void;
-  setThemePack: (themeId: string) => void;
+  setSubThemeId: (subThemeId: string) => void;
   setFileIconTheme: (value: FileIconThemeId) => void;
   setSidebarNavigationLayout: (value: SidebarNavigationLayout) => void;
   setSidebarNavigationVisibilitySettings: (value: SidebarNavigationVisibilitySettings) => void;
@@ -78,7 +77,7 @@ export type SettingsWorkspaceSurfaceProps = {
   activeSection: SettingsSection;
   onSelectSection: (section: SettingsSection) => void;
   preferences: SettingsPreferencesPort;
-  themeCatalog: ThemeCatalogController;
+  subThemeCatalog: SubThemeCatalogController;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
   git: {
     status: GitStatusSnapshot | null;
@@ -115,7 +114,7 @@ export function createSettingsWorkspaceSurface({
   onFilesVisibilitySettingsChange,
   onSelectSection,
   preferences,
-  themeCatalog,
+  subThemeCatalog,
   updates,
   workspace,
   workspaceConfig,
@@ -146,8 +145,8 @@ export function createSettingsWorkspaceSurface({
         typographyPreferences={preferences.typographyPreferences}
         pointerCursors={preferences.pointerCursors}
         markdownPresentation={preferences.markdownPresentation}
-        surfaceThemePreferences={preferences.surfaceThemePreferences}
-        themeCatalog={themeCatalog}
+        requestedSubThemeId={preferences.requestedSubThemeId}
+        subThemeCatalog={subThemeCatalog}
         fileIconTheme={preferences.fileIconTheme}
         sidebarNavigationLayout={preferences.sidebarNavigationLayout}
         sidebarNavigationVisibilitySettings={preferences.sidebarNavigationVisibilitySettings}
@@ -176,7 +175,7 @@ export function createSettingsWorkspaceSurface({
         onPointerCursorsChange={preferences.setPointerCursors}
         onMarkdownPresentationChange={preferences.setMarkdownPresentation}
         onSelectSettingsSection={onSelectSection}
-        onThemePackChange={preferences.setThemePack}
+        onSubThemeChange={preferences.setSubThemeId}
         onFileIconThemeChange={preferences.setFileIconTheme}
         onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
         onSidebarNavigationVisibilitySettingsChange={preferences.setSidebarNavigationVisibilitySettings}

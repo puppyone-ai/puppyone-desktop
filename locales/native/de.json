@@ -3,7 +3,7 @@
   "native.dock.newWindow": "Neues Fenster",
   "native.menu.file": "Datei",
   "native.menu.theme": "Theme",
-  "native.menu.theme.pack": "Designpaket",
+  "native.menu.theme.pack": "Visuelle Variante",
   "native.menu.theme.openFolder": "Theme-Ordner öffnen",
   "native.menu.checkForUpdates": "Nach Updates suchen…",
   "native.update.manual.ok": "OK",

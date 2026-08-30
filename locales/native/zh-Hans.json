@@ -3,7 +3,7 @@
   "native.dock.newWindow": "新建窗口",
   "native.menu.file": "文件",
   "native.menu.theme": "主题",
-  "native.menu.theme.pack": "主题套装",
+  "native.menu.theme.pack": "视觉变体",
   "native.menu.theme.openFolder": "打开主题文件夹",
   "native.menu.checkForUpdates": "检查更新…",
   "native.update.manual.ok": "好",

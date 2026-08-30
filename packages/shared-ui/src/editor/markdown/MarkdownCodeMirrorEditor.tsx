@@ -40,7 +40,7 @@ import {
 import { bindMarkdownFormatHotkeys } from "./core/commands/markdownFormatHotkeys";
 import { CodeMirrorFindAdapter } from "../find/codeMirrorFindAdapter";
 import { useRegisterEditorFindAdapter } from "../find/editorFind";
-import { useThemeSurfaceId } from "../../core/theme/ThemeSurfaceContext";
+import { useEditorAppearanceRevision } from "../../core/appearance/EditorAppearanceContext";
 
 const rendererPerformance = getRendererPerformanceTracker();
 
@@ -97,7 +97,7 @@ export function MarkdownCodeMirrorEditor({
   onPreviewReady,
   onPreviewError,
 }: MarkdownCodeMirrorEditorProps) {
-  const themeId = useThemeSurfaceId("markdown");
+  const appearanceRevision = useEditorAppearanceRevision();
   const { direction, formatNumber, locale, t } = useLocalization();
   const localization = useMemo(
     () => ({ direction, formatNumber, locale, t }),
@@ -568,7 +568,7 @@ export function MarkdownCodeMirrorEditor({
 
   useLayoutEffect(() => {
     viewRef.current?.requestMeasure();
-  }, [themeId]);
+  }, [appearanceRevision]);
 
   const previewMessage = previewState === "error"
     ? t("editor.markdown.previewUnavailable")
@@ -583,8 +583,7 @@ export function MarkdownCodeMirrorEditor({
         dir="auto"
         lang={contentLanguage.language}
         className="markdown-codemirror-editor"
-        data-po-theme-surface="markdown"
-        data-po-theme-id={themeId}
+        data-editor-appearance-revision={appearanceRevision}
         data-po-typography-role="content"
         data-po-content-language-source={contentLanguage.source}
         data-live-preview={livePreview ? "true" : "false"}

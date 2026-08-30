@@ -1,39 +1,29 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopThemeSnapshot } from "../../types/electron";
-import { createThemeCatalogSnapshot } from "./builtinSurfaceThemes";
-import type { ThemeCatalogState } from "./themeTypes";
-import type { SurfaceThemePreferences } from "./themePreferences";
 import {
-  DEFAULT_SURFACE_THEME_PREFERENCES,
-  resolveSurfaceThemeSelection,
-  type SurfaceThemeSelection,
-} from "./themePreferences";
-import type { ThemeColorMode } from "./themeTypes";
+  createSubThemeCatalogSnapshot,
+  getCompatibleSubThemes,
+} from "./builtinSubThemes";
+import type {
+  SubThemeCatalogState,
+  SubThemeCatalogSnapshot,
+} from "./themeTypes";
+import type { InterfaceStyle } from "../appearance/interfaceStyles";
 
 const EMPTY_HOST_SNAPSHOT: DesktopThemeSnapshot = Object.freeze({
   themes: Object.freeze([]),
   diagnostics: Object.freeze([]),
 });
 
-export type ThemeCatalogController = ThemeCatalogState & Readonly<{
-  selection: SurfaceThemeSelection;
+export type SubThemeCatalogController = SubThemeCatalogState & Readonly<{
   openDirectory: () => Promise<{ opened: boolean }>;
 }>;
 
-export function useThemeCatalog(options: {
-  preferences?: SurfaceThemePreferences;
-  colorMode?: ThemeColorMode;
-  onThemePackChange?: (themeId: string) => void;
-} = {}): ThemeCatalogController {
-  const {
-    colorMode = "light",
-    preferences = DEFAULT_SURFACE_THEME_PREFERENCES,
-    onThemePackChange,
-  } = options;
+export function useSubThemeCatalog(): SubThemeCatalogController {
   const desktopThemes = window.puppyoneDesktop?.themes;
   const refreshGeneration = useRef(0);
-  const [state, setState] = useState<ThemeCatalogState>(() => ({
-    snapshot: createThemeCatalogSnapshot(EMPTY_HOST_SNAPSHOT),
+  const [state, setState] = useState<SubThemeCatalogState>(() => ({
+    snapshot: createSubThemeCatalogSnapshot(EMPTY_HOST_SNAPSHOT),
     status: desktopThemes ? "loading" : "ready",
     error: null,
   }));
@@ -43,7 +33,7 @@ export function useThemeCatalog(options: {
     const generation = refreshGeneration.current + 1;
     refreshGeneration.current = generation;
     try {
-      const snapshot = createThemeCatalogSnapshot(await desktopThemes.list());
+      const snapshot = createSubThemeCatalogSnapshot(await desktopThemes.list());
       if (generation !== refreshGeneration.current) return null;
       setState({ snapshot, status: "ready", error: null });
       return snapshot;
@@ -61,7 +51,7 @@ export function useThemeCatalog(options: {
   useEffect(() => {
     if (!desktopThemes) {
       setState({
-        snapshot: createThemeCatalogSnapshot(EMPTY_HOST_SNAPSHOT),
+        snapshot: createSubThemeCatalogSnapshot(EMPTY_HOST_SNAPSHOT),
         status: "ready",
         error: null,
       });
@@ -90,31 +80,35 @@ export function useThemeCatalog(options: {
     }
   }, [desktopThemes]);
 
-  const selection = useMemo(
-    () => resolveSurfaceThemeSelection(preferences, state.snapshot, colorMode),
-    [colorMode, preferences, state.snapshot],
-  );
+  return { ...state, openDirectory };
+}
+
+export function useSubThemeNativeMenu({
+  snapshot,
+  rootThemeId,
+  selectedSubThemeId,
+  onSubThemeChange,
+}: {
+  snapshot: SubThemeCatalogSnapshot;
+  rootThemeId: InterfaceStyle;
+  selectedSubThemeId: string;
+  onSubThemeChange: (subThemeId: string) => void;
+}) {
+  const desktopThemes = window.puppyoneDesktop?.themes;
 
   useEffect(() => {
     if (!desktopThemes?.syncNativeMenu) return;
     void desktopThemes.syncNativeMenu({
-      pack: preferences.pack,
-      themes: state.snapshot.themes.map(({ id, name, targets }) => ({ id, name, targets })),
+      pack: selectedSubThemeId,
+      themes: getCompatibleSubThemes(snapshot, rootThemeId)
+        .map(({ id, name, targets }) => ({ id, name, targets })),
     }).catch(() => undefined);
-  }, [desktopThemes, preferences.pack, state.snapshot]);
+  }, [desktopThemes, rootThemeId, selectedSubThemeId, snapshot]);
 
   useEffect(() => {
     if (!desktopThemes?.onSelectionRequested) return undefined;
     return desktopThemes.onSelectionRequested((request) => {
-      if (request.kind === "pack" && request.themeId) {
-        onThemePackChange?.(request.themeId);
-      }
+      if (request.kind === "pack" && request.themeId) onSubThemeChange(request.themeId);
     });
-  }, [desktopThemes, onThemePackChange]);
-
-  return {
-    ...state,
-    selection,
-    openDirectory,
-  };
+  }, [desktopThemes, onSubThemeChange]);
 }

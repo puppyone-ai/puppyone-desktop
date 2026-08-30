@@ -5,7 +5,8 @@ export const INTERFACE_STYLE_MANIFEST = {
   "defaultStyle": "default",
   "storage": {
     "interfaceStyle": "puppyone.desktop.interfaceStyle",
-    "appearancePreferences": "puppyone.desktop.appearance.v2",
+    "appearancePreferences": "puppyone.desktop.appearance",
+    "legacyAppearancePreferences": "puppyone.desktop.appearance.v2",
     "themeMode": "puppyone.desktop.theme",
     "lightThemePreset": "puppyone.desktop.lightThemePreset",
     "darkThemePreset": "puppyone.desktop.darkThemePreset",
@@ -42,6 +43,14 @@ export const INTERFACE_STYLE_MANIFEST = {
         "fileIconTheme": {
           "mode": "inherit"
         }
+      },
+      "subThemes": {
+        "defaultSubThemeId": "default.neutral",
+        "allowedTargets": [
+          "application",
+          "markdown",
+          "csv"
+        ]
       },
       "palette": {
         "kind": "adaptive",
@@ -138,6 +147,13 @@ export const INTERFACE_STYLE_MANIFEST = {
         "fileIconTheme": {
           "mode": "inherit"
         }
+      },
+      "subThemes": {
+        "defaultSubThemeId": "windows-xp.luna-blue",
+        "allowedTargets": [
+          "markdown",
+          "csv"
+        ]
       },
       "palette": {
         "kind": "fixed",

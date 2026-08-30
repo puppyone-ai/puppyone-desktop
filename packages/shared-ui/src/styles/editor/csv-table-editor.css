@@ -1,17 +1,22 @@
 .csv-table-editor {
   /* CSV is a data view, not a document card. Its viewport may fill the pane,
      while the table keeps stable, content-owned tracks like a Notion view. */
-  --po-csv-surface-background: var(--po-editor-bg);
-  --po-csv-surface-color: var(--po-text);
+  --po-csv-surface-background: var(--po-host-csv-surface-background, var(--po-editor-bg));
+  --po-csv-surface-color: var(--po-host-csv-surface-color, var(--po-text));
   --po-editable-table-cell-max-width: 560px;
   --po-editable-table-row-min-height: 31px;
   --po-editable-table-radius: 0px;
-  --po-editable-table-background: transparent;
-  --po-editable-table-header-background: transparent;
-  --po-editable-table-sticky-header-background: var(--po-editor-bg);
+  --po-editable-table-background: var(--po-host-csv-table-background, transparent);
+  --po-editable-table-border: var(--po-host-csv-table-border, var(--po-divider));
+  --po-editable-table-cell-border: var(--po-host-csv-cell-border, var(--po-divider));
+  --po-editable-table-header-background: var(--po-host-csv-header-background, transparent);
+  --po-editable-table-sticky-header-background: var(--po-host-csv-header-background, var(--po-editor-bg));
   --po-editable-table-header-font-weight: 600;
   --csv-table-record-index-width: var(--po-editable-table-row-min-height);
-  --csv-table-record-index-background: color-mix(in srgb, var(--po-control) 18%, var(--po-editor-bg));
+  --csv-table-record-index-background: var(--po-host-csv-index-background, color-mix(in srgb, var(--po-control) 18%, var(--po-editor-bg)));
+  --po-editable-table-cell-hover-background: var(--po-host-csv-cell-hover-background, var(--po-hover));
+  --po-editable-table-cell-focus-background: var(--po-host-csv-cell-focus-background, var(--po-selected));
+  --po-editable-table-cell-focus-ring: var(--po-host-csv-cell-focus-ring, var(--po-focus-ring));
   --csv-table-record-index-active-background: color-mix(in srgb, var(--po-hover) 42%, var(--po-editor-bg));
   --csv-table-content-inline-start-inset: 32px;
   --csv-table-content-inline-end-inset: 32px;

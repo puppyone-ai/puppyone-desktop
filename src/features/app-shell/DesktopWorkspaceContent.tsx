@@ -34,7 +34,7 @@ import { useDesktopViewerPacks } from "../viewer-packs/host";
 import { DesktopDataWorkspaceSurface } from "./DesktopDataWorkspaceSurface";
 import type { DesktopEditorWorkbenchController } from "../editor-workbench/controller/useDesktopEditorWorkbench";
 import type { ResolvedWorkbenchDataResource } from "../data-workspace/workbenchDataPort";
-import type { ThemeCatalogController } from "../themes/useThemeCatalog";
+import type { SubThemeCatalogController } from "../themes/useSubThemeCatalog";
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
 type DesktopWorkspaceContentProps = {
@@ -78,7 +78,7 @@ type DesktopWorkspaceContentProps = {
   settingsSection: SettingsSection;
   sidebarCompanion?: ReactNode;
   sidebarUtility?: ReactNode;
-  themeCatalog: ThemeCatalogController;
+  subThemeCatalog: SubThemeCatalogController;
   workspace: Workspace;
   workspaceFolders: readonly WorkspaceFolder[];
   resolveWorkspaceResource: (path: string | null) => ResolvedWorkbenchDataResource | null;
@@ -124,7 +124,7 @@ export function DesktopWorkspaceContent({
   settingsSection,
   sidebarCompanion,
   sidebarUtility,
-  themeCatalog,
+  subThemeCatalog,
   workspace,
   workspaceFolders,
   resolveWorkspaceResource,
@@ -180,7 +180,7 @@ export function DesktopWorkspaceContent({
     puppyoneConfigLoading,
     puppyoneConfigSaving,
     settingsSection,
-    themeCatalog,
+    subThemeCatalog,
     viewerPacks: {
       hostAvailable: externalViewerPacksEnabled,
       refresh: refreshViewerPackSnapshot,

@@ -55,6 +55,57 @@ const applicationColorTokens = new Set([
   "--po-backdrop-strong",
   "--po-shadow",
 ]);
+const markdownTokenMap = new Map([
+  ["--po-md-surface-background", "--po-host-md-surface-background"],
+  ["--po-md-content-color", "--po-host-md-content-color"],
+  ["--po-md-content-font", "--po-host-md-content-font"],
+  ["--po-md-content-size", "--po-host-md-content-size"],
+  ["--po-md-content-weight", "--po-host-md-content-weight"],
+  ["--po-md-content-letter-spacing", "--po-host-md-content-letter-spacing"],
+  ["--po-md-content-line-height", "--po-host-md-content-line-height"],
+  ["--po-md-block-gap", "--po-host-md-block-gap"],
+  ["--po-md-heading-gap-before", "--po-host-md-heading-gap-before"],
+  ["--po-md-heading-gap-after", "--po-host-md-heading-gap-after"],
+  ["--po-md-heading-color", "--po-host-md-heading-color"],
+  ["--po-md-heading-weight", "--po-host-md-heading-weight"],
+  ["--po-md-heading-line-height", "--po-host-md-heading-line-height"],
+  ["--po-md-heading-border-color", "--po-host-md-heading-border-color"],
+  ["--po-md-h1-size", "--po-host-md-h1-size"],
+  ["--po-md-h2-size", "--po-host-md-h2-size"],
+  ["--po-md-h3-size", "--po-host-md-h3-size"],
+  ["--po-md-h4-size", "--po-host-md-h4-size"],
+  ["--po-md-h5-size", "--po-host-md-h5-size"],
+  ["--po-md-h6-size", "--po-host-md-h6-size"],
+  ["--po-md-h1-weight", "--po-host-md-h1-weight"],
+  ["--po-md-h2-weight", "--po-host-md-h2-weight"],
+  ["--po-md-h3-weight", "--po-host-md-h3-weight"],
+  ["--po-md-strong-weight", "--po-host-md-strong-weight"],
+  ["--po-md-strong-color", "--po-host-md-strong-color"],
+  ["--po-md-rule-color", "--po-host-md-rule-color"],
+  ["--po-md-link-color", "--po-host-md-link-color"],
+  ["--po-md-blockquote-color", "--po-host-md-blockquote-color"],
+  ["--po-md-blockquote-border-color", "--po-host-md-blockquote-border-color"],
+  ["--po-md-inline-code-background", "--po-host-md-inline-code-background"],
+  ["--po-md-inline-code-color", "--po-host-md-inline-code-color"],
+  ["--po-md-code-block-background", "--po-host-md-code-block-background"],
+  ["--po-md-code-block-color", "--po-host-md-code-block-color"],
+  ["--po-md-syntax-keyword", "--po-host-md-syntax-keyword"],
+  ["--po-md-syntax-string", "--po-host-md-syntax-string"],
+  ["--po-md-syntax-comment", "--po-host-md-syntax-comment"],
+]);
+const csvTokenMap = new Map([
+  ["--po-csv-surface-background", "--po-host-csv-surface-background"],
+  ["--po-csv-surface-color", "--po-host-csv-surface-color"],
+  ["--po-editable-table-background", "--po-host-csv-table-background"],
+  ["--po-editable-table-border", "--po-host-csv-table-border"],
+  ["--po-editable-table-cell-border", "--po-host-csv-cell-border"],
+  ["--po-editable-table-header-background", "--po-host-csv-header-background"],
+  ["--po-editable-table-sticky-header-background", "--po-host-csv-header-background"],
+  ["--csv-table-record-index-background", "--po-host-csv-index-background"],
+  ["--po-editable-table-cell-hover-background", "--po-host-csv-cell-hover-background"],
+  ["--po-editable-table-cell-focus-background", "--po-host-csv-cell-focus-background"],
+  ["--po-editable-table-cell-focus-ring", "--po-host-csv-cell-focus-ring"],
+]);
 
 export async function compileThemeCss({
   css,
@@ -129,21 +180,19 @@ async function parseAndInlineImports(css, { sourcePath, loadImport, ancestry, de
 function validateAtRules(root) {
   root.walkAtRules((rule) => {
     const name = rule.name.toLowerCase();
-    if (name === "font-face" || allowedContainerAtRules.has(name)) return;
+    if (allowedContainerAtRules.has(name)) return;
     throw new TypeError(`Unsupported theme CSS at-rule: @${rule.name}.`);
   });
 }
 
 function scopeRules(root, { themeId, target }) {
-  const host = `[data-po-theme-surface="${target}"][data-po-theme-id="${themeId}"]`;
+  const host = `[data-po-appearance-root][data-sub-theme-id="${themeId}"]`;
   root.walkRules((rule) => {
     const selectors = splitSelectors(rule.selector);
     const scoped = selectors.map((selector) => scopeSelector(selector, host, target));
-    if (target === "application") {
-      const rootOnly = selectors.every((selector) => isApplicationRootSelector(selector));
-      if (!rootOnly) {
-        throw new TypeError("Application themes may only declare root-level --po-* tokens.");
-      }
+    const rootOnly = selectors.every((selector) => isApplicationRootSelector(selector));
+    if (!rootOnly) {
+      throw new TypeError(`${target} Sub Themes may only declare root-level public tokens.`);
     }
     rule.selector = scoped.join(", ");
   });
@@ -159,7 +208,7 @@ function scopeSelector(selector, host, target) {
   const darkRoot = parseDarkRootSelector(normalized);
   if (darkRoot) {
     assertRootSuffixRemainsScoped(darkRoot.suffix, normalized);
-    if (target === "application" && darkRoot.suffix.length === 0) return `${host}:where(.dark)`;
+    if (darkRoot.suffix.length === 0) return `${host}:where(.dark)`;
     return `:where(.dark) ${host}${darkRoot.suffix}`;
   }
 
@@ -176,7 +225,7 @@ function scopeSelector(selector, host, target) {
   if (containsRootAlias(suffix)) {
     throw new TypeError(`Theme CSS selector contains more than one root alias: ${normalized}.`);
   }
-  if (target === "application" && suffix === ".dark") {
+  if (suffix === ".dark") {
     return `${host}:where(.dark)`;
   }
   assertRootSuffixRemainsScoped(suffix, normalized);
@@ -280,11 +329,18 @@ function validateDeclarations(root, { target }) {
     if (declaration.important) {
       throw new TypeError("Theme CSS cannot use !important; cascade precedence is managed by PuppyOne.");
     }
-    if (target === "application" && !property.startsWith("--po-")) {
-      throw new TypeError("Application themes may only declare root-level --po-* tokens.");
-    }
     if (target === "application" && !applicationColorTokens.has(property)) {
-      throw new TypeError("Application themes may only declare public color tokens.");
+      throw new TypeError("Application Sub Themes may only declare public color tokens.");
+    }
+    if (target === "markdown") {
+      const mapped = markdownTokenMap.get(property);
+      if (!mapped) throw new TypeError("Markdown Sub Themes may only declare public Markdown tokens.");
+      declaration.prop = mapped;
+    }
+    if (target === "csv") {
+      const mapped = csvTokenMap.get(property);
+      if (!mapped) throw new TypeError("CSV Sub Themes may only declare public CSV tokens.");
+      declaration.prop = mapped;
     }
     if (property === "position" && value === "fixed") {
       throw new TypeError("Theme CSS cannot use fixed positioning.");

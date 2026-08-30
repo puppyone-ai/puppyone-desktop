@@ -3,7 +3,7 @@
   "native.dock.newWindow": "새 윈도우",
   "native.menu.file": "파일",
   "native.menu.theme": "테마",
-  "native.menu.theme.pack": "테마 팩",
+  "native.menu.theme.pack": "비주얼 변형",
   "native.menu.theme.openFolder": "테마 폴더 열기",
   "native.menu.checkForUpdates": "업데이트 확인…",
   "native.update.manual.ok": "확인",

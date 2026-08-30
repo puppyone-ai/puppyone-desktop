@@ -25,7 +25,7 @@ import {
   type CsvFindMatch,
 } from "../../find/useCsvFindAdapter";
 import { useRegisterEditorFindAdapter } from "../../find/editorFind";
-import { useThemeSurfaceId } from "../../../core/theme/ThemeSurfaceContext";
+import { useEditorAppearanceRevision } from "../../../core/appearance/EditorAppearanceContext";
 import { CsvTableControls } from "./CsvTableControls";
 import { CsvColumnResizeLayer } from "./CsvColumnResizeLayer";
 import { CsvColumnLayoutModel } from "./CsvColumnLayoutModel";
@@ -80,7 +80,7 @@ export function CsvTableEditor({
   onSourceRevisionChange,
   onSnapshotPortChange,
 }: CsvTableEditorProps) {
-  const themeId = useThemeSurfaceId("csv");
+  const appearanceRevision = useEditorAppearanceRevision();
   const { direction, locale, t } = useLocalization();
   const resolvedDocumentId = documentId ?? (nodeName || "csv-document");
   const resolvedDelimiter = delimiter ?? inferDelimiter(nodeName, content);
@@ -236,6 +236,10 @@ export function CsvTableEditor({
   });
   const revealViewportCell = viewport.revealCell;
   const scheduleViewportUpdate = viewport.handleScroll;
+
+  useLayoutEffect(() => {
+    scheduleViewportUpdate();
+  }, [appearanceRevision, scheduleViewportUpdate]);
 
   const requestFocus = useCallback((target: CsvTableFocusTarget) => {
     pendingFocusRef.current = target;
@@ -425,8 +429,6 @@ export function CsvTableEditor({
   return (
     <section
       className="csv-table-editor"
-      data-po-theme-surface="csv"
-      data-po-theme-id={themeId}
       data-readonly={readOnly ? "true" : undefined}
       data-row-numbers-visible={rowNumbersVisible ? "true" : undefined}
     >

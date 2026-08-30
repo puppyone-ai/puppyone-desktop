@@ -841,6 +841,8 @@ export type DesktopThemeDefinition = Readonly<{
   name: string;
   version: string;
   author?: string;
+  contractVersion?: number;
+  compatibleRootThemeIds?: readonly string[];
   modes: readonly DesktopThemeColorMode[];
   targets: readonly DesktopThemeTarget[];
   source: "local-css" | "local-package";

@@ -2,7 +2,7 @@
   "appearance.title": "外观",
   "appearance.detail": "此设备的本地显示偏好设置。",
   "appearance.themes.title": "主题",
-  "appearance.themes.pack": "主题套装",
+  "appearance.themes.pack": "视觉变体",
   "appearance.themes.add": "添加主题",
   "appearance.themes.addUnavailable": "主题库网址尚未配置。",
   "appearance.themes.openFolder": "打开主题文件夹",

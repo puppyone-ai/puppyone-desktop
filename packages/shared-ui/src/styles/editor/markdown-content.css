@@ -7,51 +7,55 @@
  */
 .markdown-codemirror-editor {
   --po-md-presentation-version: 2;
-  --po-md-surface-background: var(--po-editor-bg);
-  --po-md-content-font: var(--po-font-content, var(--po-font-sans));
-  --po-md-content-size: var(--po-text-size-content, 14px);
-  --po-md-content-weight: var(--po-content-reading-weight, 450);
-  --po-md-content-letter-spacing: var(--po-content-reading-letter-spacing, 0);
-  --po-md-content-line-height: var(--po-content-reading-line-height, 1.7142857143);
+  --po-md-surface-background: var(--po-host-md-surface-background, var(--po-editor-bg));
+  --po-md-content-font: var(--po-host-md-content-font, var(--po-font-content, var(--po-font-sans)));
+  --po-md-content-size: var(--po-host-md-content-size, var(--po-text-size-content, 14px));
+  --po-md-content-weight: var(--po-host-md-content-weight, var(--po-content-reading-weight, 450));
+  --po-md-content-letter-spacing: var(--po-host-md-content-letter-spacing, var(--po-content-reading-letter-spacing, 0));
+  --po-md-content-line-height: var(--po-host-md-content-line-height, var(--po-content-reading-line-height, 1.7142857143));
   /* Light surfaces use the full semantic foreground. Regular CJK glyphs need
      contrast, not a theme-specific synthetic weight. */
-  --po-md-content-color: var(--po-text);
-  --po-md-block-gap: 16px;
-  --po-md-heading-gap-before: 24px;
-  --po-md-heading-gap-after: 16px;
-  --po-md-heading-weight: 600;
-  --po-md-h1-weight: 650;
-  --po-md-h2-weight: 625;
-  --po-md-h3-weight: 600;
-  --po-md-heading-line-height: 1.25;
-  --po-md-rule-color: color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 4%);
-  --po-md-h1-size: inherit;
-  --po-md-h2-size: inherit;
-  --po-md-h3-size: inherit;
-  --po-md-h4-size: inherit;
-  --po-md-h5-size: inherit;
-  --po-md-h6-size: inherit;
-  --po-md-strong-weight: inherit;
-  --po-md-strong-color: inherit;
+  --po-md-content-color: var(--po-host-md-content-color, var(--po-text));
+  --po-md-block-gap: var(--po-host-md-block-gap, 16px);
+  --po-md-heading-gap-before: var(--po-host-md-heading-gap-before, 24px);
+  --po-md-heading-gap-after: var(--po-host-md-heading-gap-after, 16px);
+  --po-md-heading-color: var(--po-host-md-heading-color, var(--po-text));
+  --po-md-heading-weight: var(--po-host-md-heading-weight, 600);
+  --po-md-h1-weight: var(--po-host-md-h1-weight, 650);
+  --po-md-h2-weight: var(--po-host-md-h2-weight, 625);
+  --po-md-h3-weight: var(--po-host-md-h3-weight, 600);
+  --po-md-heading-line-height: var(--po-host-md-heading-line-height, 1.25);
+  --po-md-heading-border-color: var(--po-host-md-heading-border-color, transparent);
+  --po-md-rule-color: var(--po-host-md-rule-color, color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 4%));
+  --po-md-link-color: var(--po-host-md-link-color, var(--po-accent));
+  --po-md-blockquote-color: var(--po-host-md-blockquote-color, var(--po-text-muted));
+  --po-md-blockquote-border-color: var(--po-host-md-blockquote-border-color, var(--po-divider));
+  --po-md-inline-code-background: var(--po-host-md-inline-code-background, color-mix(in srgb, var(--po-control) 38%, transparent));
+  --po-md-inline-code-color: var(--po-host-md-inline-code-color, var(--po-text));
+  --po-md-code-block-background: var(--po-host-md-code-block-background, color-mix(in srgb, var(--po-control) 28%, transparent));
+  --po-md-code-block-color: var(--po-host-md-code-block-color, var(--po-text));
+  --po-md-syntax-keyword: var(--po-host-md-syntax-keyword, var(--po-md-code-block-color));
+  --po-md-syntax-string: var(--po-host-md-syntax-string, var(--po-md-code-block-color));
+  --po-md-syntax-comment: var(--po-host-md-syntax-comment, var(--po-text-muted));
+  --po-md-h1-size: var(--po-user-md-h1-size, var(--po-host-md-h1-size, 2em));
+  --po-md-h2-size: var(--po-user-md-h2-size, var(--po-host-md-h2-size, 1.5em));
+  --po-md-h3-size: var(--po-user-md-h3-size, var(--po-host-md-h3-size, 1.25em));
+  --po-md-h4-size: var(--po-host-md-h4-size, 1em);
+  --po-md-h5-size: var(--po-host-md-h5-size, 0.875em);
+  --po-md-h6-size: var(--po-host-md-h6-size, 0.85em);
+  --po-md-strong-weight: var(--po-user-md-strong-weight, var(--po-host-md-strong-weight, 600));
+  --po-md-strong-color: var(--po-user-md-strong-color, var(--po-host-md-strong-color, var(--po-text)));
   background: var(--po-md-surface-background);
   color: var(--po-md-content-color);
-}
-
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root) {
-  --po-md-h1-size: 2em;
-  --po-md-h2-size: 1.5em;
-  --po-md-h3-size: 1.25em;
-  --po-md-h4-size: 1em;
-  --po-md-h5-size: 0.875em;
-  --po-md-h6-size: 0.85em;
-  --po-md-strong-weight: 600;
-  --po-md-strong-color: var(--po-text);
 }
 
 /* Reverse-polarity text appears optically heavier. Keep the exact same font
    face and weight across themes, and soften only the dark-theme foreground. */
 :where(.dark) .markdown-codemirror-editor {
-  --po-md-content-color: color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted));
+  --po-md-content-color: var(
+    --po-host-md-content-color,
+    color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted))
+  );
 }
 
 .markdown-codemirror-editor .cm-scroller {
@@ -64,7 +68,7 @@
 
 .markdown-codemirror-editor .cm-md-syntax-heading,
 .markdown-codemirror-editor .cm-md-heading {
-  color: var(--po-text);
+  color: var(--po-md-heading-color);
   font-weight: var(--po-md-current-heading-weight, var(--po-md-heading-weight));
   line-height: var(--po-md-heading-line-height);
 }
@@ -82,6 +86,11 @@
 .markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-3 {
   --po-md-current-heading-weight: var(--po-md-h3-weight);
   font-size: var(--po-md-h3-size);
+}
+
+.markdown-codemirror-editor[data-live-preview="true"] :is(.cm-md-heading-1, .cm-md-heading-2),
+.markdown-codemirror-editor .cm-md-html-rendered-surface :is(h1, h2) {
+  box-shadow: inset 0 -1px var(--po-md-heading-border-color);
 }
 
 .markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-4 {
@@ -132,7 +141,7 @@
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface :where(h1, h2, h3, h4, h5, h6) {
   margin-block: var(--po-md-heading-gap-before) var(--po-md-heading-gap-after);
-  color: var(--po-text);
+  color: var(--po-md-heading-color);
   font-weight: var(--po-md-heading-weight);
   line-height: var(--po-md-heading-line-height);
 }
@@ -185,8 +194,8 @@
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface blockquote {
   padding-inline: 1em;
-  border-inline-start: 0.25em solid var(--po-divider);
-  color: var(--po-text-muted);
+  border-inline-start: 0.25em solid var(--po-md-blockquote-border-color);
+  color: var(--po-md-blockquote-color);
 }
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface hr {
@@ -197,7 +206,7 @@
 }
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface a {
-  color: var(--po-accent);
+  color: var(--po-md-link-color);
   text-decoration: none;
 }
 

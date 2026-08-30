@@ -1,9 +1,0 @@
-/*
- * Default intentionally contributes no visual overrides. It is the product
- * baseline produced by Interface Style plus the shared Application, Markdown,
- * and CSV semantic tokens. Keeping this explicit entrypoint makes the three
- * built-in Theme Packs visible in source without duplicating the base palette.
- */
-[data-po-theme-surface][data-po-theme-id="default"] {
-  --po-theme-pack-source: "builtin";
-}

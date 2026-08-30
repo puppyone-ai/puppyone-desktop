@@ -2,7 +2,7 @@
   "appearance.title": "Apariencia",
   "appearance.detail": "Preferencias de visualización locales para este dispositivo.",
   "appearance.themes.title": "Tema",
-  "appearance.themes.pack": "Paquete de tema",
+  "appearance.themes.pack": "Variante visual",
   "appearance.themes.add": "Añadir tema",
   "appearance.themes.addUnavailable": "La URL de la galería de temas aún no está configurada.",
   "appearance.themes.openFolder": "Abrir carpeta de temas",

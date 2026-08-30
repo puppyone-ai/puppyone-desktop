@@ -12,12 +12,19 @@ import {
 import {
   getInterfaceStyleDefinition,
   type InterfaceStyle,
+  type ResolvedTheme,
 } from "./interfaceStyles";
+import { BUILTIN_SUB_THEMES } from "../themes/builtinSubThemes";
+import type {
+  SubThemeCatalogSnapshot,
+  SubThemeDefinition,
+} from "../themes/themeTypes";
 
 export type AppearanceSettingStatus = "editable" | "constrained" | "forced" | "unavailable";
 export type AppearanceDecisionSource =
   | "accessibility"
   | "platform"
+  | "sub-theme"
   | "style-surface"
   | "style"
   | "user"
@@ -38,20 +45,38 @@ export type AppearancePolicy<T extends string> =
   | Readonly<{ mode: "force"; value: T; reasonKey: string }>
   | Readonly<{ mode: "unavailable"; reasonKey: string }>;
 
+export type AppearanceDiagnostic = Readonly<{
+  code: "sub-theme-missing" | "sub-theme-incompatible" | "sub-theme-mode-unsupported";
+  requestedSubThemeId: string;
+  effectiveSubThemeId: string;
+}>;
+
 export type AppearanceResolutionInput = Readonly<{
   interfaceStyle: InterfaceStyle;
   themeMode: ThemeMode;
+  systemColorMode?: ResolvedTheme;
+  requestedSubThemeId?: string;
+  subThemeCatalog?: SubThemeCatalogSnapshot;
   sidebarNavigationLayout: SidebarNavigationLayout;
   textSize: TextSize;
   fileIconTheme: FileIconThemeId;
 }>;
 
 export type ResolvedAppearance = Readonly<{
+  rootThemeId: InterfaceStyle;
   interfaceStyle: InterfaceStyle;
   profile: ReturnType<typeof getInterfaceStyleDefinition>["profile"];
   tokenSet: string;
   composition: ReturnType<typeof getInterfaceStyleDefinition>["composition"];
+  subTheme: SubThemeDefinition;
+  subThemeId: string;
+  requestedColorMode: ThemeMode;
+  effectiveColorMode: ResolvedTheme;
+  legacyThemePreset: string;
+  appearanceRevision: string;
+  diagnostics: readonly AppearanceDiagnostic[];
   decisions: Readonly<{
+    subTheme: AppearanceSettingDecision<string>;
     themeMode: AppearanceSettingDecision<ThemeMode>;
     sidebarNavigationLayout: AppearanceSettingDecision<SidebarNavigationLayout>;
     textSize: AppearanceSettingDecision<TextSize>;
@@ -65,34 +90,64 @@ export type ResolvedAppearance = Readonly<{
   fileIconTheme: FileIconThemeId;
 }>;
 
+const BUILTIN_SUB_THEME_CATALOG: SubThemeCatalogSnapshot = Object.freeze({
+  subThemes: BUILTIN_SUB_THEMES,
+  diagnostics: Object.freeze([]),
+});
+
 export function resolveAppearance(input: AppearanceResolutionInput): ResolvedAppearance {
-  const profile = getInterfaceStyleDefinition(input.interfaceStyle);
+  const rootTheme = getInterfaceStyleDefinition(input.interfaceStyle);
   const themeMode = resolveSetting(
     input.themeMode,
-    profile.policies.themeMode as AppearancePolicy<ThemeMode>,
+    rootTheme.policies.themeMode as AppearancePolicy<ThemeMode>,
     resolveActiveThemeMode(input.interfaceStyle, input.themeMode),
   );
+  const effectiveColorMode = themeMode.effectiveValue === "system"
+    ? input.systemColorMode ?? "light"
+    : themeMode.effectiveValue;
+  const subThemeResolution = resolveSubTheme({
+    catalog: input.subThemeCatalog ?? BUILTIN_SUB_THEME_CATALOG,
+    effectiveColorMode,
+    requestedSubThemeId: input.requestedSubThemeId ?? rootTheme.subThemes.defaultSubThemeId,
+    rootTheme,
+  });
   const sidebarNavigationLayout = resolveSetting(
     input.sidebarNavigationLayout,
-    profile.policies.sidebarNavigationLayout as AppearancePolicy<SidebarNavigationLayout>,
+    rootTheme.policies.sidebarNavigationLayout as AppearancePolicy<SidebarNavigationLayout>,
     input.sidebarNavigationLayout,
   );
   const textSize = resolveSetting(
     input.textSize,
-    profile.policies.textSize as AppearancePolicy<TextSize>,
+    rootTheme.policies.textSize as AppearancePolicy<TextSize>,
     input.textSize,
   );
   const fileIconTheme = resolveSetting(
     input.fileIconTheme,
-    profile.policies.fileIconTheme as AppearancePolicy<FileIconThemeId>,
+    rootTheme.policies.fileIconTheme as AppearancePolicy<FileIconThemeId>,
     input.fileIconTheme,
   );
+  const legacyThemePreset = subThemeResolution.subTheme.legacyPresets?.[effectiveColorMode]
+    ?? (effectiveColorMode === "light" ? "neutral" : "default");
+
   return Object.freeze({
+    rootThemeId: input.interfaceStyle,
     interfaceStyle: input.interfaceStyle,
-    profile: profile.profile,
-    tokenSet: profile.tokenSet,
-    composition: profile.composition,
+    profile: rootTheme.profile,
+    tokenSet: rootTheme.tokenSet,
+    composition: rootTheme.composition,
+    subTheme: subThemeResolution.subTheme,
+    subThemeId: subThemeResolution.subTheme.id,
+    requestedColorMode: input.themeMode,
+    effectiveColorMode,
+    legacyThemePreset,
+    appearanceRevision: [
+      input.interfaceStyle,
+      subThemeResolution.subTheme.id,
+      effectiveColorMode,
+    ].join(":"),
+    diagnostics: subThemeResolution.diagnostics,
     decisions: Object.freeze({
+      subTheme: subThemeResolution.decision,
       themeMode,
       sidebarNavigationLayout,
       textSize,
@@ -105,6 +160,73 @@ export function resolveAppearance(input: AppearanceResolutionInput): ResolvedApp
     textSize: textSize.effectiveValue,
     fileIconTheme: fileIconTheme.effectiveValue,
   });
+}
+
+function resolveSubTheme({
+  catalog,
+  effectiveColorMode,
+  requestedSubThemeId,
+  rootTheme,
+}: {
+  catalog: SubThemeCatalogSnapshot;
+  effectiveColorMode: ResolvedTheme;
+  requestedSubThemeId: string;
+  rootTheme: ReturnType<typeof getInterfaceStyleDefinition>;
+}) {
+  const byId = new Map(catalog.subThemes.map((subTheme) => [subTheme.id, subTheme]));
+  const requested = byId.get(requestedSubThemeId);
+  const compatibility = requested
+    ? getSubThemeCompatibility(requested, rootTheme, effectiveColorMode)
+    : "missing";
+  const fallback = byId.get(rootTheme.subThemes.defaultSubThemeId);
+  if (!fallback || getSubThemeCompatibility(fallback, rootTheme, effectiveColorMode) !== "compatible") {
+    throw new Error(`Root Theme ${rootTheme.id} has no compatible default Sub Theme.`);
+  }
+  if (compatibility === "compatible" && requested) {
+    return Object.freeze({
+      subTheme: requested,
+      decision: Object.freeze({
+        requestedValue: requestedSubThemeId,
+        effectiveValue: requested.id,
+        status: "editable" as const,
+        source: "user" as const,
+      }),
+      diagnostics: Object.freeze([]) as readonly AppearanceDiagnostic[],
+    });
+  }
+  const code = compatibility === "missing"
+    ? "sub-theme-missing"
+    : compatibility === "mode-unsupported"
+      ? "sub-theme-mode-unsupported"
+      : "sub-theme-incompatible";
+  return Object.freeze({
+    subTheme: fallback,
+    decision: Object.freeze({
+      requestedValue: requestedSubThemeId,
+      effectiveValue: fallback.id,
+      status: "constrained" as const,
+      source: "style" as const,
+      reasonKey: `settings.appearance.subTheme.${code}`,
+    }),
+    diagnostics: Object.freeze([Object.freeze({
+      code,
+      requestedSubThemeId,
+      effectiveSubThemeId: fallback.id,
+    })]),
+  });
+}
+
+function getSubThemeCompatibility(
+  subTheme: SubThemeDefinition,
+  rootTheme: ReturnType<typeof getInterfaceStyleDefinition>,
+  effectiveColorMode: ResolvedTheme,
+): "compatible" | "root-incompatible" | "mode-unsupported" | "target-incomplete" {
+  if (!subTheme.compatibleRootThemeIds.includes(rootTheme.id)) return "root-incompatible";
+  if (!subTheme.modes.includes(effectiveColorMode)) return "mode-unsupported";
+  if (!rootTheme.subThemes.allowedTargets.every((target) => subTheme.targets.includes(target))) {
+    return "target-incomplete";
+  }
+  return "compatible";
 }
 
 export function resolveSetting<T extends string>(

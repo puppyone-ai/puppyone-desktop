@@ -3,6 +3,7 @@ const THEME_COLOR_MODES = Object.freeze(["light", "dark"]);
 const targetSet = new Set(THEME_TARGETS);
 const colorModeSet = new Set(THEME_COLOR_MODES);
 const themeIdPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$/;
+const rootThemeIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const entrypointPattern = /^[A-Za-z0-9][A-Za-z0-9._-]*\.css$/;
 
 export { THEME_COLOR_MODES, THEME_TARGETS };
@@ -25,6 +26,7 @@ export function parseThemeManifest(value) {
     : requireString(value.author, "Theme author must be a non-empty string.");
   const modes = parseUniqueList(value.modes, colorModeSet, "Unsupported theme color mode");
   const targets = parseUniqueList(value.targets, targetSet, "Unsupported theme target");
+  const compatibleRootThemeIds = parseRootThemeIds(value.compatibleRootThemeIds);
 
   if (!isRecord(value.entrypoints)) {
     throw new TypeError("Theme entrypoints must be an object.");
@@ -51,15 +53,30 @@ export function parseThemeManifest(value) {
   ));
   const manifest = {
     schemaVersion: 1,
+    contractVersion: 1,
     id,
     name,
     version,
     ...(author === undefined ? {} : { author }),
     modes: Object.freeze([...modes]),
     targets: Object.freeze([...targets]),
+    compatibleRootThemeIds: Object.freeze(compatibleRootThemeIds),
     entrypoints,
   };
   return Object.freeze(manifest);
+}
+
+function parseRootThemeIds(value) {
+  if (value === undefined) return ["default"];
+  if (
+    !Array.isArray(value)
+    || value.length === 0
+    || value.some((id) => typeof id !== "string" || !rootThemeIdPattern.test(id))
+    || new Set(value).size !== value.length
+  ) {
+    throw new TypeError("compatibleRootThemeIds must contain unique Root Theme ids.");
+  }
+  return [...value];
 }
 
 function parseUniqueList(value, allowed, errorPrefix) {

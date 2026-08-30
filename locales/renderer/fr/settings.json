@@ -2,7 +2,7 @@
   "appearance.title": "Apparence",
   "appearance.detail": "Préférences d’affichage locales pour cet appareil.",
   "appearance.themes.title": "Thème",
-  "appearance.themes.pack": "Pack de thème",
+  "appearance.themes.pack": "Variante visuelle",
   "appearance.themes.add": "Ajouter un thème",
   "appearance.themes.addUnavailable": "L’URL de la galerie de thèmes n’est pas encore configurée.",
   "appearance.themes.openFolder": "Ouvrir le dossier des thèmes",

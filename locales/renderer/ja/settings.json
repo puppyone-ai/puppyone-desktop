@@ -2,7 +2,7 @@
   "appearance.title": "外観",
   "appearance.detail": "このデバイスのローカル表示設定です。",
   "appearance.themes.title": "テーマ",
-  "appearance.themes.pack": "テーマパック",
+  "appearance.themes.pack": "ビジュアルバリエーション",
   "appearance.themes.add": "テーマを追加",
   "appearance.themes.addUnavailable": "テーマギャラリーの URL はまだ設定されていません。",
   "appearance.themes.openFolder": "テーマフォルダを開く",

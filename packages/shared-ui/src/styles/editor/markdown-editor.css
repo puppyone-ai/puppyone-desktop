@@ -296,7 +296,7 @@
 }
 
 .markdown-codemirror-editor .cm-md-syntax-link {
-  color: var(--po-accent);
+  color: var(--po-md-link-color);
 }
 
 .markdown-codemirror-editor .cm-md-syntax-monospace,
@@ -308,7 +308,26 @@
 .markdown-codemirror-editor .cm-md-code-fence,
 .markdown-codemirror-editor .cm-md-syntax-monospace,
 .markdown-codemirror-editor .cm-md-code-block-line {
-  color: color-mix(in srgb, var(--po-text) 70%, var(--po-text-muted));
+  color: var(--po-md-code-block-color);
+}
+
+/* Sub Themes expose semantic syntax colors; this editor-owned projection is
+   the only place that knows which CodeMirror classes implement those roles. */
+.markdown-codemirror-editor :is(.cm-keyword, .cm-atom, .cm-number, .cm-builtin) {
+  color: var(--po-md-syntax-keyword);
+}
+
+.markdown-codemirror-editor :is(.cm-string, .cm-string-2, .cm-variable-2, .cm-def, .cm-property) {
+  color: var(--po-md-syntax-string);
+}
+
+.markdown-codemirror-editor .cm-comment {
+  color: var(--po-md-syntax-comment);
+}
+
+.markdown-codemirror-editor .cm-md-syntax-monospace {
+  background: var(--po-md-inline-code-background);
+  color: var(--po-md-inline-code-color);
 }
 
 .markdown-codemirror-editor .cm-md-syntax-strikethrough {
@@ -342,13 +361,13 @@
 }
 
 .markdown-codemirror-editor[data-live-preview="true"] .cm-md-code-block-line {
-  background: color-mix(in srgb, var(--po-control) 28%, transparent);
+  background: var(--po-md-code-block-background);
 }
 
 .markdown-codemirror-editor .cm-md-blockquote {
   padding-left: 16px;
-  border-left: 3px solid color-mix(in srgb, var(--po-text-subtle) 42%, transparent);
-  color: var(--po-text-muted);
+  border-left: 3px solid var(--po-md-blockquote-border-color);
+  color: var(--po-md-blockquote-color);
 }
 
 .markdown-codemirror-editor .cm-md-list-line {
