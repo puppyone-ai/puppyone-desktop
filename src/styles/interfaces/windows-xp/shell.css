@@ -386,13 +386,6 @@
 }
 
 :root[data-interface-style="windows-xp"]
-  .app-shell[data-icon-pack="windows-xp-native-v1"]
-  .desktop-shell-toolbar-button[data-toolbar-action="agent"]
-  .desktop-shell-toolbar-button-icon {
-  background-image: url("./assets/toolbar-agent-skeuomorphic.png");
-}
-
-:root[data-interface-style="windows-xp"]
   .desktop-shell-navigation-toolbar-host
   .desktop-shell-toolbar-button[data-navigation-item="data"] svg {
   fill: #f6c85e;
@@ -424,15 +417,6 @@
   width: 36px;
   height: 36px;
   color: #315f91;
-}
-
-:root[data-interface-style="windows-xp"]
-  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-agent-logo {
-  display: block;
-  width: 36px;
-  height: 36px;
-  object-fit: contain;
-  image-rendering: auto;
 }
 
 :root[data-interface-style="windows-xp"]

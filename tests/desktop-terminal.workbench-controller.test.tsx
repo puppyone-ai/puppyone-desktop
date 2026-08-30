@@ -29,7 +29,8 @@ describe("Terminal Workbench controller", () => {
     let chatId = "";
     act(() => {
       terminalId = current().createTerminalLauncher(workspace);
-      chatId = current().createAgentChat(workspace);
+      const chatItem = current().reserveContributionItem("agent-chat", workspace);
+      chatId = current().commitContributionItem(chatItem);
     });
 
     expect(current().items.map(({ id, kind, rootId }) => ({ id, kind, rootId }))).toEqual([

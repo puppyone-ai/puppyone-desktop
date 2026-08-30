@@ -71,6 +71,12 @@
   border-radius: 4px;
 }
 
+.desktop-terminal-launcher-icon.is-puppyone {
+  --desktop-terminal-launcher-mark-scale: 0.94;
+
+  opacity: 0.9;
+}
+
 .desktop-terminal-launcher-icon.is-compact.is-hermes {
   /* Preserve the favicon's face details at tab scale without enlarging it in the launcher. */
   --desktop-terminal-launcher-mark-scale: 0.94;

@@ -43,6 +43,42 @@ describe("AgentSessionController", () => {
     expect(bridge.createAgentSession).not.toHaveBeenCalled();
   });
 
+  it("binds a creation recipe before discovery without restoring prior Chat history", async () => {
+    const bridge = bridgeFixture(() => {});
+    bridge.discoverAgentRuntimes.mockResolvedValueOnce({
+      runtimes: [
+        { descriptor: { id: "codex", displayName: "Codex", iconKey: "codex" }, readiness: readinessFor("codex") },
+      ],
+      selectedRuntimeId: "codex",
+      runtime: { id: "codex", displayName: "Codex", iconKey: "codex" },
+      readiness: readinessFor("codex"),
+      account: null,
+      providers: [],
+      models: [],
+      modes: [],
+      commands: [],
+      capabilities: capabilities(),
+      warnings: [],
+    });
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+
+    await expect(controller.initializeForRuntime("codex")).resolves.toBe(true);
+
+    expect(bridge.discoverAgentRuntimes).toHaveBeenCalledWith({
+      rootPath: "/workspace",
+      runtimeId: "codex",
+      refresh: false,
+    });
+    expect(controller.getSnapshot()).toMatchObject({
+      initialized: true,
+      phase: "ready",
+      selectedRuntimeId: "codex",
+      session: null,
+    });
+    expect(bridge.resumeAgentSession).not.toHaveBeenCalled();
+    expect(bridge.createAgentSession).not.toHaveBeenCalled();
+  });
+
   it("rebuilds a deterministic projection, repairs sequence gaps, and preserves the old locator on New Chat", async () => {
     let eventListener: ((event: AgentEvent) => void) | null = null;
     const bridge = bridgeFixture((listener) => { eventListener = listener; });

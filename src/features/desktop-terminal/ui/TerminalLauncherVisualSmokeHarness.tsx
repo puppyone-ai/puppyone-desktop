@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
+import { AGENT_CHAT_CREATION_RECIPES } from "../../app-shell/auxiliary-workbench/agentChatCreationRecipes";
 import { TerminalLauncher } from "./TerminalLauncher";
 import "./desktop-terminal.css";
 
@@ -7,7 +7,7 @@ export function TerminalLauncherVisualSmokeHarness() {
   const query = new URLSearchParams(window.location.search);
   const width = clamp(Number(query.get("width")) || 420, 280, 760);
   const theme = query.get("theme") === "light" ? "light" : "dark";
-  const [selection, setSelection] = useState<DesktopTerminalLauncherId | null>(null);
+  const [selection, setSelection] = useState<string | null>(null);
 
   return (
     <main
@@ -22,6 +22,8 @@ export function TerminalLauncherVisualSmokeHarness() {
           <TerminalLauncher
             discoveryPhase="ready"
             availableAgentIds={["codex", "claude", "cursor", "opencode", "pi", "hermes"]}
+            chatRecipes={AGENT_CHAT_CREATION_RECIPES}
+            onCreateChat={(recipe) => setSelection(`chat:${recipe.id}`)}
             onLaunch={setSelection}
             onRefresh={() => undefined}
           />

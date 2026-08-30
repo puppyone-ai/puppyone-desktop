@@ -101,25 +101,37 @@ export function useTerminalWorkbench({ messageFormatter }: UseTerminalWorkbenchO
       : latest.activeGroupId;
   }, []);
 
+  const reserveContributionItem = useCallback((
+    kind: string,
+    root: WorkbenchRoot,
+  ): AuxiliaryWorkbenchItem => Object.freeze({
+    id: createWorkbenchEntityId("item"),
+    kind,
+    rootId: root.path,
+    contextId: root.id,
+  }), []);
+
+  const commitContributionItem = useCallback((
+    item: AuxiliaryWorkbenchItem,
+    targetGroupId: string | null = null,
+  ) => {
+    dispatchTopology({
+      type: "create",
+      item,
+      groupId: createWorkbenchEntityId("group"),
+      targetGroupId: resolveTargetGroupId(targetGroupId),
+    });
+    return item.id;
+  }, [resolveTargetGroupId]);
+
   const insertItem = useCallback((
     kind: string,
     root: WorkbenchRoot,
     targetGroupId: string | null = null,
-  ) => {
-    const itemId = createWorkbenchEntityId("item");
-    dispatchTopology({
-      type: "create",
-      item: Object.freeze({
-        id: itemId,
-        kind,
-        rootId: root.path,
-        contextId: root.id,
-      }),
-      groupId: createWorkbenchEntityId("group"),
-      targetGroupId: resolveTargetGroupId(targetGroupId),
-    });
-    return itemId;
-  }, [resolveTargetGroupId]);
+  ) => commitContributionItem(
+    reserveContributionItem(kind, root),
+    targetGroupId,
+  ), [commitContributionItem, reserveContributionItem]);
 
   const createTerminal = useCallback((
     root: WorkbenchRoot,
@@ -161,16 +173,6 @@ export function useTerminalWorkbench({ messageFormatter }: UseTerminalWorkbenchO
     dispatchTerminal({ type: "create", itemId, launcherId: null, status: "selecting" });
     return itemId;
   }, [insertItem, resolveTargetGroupId, terminalState.sessions]);
-
-  const createAgentChat = useCallback((
-    root: WorkbenchRoot,
-    targetGroupId: string | null = null,
-  ) => insertItem(AGENT_CHAT_WORKBENCH_ITEM_KIND, root, targetGroupId), [insertItem]);
-  const createContributionItem = useCallback((
-    kind: string,
-    root: WorkbenchRoot,
-    targetGroupId: string | null = null,
-  ) => insertItem(kind, root, targetGroupId), [insertItem]);
 
   const launchTerminal = useCallback((
     itemId: string,
@@ -339,8 +341,6 @@ export function useTerminalWorkbench({ messageFormatter }: UseTerminalWorkbenchO
     activateItem,
     cancelCloseTerminal,
     confirmCloseTerminal,
-    createAgentChat,
-    createContributionItem,
     createTerminal,
     createTerminalLauncher,
     groups: topology.groups,
@@ -356,6 +356,8 @@ export function useTerminalWorkbench({ messageFormatter }: UseTerminalWorkbenchO
     pendingCloseTerminal,
     presentedItemIds,
     removeItem,
+    reserveContributionItem,
+    commitContributionItem,
     requestCloseTerminal,
     resizeSplit,
     root: topology.root,

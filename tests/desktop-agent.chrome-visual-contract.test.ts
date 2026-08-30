@@ -17,20 +17,18 @@ const terminalLauncherCss = source("src/features/desktop-terminal/ui/terminal-la
 const terminalTabsCss = source("src/features/desktop-terminal/ui/session-header/terminal-session-header.css");
 
 describe("Desktop Agent and Terminal chrome visual contract", () => {
-  it("uses the Terminal launcher's compact first-page pixel baseline", () => {
-    for (const css of [launcherCss, terminalLauncherCss]) {
-      expect(css).toMatch(/padding:\s*clamp\(56px, 20vh, 220px\) 0 32px/);
-      expect(css).toMatch(/width:\s*min\(100%, 252px\)/);
-      expect(css).toMatch(/gap:\s*8px/);
-      expect(css).toMatch(/padding:\s*18px/);
-      expect(css).toMatch(/inset-inline-start:\s*22px/);
-      expect(css).toMatch(/font-size:\s*12px/);
-      expect(css).toMatch(/font-weight:\s*500/);
-      expect(css).toMatch(/line-height:\s*18px/);
-      expect(css).toMatch(/min-height:\s*34px/);
-      expect(css).toMatch(/gap:\s*9px/);
-      expect(css).toMatch(/padding:\s*5px 8px/);
-    }
+  it("keeps the legacy in-chat runtime chooser compact", () => {
+    expect(launcherCss).toMatch(/padding:\s*clamp\(56px, 20vh, 220px\) 0 32px/);
+    expect(launcherCss).toMatch(/width:\s*min\(100%, 252px\)/);
+    expect(launcherCss).toMatch(/gap:\s*8px/);
+    expect(launcherCss).toMatch(/padding:\s*18px/);
+    expect(launcherCss).toMatch(/inset-inline-start:\s*22px/);
+    expect(launcherCss).toMatch(/font-size:\s*12px/);
+    expect(launcherCss).toMatch(/font-weight:\s*500/);
+    expect(launcherCss).toMatch(/line-height:\s*18px/);
+    expect(launcherCss).toMatch(/min-height:\s*34px/);
+    expect(launcherCss).toMatch(/gap:\s*9px/);
+    expect(launcherCss).toMatch(/padding:\s*5px 8px/);
 
     expect(launcherCss).toMatch(/\.desktop-agent-runtime-launcher-group\s*\{[^}]*border:\s*1px solid var\(--agent-border-subtle\)[^}]*border-radius:\s*0/s);
     expect(launcherCss).toMatch(/\.desktop-agent-runtime-launcher-option \.desktop-agent-brand-mark\s*\{[^}]*width:\s*18px[^}]*height:\s*18px[^}]*border-radius:\s*4px/s);
@@ -41,6 +39,17 @@ describe("Desktop Agent and Terminal chrome visual contract", () => {
     expect(launcher).toContain('className="desktop-agent-runtime-launcher-history"');
     expect(launcher).toContain('historyOpen ? (');
     expect(launcherCss).toMatch(/\.desktop-agent-history-list\s*\{[^}]*overflow-y:\s*auto/s);
+  });
+
+  it("uses two compact, non-wrapping recipe rails in the unified launcher", () => {
+    expect(terminalLauncherCss).toMatch(/padding:\s*clamp\(58px, 18vh, 196px\) 10px 32px/);
+    expect(terminalLauncherCss).toMatch(/width:\s*min\(100%, 320px\)/);
+    expect(terminalLauncherCss).toMatch(/\.desktop-terminal-launcher-content\s*\{[^}]*gap:\s*22px/s);
+    expect(terminalLauncherCss).toMatch(/\.desktop-terminal-launcher-rail\s*\{[^}]*min-height:\s*44px[^}]*flex-wrap:\s*nowrap[^}]*overflow:\s*hidden/s);
+    expect(terminalLauncherCss).toMatch(/\.desktop-terminal-launcher-recipe\s*\{[^}]*width:\s*32px[^}]*height:\s*32px/s);
+    expect(terminalLauncherCss).toMatch(/\.desktop-terminal-launcher-recipe-label\s*\{[^}]*clip-path:\s*inset\(50%\)/s);
+    expect(terminalLauncherCss).not.toContain("::-webkit-scrollbar");
+    expect(terminalLauncherCss).not.toMatch(/scrollbar-(?:width|color)\s*:/);
   });
 
   it("matches Terminal tab typography and control geometry", () => {

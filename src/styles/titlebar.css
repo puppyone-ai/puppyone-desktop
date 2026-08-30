@@ -238,8 +238,7 @@
   color: color-mix(in srgb, var(--desktop-titlebar-update-accent) 86%, var(--desktop-titlebar-text));
 }
 
-.desktop-titlebar-actions .desktop-titlebar-terminal,
-.desktop-titlebar-actions .desktop-titlebar-agent-chat {
+.desktop-titlebar-actions .desktop-titlebar-terminal {
   width: var(--desktop-titlebar-tool-action-width);
 }
 

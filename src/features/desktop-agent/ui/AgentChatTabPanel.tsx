@@ -3,7 +3,7 @@ import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentSessionController } from "../application/AgentSessionController";
 import type { AgentSubmissionStage } from "../application/agent-controller-state";
-import { listEnabledAgentRuntimes } from "../domain/agent-backend-routing";
+import { listAgentRuntimes, listEnabledAgentRuntimes } from "../domain/agent-backend-routing";
 import type { AgentChatTabPresentation } from "../domain/agent-chat-tabs";
 import type { AgentRoutePreference } from "../domain/agent-route-preference";
 import { AgentApprovalDock } from "./AgentApprovalDock";
@@ -80,7 +80,13 @@ export function AgentChatTabPanel({
   const sessionKey = state.session?.id || "new-agent-session";
   const viewport = useMemo(() => ({ sessionKey, value: controller.readViewport() }), [controller, sessionKey]).value;
   const agentRuntimes = listEnabledAgentRuntimes(inspection, enabledRuntimeIds);
-  const agentRuntimeSelected = agentRuntimes.some((entry) => entry.descriptor.id === state.selectedRuntimeId);
+  const selectedRuntimeRegistered = listAgentRuntimes(inspection).some((entry) => (
+    entry.descriptor.id === state.selectedRuntimeId
+    && (!enabledRuntimeIds || enabledRuntimeIds.includes(entry.descriptor.id))
+  ));
+  // A direct creation recipe remains bound even when its runtime needs setup.
+  // Only the chooser filters not-installed runtimes from subsequent selection.
+  const agentRuntimeSelected = selectedRuntimeRegistered;
   const runtimeModels = agentRuntimeSelected ? inspection?.models ?? [] : [];
   const routingPreferences = useAgentRoutingPreferences({
     active: commandTarget, controller, state, runtimeModels, preferredRuntimeId, preferredRoute, preferredModel,

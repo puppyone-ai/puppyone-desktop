@@ -37,6 +37,15 @@ export async function closeAgentSessionController(workspaceRoot: string, tabId: 
   return true;
 }
 
+/** Disposes a controller whose reserved Workbench Item was never committed. */
+export function discardAgentSessionController(workspaceRoot: string, tabId: string) {
+  const controllerKey = key(workspaceRoot, tabId);
+  const controller = controllers.get(controllerKey);
+  if (!controller) return;
+  controller.dispose();
+  controllers.delete(controllerKey);
+}
+
 function trimInactiveControllers(currentControllerKey: string) {
   while (controllers.size > MAX_CONTROLLERS) {
     const candidate = Array.from(controllers.entries()).find(([controllerKey, controller]) => (

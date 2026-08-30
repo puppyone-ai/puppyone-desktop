@@ -6,6 +6,7 @@ import type {
 } from "../../app-shell/auxiliary-workbench/types";
 import {
   closeAgentSessionController,
+  discardAgentSessionController,
   getAgentSessionController,
 } from "../application/controllerRegistry";
 import type { AgentChatTabPresentation } from "../domain/agent-chat-tabs";
@@ -76,6 +77,20 @@ export function AgentChatWorkbenchItem({
 
 export async function requestCloseAgentChatWorkbenchItem(rootId: string, itemId: string) {
   return closeAgentSessionController(rootId, itemId);
+}
+
+export async function prepareAgentChatWorkbenchItem(
+  rootId: string,
+  itemId: string,
+  runtimeId: string | null,
+) {
+  if (!runtimeId) return;
+  const controller = getAgentSessionController(rootId, getElectronAgentClient, itemId);
+  await controller.initializeForRuntime(runtimeId);
+}
+
+export function discardPreparedAgentChatWorkbenchItem(rootId: string, itemId: string) {
+  discardAgentSessionController(rootId, itemId);
 }
 
 export function presentAgentChatWorkbenchItem(

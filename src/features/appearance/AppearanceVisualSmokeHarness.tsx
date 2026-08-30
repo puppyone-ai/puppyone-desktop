@@ -1,5 +1,4 @@
 import { DesktopWindowChrome } from "../../components/DesktopWindowChrome";
-import { PuppyBrandMark } from "../../components/brand/PuppyBrandMark";
 import { DesktopShellLocationBar } from "../app-shell/DesktopShellLocationBar";
 import { TerminalCloseConfirmationDialog } from "../desktop-terminal/ui/TerminalCloseConfirmationDialog";
 import { useLocalization } from "@puppyone/localization/react";
@@ -200,24 +199,6 @@ function SmokeToolbarActions() {
       data-shell-toolbar-section="actions"
     >
       <button
-        className="desktop-shell-toolbar-button desktop-shell-toolbar-agent"
-        data-toolbar-action="agent"
-        type="button"
-      >
-        <i
-          className="desktop-shell-toolbar-button-icon"
-          aria-hidden="true"
-        >
-          <PuppyBrandMark
-            className="desktop-shell-toolbar-agent-logo"
-            tone="dark"
-          />
-        </i>
-        <span className="desktop-shell-toolbar-button-label">
-          {t("shell.navigation.agentChat")}
-        </span>
-      </button>
-      <button
         className="desktop-shell-toolbar-button desktop-shell-toolbar-terminal"
         data-toolbar-action="terminal"
         type="button"
@@ -230,7 +211,7 @@ function SmokeToolbarActions() {
           <SquareTerminal size={19} strokeWidth={1.8} />
         </i>
         <span className="desktop-shell-toolbar-button-label">
-          {t("agent.name")}
+          {t("terminal.title")}
         </span>
       </button>
     </div>

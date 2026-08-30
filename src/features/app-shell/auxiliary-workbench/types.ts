@@ -28,6 +28,18 @@ export type AuxiliaryWorkbenchItemRenderContext = Readonly<{
   onPresentationChange: (snapshot: AuxiliaryWorkbenchItemSnapshot) => void;
 }>;
 
+export type AuxiliaryWorkbenchCreationRecipe = Readonly<{
+  id: string;
+  label: string;
+  iconKey: string | null;
+  status: "available" | "unavailable" | "coming-soon";
+}>;
+
+export type AuxiliaryWorkbenchPreparationContext = Readonly<{
+  item: AuxiliaryWorkbenchItem;
+  recipe: AuxiliaryWorkbenchCreationRecipe | null;
+}>;
+
 export type AuxiliaryWorkbenchContribution = Readonly<{
   kind: string;
   label: string;
@@ -35,8 +47,11 @@ export type AuxiliaryWorkbenchContribution = Readonly<{
   initialSnapshot: AuxiliaryWorkbenchItemSnapshot;
   maximumItems?: number;
   minimumSize: WorkbenchSplitMinimumSize;
+  creationRecipes?: readonly AuxiliaryWorkbenchCreationRecipe[];
   /** Resolve feature code and creation prerequisites before topology commits. */
-  prepare?: () => Promise<void>;
+  prepare?: (context: AuxiliaryWorkbenchPreparationContext) => Promise<void>;
+  /** Dispose feature state prepared for an Item that admission never committed. */
+  discardPreparedItem?: (context: AuxiliaryWorkbenchPreparationContext) => void | Promise<void>;
   renderItem: (context: AuxiliaryWorkbenchItemRenderContext) => ReactNode;
   requestClose: (item: AuxiliaryWorkbenchItem) => Promise<boolean>;
 }>;

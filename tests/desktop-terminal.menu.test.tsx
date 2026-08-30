@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 describe("Desktop Terminal tab session manager", () => {
-  it("presents the terminal launcher as Agent in the workspace toolbar", () => {
+  it("presents one unified Terminal Workbench toggle in the workspace toolbar", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -37,31 +37,21 @@ describe("Desktop Terminal tab session manager", () => {
         titlebarActionsSettings={DEFAULT_TITLEBAR_ACTIONS_SETTINGS}
         terminalSidebarOpen={false}
         terminalToolEnabled
-        agentChatEnabled
-        agentChatSidebarOpen={false}
         placement="toolbar"
         visibleGroups={["right-sidebar"]}
-        onToggleAgentChat={vi.fn()}
         onToggleTerminal={vi.fn()}
       />,
     )));
 
     const terminal = container.querySelector('[data-toolbar-action="terminal"]');
-    const agent = container.querySelector('[data-toolbar-action="agent"]');
-    expect(terminal?.textContent).toBe("Agent");
+    expect(terminal?.textContent).toBe("Terminal");
     expect(terminal?.classList.contains("desktop-shell-toolbar-button")).toBe(true);
     expect(terminal?.classList.contains("desktop-titlebar-action")).toBe(false);
     expect(terminal?.querySelector(".lucide-square-terminal")).not.toBeNull();
     expect(terminal?.querySelector(".desktop-shell-toolbar-button-icon")).not.toBeNull();
     expect(terminal?.querySelector(".desktop-shell-toolbar-button-label")).not.toBeNull();
-    expect(agent?.textContent).toBe("Chat");
-    expect(agent?.classList.contains("desktop-shell-toolbar-button")).toBe(true);
-    expect(agent?.classList.contains("desktop-titlebar-action")).toBe(false);
-    expect(agent?.querySelector(".desktop-shell-toolbar-agent-logo")).not.toBeNull();
-    expect(agent?.querySelector(".desktop-shell-toolbar-button-icon")).not.toBeNull();
-    expect(agent?.querySelector(".desktop-shell-toolbar-button-label")).not.toBeNull();
     expect(Array.from(container.querySelectorAll("[data-toolbar-action]"), (item) => item.textContent))
-      .toEqual(["Chat", "Agent"]);
+      .toEqual(["Terminal"]);
     expect(container.querySelector('[aria-label="Terminal actions"]')).toBeNull();
   });
 
@@ -96,7 +86,7 @@ describe("Desktop Terminal tab session manager", () => {
     expect(tabs[0]?.getAttribute("aria-label"))
       .toContain("Terminal 1 — Codex — /workspace/my private — Running");
     expect(tabs[1]?.getAttribute("aria-label"))
-      .toContain("Terminal 2 — Open a shell — /workspace/my private — Exited");
+      .toContain("Terminal 2 — Shell — /workspace/my private — Exited");
     expect(tabs[0]?.textContent).toBe("my private");
     expect(tabs[1]?.textContent).toBe("my private");
     expect(tabs[0]?.querySelector(".desktop-terminal-launcher-icon.is-codex")).not.toBeNull();

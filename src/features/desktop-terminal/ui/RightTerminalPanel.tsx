@@ -7,16 +7,22 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import type {
+  AuxiliaryWorkbenchItem,
   WorkbenchSplitDropEdge,
   WorkbenchSplitMinimumSize,
   Workspace,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
-import type { AuxiliaryWorkbenchContribution } from "../../app-shell/auxiliary-workbench/types";
+import type {
+  AuxiliaryWorkbenchContribution,
+  AuxiliaryWorkbenchCreationRecipe,
+} from "../../app-shell/auxiliary-workbench/types";
 import { useAuxiliaryWorkbenchContributions } from "../../app-shell/auxiliary-workbench/useAuxiliaryWorkbenchContributions";
 import { useTerminalAgentLocator } from "../controller/useTerminalAgentLocator";
 import { useTerminalTabMoveDrag } from "../interactions/useTerminalTabMoveDrag";
 import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
+import { DESKTOP_TERMINAL_LAUNCHERS } from "../model/terminalLaunchers";
+import type { AvailableTerminalAgentId } from "../model/terminalAgentAvailability";
 import {
   canPlaceTerminalSplit,
   terminalLeafMinimumSize,
@@ -71,14 +77,14 @@ export function RightTerminalPanel({
     () => new Map(workbench.items.map((item) => [item.id, item])),
     [workbench.items],
   );
-  const commitContributionItem = useCallback((
+  const reserveContributionItem = useCallback((
     contribution: AuxiliaryWorkbenchContribution,
+  ) => workbench.reserveContributionItem(contribution.kind, currentRoot), [currentRoot, workbench]);
+  const commitContributionItem = useCallback((
+    _contribution: AuxiliaryWorkbenchContribution,
+    item: AuxiliaryWorkbenchItem,
     targetGroupId: string | null,
-  ) => workbench.createContributionItem(
-    contribution.kind,
-    currentRoot,
-    targetGroupId,
-  ), [currentRoot, workbench]);
+  ) => workbench.commitContributionItem(item, targetGroupId), [workbench]);
   const {
     canCreate: canCreateContribution,
     contributionByKind,
@@ -89,6 +95,7 @@ export function RightTerminalPanel({
   } = useAuxiliaryWorkbenchContributions({
     contributions,
     items: workbench.items,
+    onReserve: reserveContributionItem,
     onCommit: commitContributionItem,
   });
   const {
@@ -105,10 +112,10 @@ export function RightTerminalPanel({
   });
   const hosts = usePersistentTerminalSessionHosts(itemIds);
   const agentChatContribution = contributionByKind.get(AGENT_CHAT_WORKBENCH_ITEM_KIND) ?? null;
-  const canCreateChat = Boolean(
-    agentChatContribution
-    && canCreateContribution(agentChatContribution),
-  );
+  const chatRecipes = agentChatContribution?.creationRecipes ?? [];
+  const canCreateChat = Boolean(agentChatContribution && chatRecipes.some((recipe) => (
+    canCreateContribution(agentChatContribution, recipe)
+  )));
   const chatPreparing = preparingKinds.has(AGENT_CHAT_WORKBENCH_ITEM_KIND);
 
   const presentedTerminalSessions = useMemo(() => workbench.presentedItemIds.flatMap(
@@ -132,6 +139,12 @@ export function RightTerminalPanel({
     const hidden = new Set(hiddenAgentIds);
     return availableAgentIds.filter((agentId) => !hidden.has(agentId));
   }, [availableAgentIds, hiddenAgentIds]);
+  const terminalAgentIds = useMemo(() => {
+    const hidden = new Set(hiddenAgentIds);
+    return DESKTOP_TERMINAL_LAUNCHERS.flatMap(({ id }) => (
+      id !== "shell" && !hidden.has(id) ? [id as AvailableTerminalAgentId] : []
+    ));
+  }, [hiddenAgentIds]);
   const canLaunch = useCallback((launcherId: DesktopTerminalLauncherId) => (
     launcherId === "shell" || visibleAgentIds.includes(launcherId)
   ), [visibleAgentIds]);
@@ -146,8 +159,13 @@ export function RightTerminalPanel({
   ) => {
     if (terminalEnabled && canLaunch(launcherId)) workbench.launchTerminal(itemId, launcherId);
   }, [canLaunch, terminalEnabled, workbench]);
-  const createChat = useCallback((targetGroupId: string | null = workbench.activeGroup?.id ?? null) => (
-    agentChatContribution ? createContributionItem(agentChatContribution, targetGroupId) : null
+  const createChat = useCallback((
+    recipe: AuxiliaryWorkbenchCreationRecipe,
+    targetGroupId: string | null = workbench.activeGroup?.id ?? null,
+  ) => (
+    agentChatContribution
+      ? createContributionItem(agentChatContribution, targetGroupId, recipe)
+      : null
   ), [agentChatContribution, createContributionItem, workbench.activeGroup?.id]);
 
   useEffect(() => {
@@ -231,20 +249,52 @@ export function RightTerminalPanel({
 
   const createOptions = useCallback((groupId: string): readonly TerminalWorkbenchCreateOption[] => {
     const options: TerminalWorkbenchCreateOption[] = [];
-    if (terminalEnabled) {
-      options.push({
-        id: TERMINAL_WORKBENCH_ITEM_KIND,
-        label: t("terminal.new"),
-        onCreate: () => workbench.createTerminalLauncher(currentRoot, groupId),
-      });
-    }
     for (const contribution of contributions) {
-      options.push({
-        id: contribution.kind,
-        label: contribution.createLabel,
-        disabled: !canCreateContribution(contribution),
-        onCreate: () => { void createContributionItem(contribution, groupId); },
-      });
+      const recipes = contribution.creationRecipes;
+      if (recipes?.length) {
+        for (const recipe of recipes) {
+          options.push({
+            id: `${contribution.kind}:${recipe.id}`,
+            group: "chat",
+            groupLabel: t("terminal.launcher.chat"),
+            iconKey: recipe.iconKey,
+            label: recipe.label,
+            detail: recipe.status === "coming-soon"
+              ? t("terminal.launcher.comingSoon")
+              : undefined,
+            disabled: !canCreateContribution(contribution, recipe),
+            onCreate: () => { void createContributionItem(contribution, groupId, recipe); },
+          });
+        }
+      } else {
+        options.push({
+          id: contribution.kind,
+          group: "chat",
+          groupLabel: contribution.label,
+          label: contribution.createLabel,
+          disabled: !canCreateContribution(contribution),
+          onCreate: () => { void createContributionItem(contribution, groupId); },
+        });
+      }
+    }
+    if (terminalEnabled) {
+      const installed = new Set(visibleAgentIds);
+      const terminalIds: DesktopTerminalLauncherId[] = ["shell", ...terminalAgentIds];
+      for (const launcherId of terminalIds) {
+        const launcher = DESKTOP_TERMINAL_LAUNCHERS.find(({ id }) => id === launcherId);
+        if (!launcher) continue;
+        const available = launcherId === "shell" || installed.has(launcherId as AvailableTerminalAgentId);
+        options.push({
+          id: `${TERMINAL_WORKBENCH_ITEM_KIND}:${launcherId}`,
+          group: "terminal",
+          groupLabel: t("terminal.title"),
+          launcherId,
+          label: t(launcher.nameMessage),
+          detail: available ? undefined : t("terminal.launcher.notInstalled"),
+          disabled: !available,
+          onCreate: () => workbench.createTerminal(currentRoot, launcherId, groupId),
+        });
+      }
     }
     return options;
   }, [
@@ -254,6 +304,8 @@ export function RightTerminalPanel({
     currentRoot,
     t,
     terminalEnabled,
+    terminalAgentIds,
+    visibleAgentIds,
     workbench,
   ]);
 
@@ -271,9 +323,12 @@ export function RightTerminalPanel({
           <TerminalLauncher
             discoveryPhase={agentDiscoveryPhase}
             availableAgentIds={visibleAgentIds}
-            launching={chatPreparing}
-            onCreateChat={agentChatContribution && (canCreateChat || chatPreparing)
-              ? () => { if (!chatPreparing) void createChat(null); }
+            terminalAgentIds={terminalAgentIds}
+            chatCreationAvailable={canCreateChat}
+            chatPreparing={chatPreparing}
+            chatRecipes={chatRecipes}
+            onCreateChat={agentChatContribution
+              ? (recipe) => { if (!chatPreparing) void createChat(recipe, null); }
               : undefined}
             onLaunch={createDetectedTerminal}
             onRefresh={() => void refreshAvailableAgents()}

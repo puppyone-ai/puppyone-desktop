@@ -4,8 +4,13 @@
 import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import type { AuxiliaryWorkbenchItem } from "@puppyone/shared-ui";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AuxiliaryWorkbenchContribution } from "../src/features/app-shell/auxiliary-workbench/types";
+import type {
+  AuxiliaryWorkbenchContribution,
+  AuxiliaryWorkbenchCreationRecipe,
+  AuxiliaryWorkbenchPreparationContext,
+} from "../src/features/app-shell/auxiliary-workbench/types";
 import { useAuxiliaryWorkbenchContributions } from "../src/features/app-shell/auxiliary-workbench/useAuxiliaryWorkbenchContributions";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -15,6 +20,13 @@ type Registry = ReturnType<typeof useAuxiliaryWorkbenchContributions>;
 let latest: Registry | null = null;
 let reactRoot: Root | null = null;
 
+const reservedItem = Object.freeze({
+  id: "chat-1",
+  kind: "agent-chat",
+  rootId: "/workspace",
+  contextId: "workspace-1",
+});
+
 afterEach(() => {
   if (reactRoot) act(() => reactRoot?.unmount());
   reactRoot = null;
@@ -23,57 +35,65 @@ afterEach(() => {
 });
 
 describe("Auxiliary Workbench contribution admission", () => {
-  it("prepares a lazy contribution before committing one Item", async () => {
+  it("reserves identity, prepares the selected recipe, then commits the same Item", async () => {
     const ready = deferred<void>();
-    const contribution = createContribution(() => ready.promise);
-    const onCommit = vi.fn(() => "chat-1");
-    renderRegistry([contribution], onCommit);
+    const prepare = vi.fn(() => ready.promise);
+    const recipe = availableRecipe("codex");
+    const contribution = createContribution(prepare, [recipe]);
+    const onReserve = vi.fn(() => reservedItem);
+    const onCommit = vi.fn(() => reservedItem.id);
+    renderRegistry([contribution], onReserve, onCommit);
 
     let first: Promise<string | null>;
     let duplicate: Promise<string | null>;
     act(() => {
-      first = current().create(contribution, "group-1");
-      duplicate = current().create(contribution, "group-1");
+      first = current().create(contribution, "group-1", recipe);
+      duplicate = current().create(contribution, "group-1", recipe);
     });
+    expect(onReserve).toHaveBeenCalledOnce();
     expect(onCommit).not.toHaveBeenCalled();
-    expect(current().canCreate(contribution)).toBe(false);
+    expect(current().canCreate(contribution, recipe)).toBe(false);
     await expect(duplicate!).resolves.toBeNull();
 
     await act(async () => {
       ready.resolve();
       await expect(first!).resolves.toBe("chat-1");
     });
-    expect(onCommit).toHaveBeenCalledTimes(1);
-    expect(onCommit).toHaveBeenCalledWith(contribution, "group-1");
+    expect(prepare).toHaveBeenCalledWith({ item: reservedItem, recipe });
+    expect(onCommit).toHaveBeenCalledWith(contribution, reservedItem, "group-1");
   });
 
-  it("reports preparation failure without leaving a topology Item", async () => {
+  it("reports preparation failure, disposes prepared state, and leaves topology empty", async () => {
     const prepare = vi.fn()
       .mockRejectedValueOnce(new Error("chunk unavailable"))
       .mockResolvedValueOnce(undefined);
-    const contribution = createContribution(prepare);
+    const discardPreparedItem = vi.fn();
+    const contribution = createContribution(prepare, undefined, discardPreparedItem);
     const onCommit = vi.fn(() => "chat-1");
-    renderRegistry([contribution], onCommit);
+    renderRegistry([contribution], () => reservedItem, onCommit);
 
     await act(async () => {
       await expect(current().create(contribution, null)).resolves.toBeNull();
     });
     expect(onCommit).not.toHaveBeenCalled();
+    expect(discardPreparedItem).toHaveBeenCalledWith({ item: reservedItem, recipe: null });
     expect(current().creationFailure).toEqual({ kind: "agent-chat", label: "Agent Chat" });
     expect(current().canCreate(contribution)).toBe(true);
 
     await act(async () => {
       await expect(current().create(contribution, null)).resolves.toBe("chat-1");
     });
-    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledOnce();
+    expect(discardPreparedItem).toHaveBeenCalledOnce();
     expect(current().creationFailure).toBeNull();
   });
 
-  it("does not commit when the contribution is disabled while preparation is pending", async () => {
+  it("disposes a reservation when the contribution is disabled during preparation", async () => {
     const ready = deferred<void>();
-    const contribution = createContribution(() => ready.promise);
+    const discardPreparedItem = vi.fn();
+    const contribution = createContribution(() => ready.promise, undefined, discardPreparedItem);
     const onCommit = vi.fn(() => "chat-1");
-    const rerender = renderRegistry([contribution], onCommit);
+    const rerender = renderRegistry([contribution], () => reservedItem, onCommit);
 
     let creation: Promise<string | null>;
     act(() => {
@@ -85,18 +105,49 @@ describe("Auxiliary Workbench contribution admission", () => {
       await expect(creation!).resolves.toBeNull();
     });
     expect(onCommit).not.toHaveBeenCalled();
+    expect(discardPreparedItem).toHaveBeenCalledOnce();
+  });
+
+  it("rejects unknown and Coming soon recipes before reserving an Item", async () => {
+    const codex = availableRecipe("codex");
+    const puppyone = Object.freeze({
+      id: "puppyone-agent",
+      label: "PuppyOne",
+      iconKey: "puppyone-agent",
+      status: "coming-soon" as const,
+    });
+    const contribution = createContribution(async () => undefined, [codex, puppyone]);
+    const onReserve = vi.fn(() => reservedItem);
+    renderRegistry([contribution], onReserve, vi.fn(() => "chat-1"));
+
+    expect(current().canCreate(contribution, codex)).toBe(true);
+    expect(current().canCreate(contribution, puppyone)).toBe(false);
+    expect(current().canCreate(contribution, availableRecipe("cursor"))).toBe(false);
+    await expect(current().create(contribution, null, puppyone)).resolves.toBeNull();
+    expect(onReserve).not.toHaveBeenCalled();
   });
 });
 
 function renderRegistry(
   contributions: readonly AuxiliaryWorkbenchContribution[],
-  onCommit: (contribution: AuxiliaryWorkbenchContribution, groupId: string | null) => string,
+  onReserve: (contribution: AuxiliaryWorkbenchContribution) => AuxiliaryWorkbenchItem,
+  onCommit: (
+    contribution: AuxiliaryWorkbenchContribution,
+    item: AuxiliaryWorkbenchItem,
+    groupId: string | null,
+  ) => string,
 ) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   reactRoot = createRoot(container);
   const render = (next: readonly AuxiliaryWorkbenchContribution[]) => {
-    act(() => reactRoot?.render(<Harness contributions={next} onCommit={onCommit} />));
+    act(() => reactRoot?.render(
+      <Harness
+        contributions={next}
+        onReserve={onReserve}
+        onCommit={onCommit}
+      />,
+    ));
   };
   render(contributions);
   return render;
@@ -105,11 +156,22 @@ function renderRegistry(
 function Harness({
   contributions,
   onCommit,
+  onReserve,
 }: Readonly<{
   contributions: readonly AuxiliaryWorkbenchContribution[];
-  onCommit: (contribution: AuxiliaryWorkbenchContribution, groupId: string | null) => string;
+  onReserve: (contribution: AuxiliaryWorkbenchContribution) => AuxiliaryWorkbenchItem;
+  onCommit: (
+    contribution: AuxiliaryWorkbenchContribution,
+    item: AuxiliaryWorkbenchItem,
+    groupId: string | null,
+  ) => string;
 }>) {
-  latest = useAuxiliaryWorkbenchContributions({ contributions, items: [], onCommit });
+  latest = useAuxiliaryWorkbenchContributions({
+    contributions,
+    items: [],
+    onCommit,
+    onReserve,
+  });
   return null;
 }
 
@@ -118,11 +180,16 @@ function current() {
   return latest;
 }
 
-function createContribution(prepare: () => Promise<void>): AuxiliaryWorkbenchContribution {
+function createContribution(
+  prepare: (context: AuxiliaryWorkbenchPreparationContext) => Promise<void>,
+  creationRecipes?: readonly AuxiliaryWorkbenchCreationRecipe[],
+  discardPreparedItem?: (context: AuxiliaryWorkbenchPreparationContext) => void | Promise<void>,
+): AuxiliaryWorkbenchContribution {
   return Object.freeze({
     kind: "agent-chat",
     label: "Agent Chat",
     createLabel: "New chat",
+    creationRecipes,
     initialSnapshot: Object.freeze({
       title: "New chat",
       accessibleLabel: "New chat — Agent Chat",
@@ -134,9 +201,14 @@ function createContribution(prepare: () => Promise<void>): AuxiliaryWorkbenchCon
     maximumItems: 8,
     minimumSize: Object.freeze({ width: 320, height: 260 }),
     prepare,
+    discardPreparedItem,
     renderItem: () => null,
     requestClose: async () => true,
   });
+}
+
+function availableRecipe(id: string): AuxiliaryWorkbenchCreationRecipe {
+  return Object.freeze({ id, label: id, iconKey: id, status: "available" });
 }
 
 function deferred<T>() {

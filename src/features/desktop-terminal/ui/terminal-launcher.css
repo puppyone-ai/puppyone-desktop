@@ -8,82 +8,144 @@
   box-sizing: border-box;
   overflow: auto;
   place-items: start center;
-  padding: clamp(56px, 20vh, 220px) 0 32px;
+  padding: clamp(58px, 18vh, 196px) 10px 32px;
   background: var(--po-terminal-bg);
   color: var(--po-terminal-fg);
 }
 
 .desktop-terminal-launcher-content {
   display: flex;
-  width: min(100%, 252px);
+  width: min(100%, 320px);
   min-width: 0;
   flex-direction: column;
-  gap: 28px;
+  gap: 22px;
 }
 
 .desktop-terminal-launcher-group {
   position: relative;
-  box-sizing: border-box;
   display: flex;
-  width: 100%;
   min-width: 0;
   flex-direction: column;
-  gap: 8px;
-  padding: 18px;
-  border: 1px solid var(--po-border);
-  border-radius: 0;
+  gap: 7px;
 }
 
 .desktop-terminal-launcher-heading {
-  position: absolute;
-  z-index: 1;
-  top: 0;
-  inset-inline-start: 22px;
-  inset-inline-end: auto;
   display: flex;
-  width: max-content;
-  max-width: calc(100% - 28px);
   min-width: 0;
-  height: var(--po-menu-item-height);
+  height: 20px;
   align-items: center;
-  justify-content: flex-start;
-  gap: 4px;
-  padding: 0 6px;
-  background: var(--po-terminal-bg);
-  pointer-events: none;
-  transform: translateY(-50%);
+  justify-content: space-between;
+  gap: 6px;
+  padding-inline: 2px;
 }
 
 .desktop-terminal-launcher-heading h2 {
   display: flex;
   min-width: 0;
   align-items: center;
-  justify-content: flex-start;
   gap: 5px;
   margin: 0;
-  padding: 0;
   overflow: hidden;
-  background: transparent;
-  color: var(--po-text-subtle);
+  color: var(--po-text-muted);
   font-family: var(--po-font-sans);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0;
   line-height: 18px;
-  text-align: start;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.desktop-terminal-launcher-heading h2 > span {
+.desktop-terminal-launcher-rail {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 3px;
+  padding: 5px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  border: 1px solid var(--po-border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--po-terminal-fg) 2.5%, transparent);
+}
+
+.desktop-terminal-launcher-rail > [role="listitem"] {
+  display: grid;
+  flex: 0 0 32px;
+  place-items: center;
+}
+
+.desktop-terminal-launcher-recipe {
+  position: relative;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+  cursor: var(--po-clickable-cursor, pointer);
+  font: inherit;
+  animation: desktop-terminal-launcher-recipe-enter 140ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.desktop-terminal-launcher-recipe:hover:not([aria-disabled="true"]) {
+  border-color: color-mix(in srgb, var(--po-border-strong, var(--po-border)) 62%, transparent);
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-terminal-launcher-recipe:focus-visible {
+  border-color: var(--po-focus-ring);
+  outline: 0;
+  box-shadow: inset 0 0 0 1px var(--po-focus-ring);
+}
+
+.desktop-terminal-launcher-recipe[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.34;
+}
+
+.desktop-terminal-launcher-recipe[data-status="coming-soon"]::after {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--po-terminal-bg);
+  border-radius: 50%;
+  background: var(--po-text-subtle);
+  content: "";
+}
+
+.desktop-terminal-launcher-recipe-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.desktop-terminal-launcher-recipe:hover .desktop-terminal-launcher-icon,
+.desktop-terminal-launcher-recipe:focus-visible .desktop-terminal-launcher-icon {
+  opacity: 1;
 }
 
 .desktop-terminal-launcher-scan {
   display: grid;
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
   place-items: center;
   padding: 0;
   border: 0;
@@ -91,7 +153,6 @@
   background: transparent;
   color: var(--po-text-subtle);
   cursor: var(--po-clickable-cursor, pointer);
-  pointer-events: auto;
 }
 
 .desktop-terminal-launcher-scan:hover:not(:disabled) {
@@ -104,11 +165,6 @@
   opacity: 0.52;
 }
 
-.desktop-terminal-launcher-scan:disabled:hover {
-  background: transparent;
-  color: var(--po-text-subtle);
-}
-
 .desktop-terminal-launcher-scan:focus-visible {
   outline: 1px solid var(--po-focus-ring);
   outline-offset: 1px;
@@ -118,60 +174,10 @@
   animation: desktop-terminal-launcher-scan 900ms linear infinite;
 }
 
-.desktop-terminal-launcher-tools {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1px;
-}
-
-.desktop-terminal-launcher-more {
-  min-width: 0;
-  color: var(--po-text-subtle);
-  font-size: 11px;
-}
-
-.desktop-terminal-launcher-more > summary {
-  padding: 4px 8px;
-  border-radius: 5px;
-  cursor: var(--po-clickable-cursor, pointer);
-  list-style-position: inside;
-  line-height: 16px;
-}
-
-.desktop-terminal-launcher-more > summary:hover {
-  background: var(--po-hover);
-  color: var(--po-text-muted);
-}
-
-.desktop-terminal-launcher-more > summary:focus-visible {
-  outline: 1px solid var(--po-focus-ring);
-  outline-offset: 1px;
-}
-
-.desktop-terminal-launcher-more[open] > summary {
-  margin-block-end: 1px;
-}
-
 .desktop-terminal-launcher-availability {
-  display: flex;
-  min-height: 34px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 3px 8px;
-  color: var(--po-text-subtle);
-  font-size: 11px;
-  line-height: 16px;
-  text-align: center;
-}
-
-.desktop-terminal-launcher-availability.is-assistive {
   position: absolute;
   width: 1px;
   height: 1px;
-  min-height: 0;
   margin: -1px;
   padding: 0;
   overflow: hidden;
@@ -210,83 +216,6 @@
   display: none;
 }
 
-.desktop-terminal-launcher-tool,
-.desktop-terminal-launcher-shell {
-  display: flex;
-  width: 100%;
-  min-width: 0;
-  align-items: center;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--po-text-muted);
-  cursor: var(--po-clickable-cursor, pointer);
-  font: inherit;
-  text-align: start;
-}
-
-.desktop-terminal-launcher-tool {
-  min-height: 34px;
-  gap: 9px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  animation: desktop-terminal-launcher-tool-enter 140ms cubic-bezier(0.2, 0, 0, 1) both;
-}
-
-.desktop-terminal-launcher-shell {
-  min-height: 34px;
-  gap: 9px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  color: var(--po-text-subtle);
-}
-
-.desktop-terminal-launcher-tool:hover,
-.desktop-terminal-launcher-shell:hover {
-  color: var(--po-text);
-  background: var(--po-hover);
-}
-
-.desktop-terminal-launcher-tool:disabled,
-.desktop-terminal-launcher-shell:disabled {
-  cursor: default;
-  opacity: 0.52;
-}
-
-.desktop-terminal-launcher-tool:disabled:hover,
-.desktop-terminal-launcher-shell:disabled:hover {
-  background: transparent;
-  color: var(--po-text-muted);
-}
-
-.desktop-terminal-launcher-tool:focus-visible,
-.desktop-terminal-launcher-shell:focus-visible {
-  border-color: var(--po-focus-ring);
-  outline: 0;
-  box-shadow: inset 0 0 0 1px var(--po-focus-ring);
-}
-
-.desktop-terminal-launcher-shell-icon {
-  border-radius: 4px;
-}
-
-.desktop-terminal-launcher-tool > span:last-child,
-.desktop-terminal-launcher-shell > span:last-child {
-  min-width: 0;
-  overflow: hidden;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-terminal-launcher-tool:hover .desktop-terminal-launcher-icon,
-.desktop-terminal-launcher-tool:focus-visible .desktop-terminal-launcher-icon,
-.desktop-terminal-launcher-shell:hover .desktop-terminal-launcher-shell-icon,
-.desktop-terminal-launcher-shell:focus-visible .desktop-terminal-launcher-shell-icon {
-  opacity: 1;
-}
-
 .desktop-terminal-launcher-spinner {
   color: currentColor;
 }
@@ -297,28 +226,22 @@
   }
 }
 
-@keyframes desktop-terminal-launcher-tool-enter {
+@keyframes desktop-terminal-launcher-recipe-enter {
   from {
     opacity: 0;
     transform: translateY(2px);
   }
 }
 
-@container (min-width: 460px) {
-  .desktop-terminal-launcher-content {
-    width: 264px;
-  }
-}
-
 @media (max-height: 420px) {
   .desktop-terminal-launcher {
-    padding-block-start: 40px;
+    padding-block-start: 36px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .desktop-terminal-launcher-scan.is-scanning svg,
-  .desktop-terminal-launcher-tool {
+  .desktop-terminal-launcher-recipe {
     animation: none;
   }
 }

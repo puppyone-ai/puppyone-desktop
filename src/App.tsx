@@ -19,6 +19,7 @@ import {
 import { AssetLibraryHome } from "./components/AssetLibraryHome";
 import {
   closeAgentChatWorkbenchItem,
+  discardPreparedAgentChatWorkbenchItem,
   isDesktopAgentChatEnabled,
   loadAgentChatWorkbenchItem,
   prepareAgentChatWorkbenchItem,
@@ -95,6 +96,7 @@ import {
 } from "./features/typography";
 import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
 import type { AuxiliaryWorkbenchContribution } from "./features/app-shell/auxiliary-workbench/types";
+import { AGENT_CHAT_CREATION_RECIPES } from "./features/app-shell/auxiliary-workbench/agentChatCreationRecipes";
 
 const AgentChatWorkbenchItem = lazy(loadAgentChatWorkbenchItem);
 
@@ -895,7 +897,9 @@ function AppContent() {
       }),
       maximumItems: 8,
       minimumSize: Object.freeze({ width: 280, height: 260 }),
+      creationRecipes: AGENT_CHAT_CREATION_RECIPES,
       prepare: prepareAgentChatWorkbenchItem,
+      discardPreparedItem: discardPreparedAgentChatWorkbenchItem,
       renderItem: (context) => (
         <Suspense fallback={null}>
           <AgentChatWorkbenchItem
@@ -1011,14 +1015,11 @@ function AppContent() {
     titlebarActionsSettings,
     terminalSidebarOpen: rightSidebarOpen && desktopRightSidebarEnabled,
     terminalToolEnabled: desktopRightSidebarEnabled,
-    agentChatEnabled: false,
-    agentChatSidebarOpen: false,
     onUpdateNow: () => void desktopUpdates.updateNow(),
     onToggleTerminal: () => {
       setRightSidebarOpen(!rightSidebarOpen);
       setSwitcherOpen(false);
     },
-    onToggleAgentChat: () => undefined,
   };
   const titlebarActions = (
     <DesktopTitlebarActions

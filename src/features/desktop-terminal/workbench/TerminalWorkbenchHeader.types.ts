@@ -12,7 +12,12 @@ export type TerminalWorkbenchHeaderItem = Readonly<{
 
 export type TerminalWorkbenchCreateOption = Readonly<{
   id: string;
+  group: "chat" | "terminal";
+  groupLabel: string;
   label: string;
+  detail?: string;
   disabled?: boolean;
+  iconKey?: string | null;
+  launcherId?: import("../model/terminalLaunchers").DesktopTerminalLauncherId;
   onCreate: () => void;
 }>;

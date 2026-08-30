@@ -1,7 +1,5 @@
 import { Fragment, type ReactNode } from "react";
-import { MessageSquare } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
-import { PuppyBrandMark } from "../../components/brand/PuppyBrandMark";
 import { getOrderedHeaderElementDefinitions, type HeaderElementRenderContext } from "./headerElements";
 import type { TitlebarActionsSettings } from "../../preferences";
 import type { DesktopUpdateState } from "../../types/electron";
@@ -16,10 +14,7 @@ type DesktopTitlebarActionsProps = {
   titlebarActionsSettings: TitlebarActionsSettings;
   terminalSidebarOpen: boolean;
   terminalToolEnabled: boolean;
-  agentChatEnabled: boolean;
-  agentChatSidebarOpen: boolean;
   onUpdateNow?: () => void;
-  onToggleAgentChat: () => void;
   onToggleTerminal: () => void;
   placement?: "titlebar" | "toolbar";
   visibleGroups?: readonly DesktopTitlebarActionGroup[];
@@ -32,10 +27,7 @@ export function DesktopTitlebarActions({
   titlebarActionsSettings,
   terminalSidebarOpen,
   terminalToolEnabled,
-  agentChatEnabled,
-  agentChatSidebarOpen,
   onUpdateNow = () => {},
-  onToggleAgentChat,
   onToggleTerminal,
   placement = "titlebar",
   visibleGroups,
@@ -90,21 +82,6 @@ export function DesktopTitlebarActions({
     });
   }
 
-  if (agentChatEnabled) {
-    titlebarActionItems.push({
-      group: "right-sidebar",
-      id: "agent-chat",
-      node: (
-        <AgentChatTitlebarButton
-          enabled
-          open={agentChatSidebarOpen}
-          onToggle={onToggleAgentChat}
-          placement={placement}
-        />
-      ),
-    });
-  }
-
   const placementOrderedItems = placement === "toolbar"
     ? [
         ...titlebarActionItems.filter((item) => item.id !== "terminal"),
@@ -129,53 +106,5 @@ export function DesktopTitlebarActions({
         );
       })}
     </>
-  );
-}
-
-export function AgentChatTitlebarButton({
-  enabled,
-  open,
-  onToggle,
-  placement = "titlebar",
-}: {
-  enabled: boolean;
-  open: boolean;
-  onToggle: () => void;
-  placement?: "titlebar" | "toolbar";
-}) {
-  const { t } = useLocalization();
-  if (!enabled) return null;
-  const label = t(open ? "shell.titlebar.hideAgentChat" : "shell.titlebar.showAgentChat");
-  return (
-    <button
-      className={placement === "toolbar"
-        ? "desktop-shell-toolbar-button desktop-shell-toolbar-agent"
-        : "desktop-titlebar-action desktop-titlebar-agent-chat"}
-      type="button"
-      title={label}
-      aria-label={label}
-      aria-pressed={open}
-      data-toolbar-action={placement === "toolbar" ? "agent" : undefined}
-      onClick={onToggle}
-    >
-      {placement === "toolbar" ? (
-        <i
-          className="desktop-shell-toolbar-button-icon"
-          aria-hidden="true"
-        >
-          <PuppyBrandMark
-            className="desktop-shell-toolbar-agent-logo"
-            tone="dark"
-          />
-        </i>
-      ) : (
-        <MessageSquare size={15} strokeWidth={1.8} />
-      )}
-      {placement === "toolbar" && (
-        <span className="desktop-shell-toolbar-button-label">
-          {t("shell.navigation.agentChat")}
-        </span>
-      )}
-    </button>
   );
 }

@@ -4,11 +4,13 @@ import { useLocalization } from "@puppyone/localization/react";
 import {
   DesktopMenuIconButton,
   DesktopMenuItem,
+  DesktopMenuSection,
   DesktopMenuSurface,
 } from "../../../components/DesktopMenu";
 import { DesktopOverlayLayer } from "../../app-shell/DesktopOverlayPortal";
 import { useAnchoredOverlayPosition } from "../../app-shell/useAnchoredOverlayPosition";
 import type { TerminalWorkbenchCreateOption } from "./TerminalWorkbenchHeader.types";
+import { WorkbenchLauncherIcon } from "../ui/WorkbenchLauncherIcon";
 
 export function TerminalWorkbenchCreateMenu({
   options,
@@ -23,8 +25,8 @@ export function TerminalWorkbenchCreateMenu({
     open,
     anchorRef: triggerRef,
     boundarySelector: ".desktop-terminal-panel",
-    preferredWidth: 184,
-    preferredMaxHeight: 240,
+    preferredWidth: 216,
+    preferredMaxHeight: 360,
     gap: 4,
     margin: 8,
   });
@@ -67,8 +69,8 @@ export function TerminalWorkbenchCreateMenu({
     : {
         left: 0,
         top: 0,
-        width: 184,
-        maxHeight: 240,
+        width: 216,
+        maxHeight: 360,
         visibility: "hidden",
         pointerEvents: "none",
       } satisfies CSSProperties;
@@ -93,22 +95,53 @@ export function TerminalWorkbenchCreateMenu({
             className="desktop-terminal-create-menu"
             style={menuStyle}
           >
-            {options.map((option) => (
-              <DesktopMenuItem
-                key={option.id}
-                label={option.label}
-                role="menuitem"
-                disabled={option.disabled}
-                onClick={() => {
-                  if (option.disabled) return;
-                  setOpen(false);
-                  option.onCreate();
-                }}
-              />
+            {groupCreateOptions(options).map((group) => (
+              <DesktopMenuSection key={group.id} label={group.label}>
+                {group.options.map((option) => (
+                  <DesktopMenuItem
+                    key={option.id}
+                    detail={option.detail}
+                    icon={option.launcherId || option.iconKey !== undefined
+                      ? (
+                          <WorkbenchLauncherIcon
+                            compact
+                            iconKey={option.iconKey}
+                            launcherId={option.launcherId}
+                          />
+                        )
+                      : undefined}
+                    label={option.label}
+                    role="menuitem"
+                    disabled={option.disabled}
+                    onClick={() => {
+                      if (option.disabled) return;
+                      setOpen(false);
+                      option.onCreate();
+                    }}
+                  />
+                ))}
+              </DesktopMenuSection>
             ))}
           </DesktopMenuSurface>
         </DesktopOverlayLayer>
       )}
     </>
   );
+}
+
+function groupCreateOptions(options: readonly TerminalWorkbenchCreateOption[]) {
+  const groups = new Map<TerminalWorkbenchCreateOption["group"], {
+    id: TerminalWorkbenchCreateOption["group"];
+    label: string;
+    options: TerminalWorkbenchCreateOption[];
+  }>();
+  for (const option of options) {
+    let group = groups.get(option.group);
+    if (!group) {
+      group = { id: option.group, label: option.groupLabel, options: [] };
+      groups.set(option.group, group);
+    }
+    group.options.push(option);
+  }
+  return Array.from(groups.values());
 }

@@ -160,6 +160,19 @@ export class AgentSessionController {
     return this.initializeRuntime(refresh, true);
   }
 
+  /** Selects a creation recipe before first discovery without restoring history. */
+  async initializeForRuntime(runtimeId: string) {
+    if (!runtimeId) return false;
+    if (this.initializePromise) await this.initializePromise;
+    if (this.state.initialized || this.state.inspection || this.state.session) {
+      if (this.state.selectedRuntimeId === runtimeId) return true;
+      return this.selectRuntime(runtimeId);
+    }
+    this.patch({ selectedRuntimeId: runtimeId });
+    await this.initializeRuntime(false, false);
+    return this.getSnapshot().inspection?.selectedRuntimeId === runtimeId;
+  }
+
   private async initializeRuntime(refresh: boolean, restoreLatest: boolean) {
     if (this.initializePromise) return this.initializePromise;
     if (restoreLatest && !refresh && hasFreshAgentRuntimeInspection(this.state, this.lastInspectionAt)) return;

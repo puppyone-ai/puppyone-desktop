@@ -90,6 +90,8 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(nativeIdentityVerifier).toContain("MAX_EXECUTABLE_PREFIX_BYTES");
     expect(nativeIdentityVerifier).not.toMatch(/runCommand|spawn\(|--version|account\/read|model\/list/);
     expect(controller).toContain("auxiliaryWorkbenchReducer");
+    expect(controller).toContain("reserveContributionItem");
+    expect(controller).toContain("commitContributionItem");
     expect(controller).toContain('type: "create"');
     expect(controller).toContain('type: "split-item"');
     expect(controller).toContain('dispatchTerminal({ type: "launch"');
@@ -114,6 +116,7 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(controller).not.toContain("initiallyActive");
     expect(controller).not.toContain("getDesktopTerminalLauncher(launcherId)");
     expect(launcher).toContain("DESKTOP_TERMINAL_LAUNCHERS");
+    expect(launcher).toContain("chatRecipes.map");
     expect(launcher).not.toContain("window.puppyoneDesktop");
     expect(launchers).not.toContain("command:");
     expect(controller).not.toContain('dispatch({ type: "restart-active" });');
@@ -263,12 +266,14 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(launcherCss).toContain(".desktop-terminal-launcher");
     expect(launcherCss).toContain("container-type: size");
     expect(launcherCss).toMatch(
-      /\.desktop-terminal-launcher\s*\{[^}]*place-items:\s*start center;[^}]*padding:\s*clamp\(56px, 20vh, 220px\) 0 32px;/s,
+      /\.desktop-terminal-launcher\s*\{[^}]*place-items:\s*start center;[^}]*padding:\s*clamp\(58px, 18vh, 196px\) 10px 32px;/s,
     );
     expect(launcherCss).toMatch(
-      /\.desktop-terminal-launcher-availability\.is-assistive\s*\{[^}]*position:\s*absolute;[^}]*width:\s*1px;[^}]*height:\s*1px;/s,
+      /\.desktop-terminal-launcher-availability\s*\{[^}]*position:\s*absolute;[^}]*width:\s*1px;[^}]*height:\s*1px;/s,
     );
-    expect(launcherCss).toContain("@container (min-width: 460px)");
+    expect(launcherCss).toMatch(
+      /\.desktop-terminal-launcher-rail\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*nowrap;[^}]*gap:\s*3px;/s,
+    );
     expect(launcherCss).toContain("var(--po-terminal-bg)");
     expect(launcherCss).toContain("var(--po-focus-ring)");
     expect(launcherIconCss).toMatch(
@@ -277,16 +282,15 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(launcherIconCss).toContain(".desktop-terminal-launcher-icon.is-compact.is-hermes");
     expect(launcher).toContain("desktop-terminal-launcher-heading");
     expect(launcher).toContain("desktop-terminal-launcher-scan");
-    expect(launcher).toContain("desktop-terminal-launcher-group is-agents");
-    expect(launcher).toContain("desktop-terminal-launcher-group is-shell");
-    expect(launcher).toContain('t("terminal.launcher.shell.title")');
+    expect(launcher).toContain("desktop-terminal-launcher-group is-chat");
+    expect(launcher).toContain("desktop-terminal-launcher-group is-terminal");
+    expect(launcher).toContain('t("terminal.launcher.chat")');
+    expect(launcher).toContain('t("terminal.title")');
     expect(launcher).toContain('aria-label={t("terminal.launcher.scanAgain")}');
-    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-group\s*\{[^}]*padding:\s*18px;[^}]*border:\s*1px solid var\(--po-border\);[^}]*border-radius:\s*0;/s);
-    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-content\s*\{[^}]*gap:\s*28px;/s);
-    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-heading\s*\{[^}]*inset-inline-start:\s*22px;[^}]*justify-content:\s*flex-start;/s);
-    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-heading h2\s*\{[^}]*font-size:\s*12px;[^}]*font-weight:\s*500;[^}]*text-align:\s*start;/s);
-    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-tool\s*\{[^}]*border-radius:\s*6px;/s);
-    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-shell\s*\{[^}]*border-radius:\s*6px;/s);
+    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-content\s*\{[^}]*gap:\s*22px;/s);
+    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-heading h2\s*\{[^}]*font-size:\s*12px;[^}]*font-weight:\s*600;/s);
+    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-recipe\s*\{[^}]*width:\s*32px;[^}]*height:\s*32px;[^}]*border-radius:\s*6px;/s);
+    expect(launcherCss).toContain('.desktop-terminal-launcher-recipe[data-status="coming-soon"]::after');
     expect(launcherCss).not.toContain("aspect-ratio:");
     expect(header).toContain('import "./terminal-session-header.css"');
     expect(header).toContain("<TerminalSessionTab");
