@@ -11,6 +11,7 @@ import {
 } from "../../domain/agent-activity-presentation";
 import type { AgentActivity } from "../../domain/agent-projection-types";
 import { AgentActivityShell } from "./AgentActivityShell";
+import { AgentToolEvidenceNode, AgentToolEvidenceTree } from "./AgentToolEvidenceTree";
 
 export function AgentGenericActivity({ activity }: { activity: AgentActivity }) {
   const { t } = useLocalization();
@@ -36,9 +37,18 @@ export function AgentGenericActivity({ activity }: { activity: AgentActivity }) 
       className="desktop-agent-generic-tool"
     >
       {detail && (
-        <pre className="desktop-agent-tool-output" data-po-scrollbar="content">
-          {detail}
-        </pre>
+        <AgentToolEvidenceTree>
+          {input && (
+            <AgentToolEvidenceNode kind="request">
+              <pre className="desktop-agent-tool-output" data-po-scrollbar="content">{input}</pre>
+            </AgentToolEvidenceNode>
+          )}
+          {output && (
+            <AgentToolEvidenceNode kind="result">
+              <pre className="desktop-agent-tool-output" data-po-scrollbar="content">{output}</pre>
+            </AgentToolEvidenceNode>
+          )}
+        </AgentToolEvidenceTree>
       )}
     </AgentActivityShell>
   );

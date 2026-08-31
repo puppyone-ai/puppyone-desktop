@@ -861,7 +861,11 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(row.getAttribute("aria-expanded")).toBe("false");
     act(() => row.click());
     expect(row.getAttribute("aria-expanded")).toBe("true");
-    expect(container.querySelector(".desktop-agent-command-line")?.textContent).toContain("$npm test");
+    const evidence = Array.from(container.querySelectorAll(".desktop-agent-evidence-node"));
+    expect(evidence).toHaveLength(2);
+    expect(evidence.map((node) => node.getAttribute("data-evidence-kind"))).toEqual(["command", "result"]);
+    expect(evidence[0].querySelector(".desktop-agent-evidence-marker")?.textContent).toBe("$");
+    expect(container.querySelector(".desktop-agent-command-line")?.textContent).toBe("npm test");
     expect(container.querySelector(".desktop-agent-command-output")?.textContent).toContain("25 files passed");
     expect(row.textContent).not.toContain("Exit 0");
     expect(row.textContent).not.toMatch(/\d+\s*ms/u);
@@ -988,6 +992,8 @@ describe("Desktop Agent renderer surfaces", () => {
     const row = container.querySelector(".desktop-agent-tool-row") as HTMLButtonElement;
     expect(row.textContent).toContain("Read");
     act(() => row.click());
+    expect(container.querySelector(".desktop-agent-evidence-tree")).not.toBeNull();
+    expect(container.querySelector(".desktop-agent-evidence-node")?.getAttribute("data-evidence-kind")).toBe("result");
     expect(container.querySelector(".desktop-agent-tool-output")?.textContent).toContain("export function AgentComposer");
     expect(container.querySelector('button[aria-label^="Open"]')).toBeNull();
     expect(onOpenFile).not.toHaveBeenCalled();

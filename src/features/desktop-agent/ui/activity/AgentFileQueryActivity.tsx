@@ -9,6 +9,7 @@ import {
 } from "../../domain/agent-activity-presentation";
 import type { AgentActivity } from "../../domain/agent-projection-types";
 import { AgentActivityShell } from "./AgentActivityShell";
+import { AgentToolEvidenceNode, AgentToolEvidenceTree } from "./AgentToolEvidenceTree";
 
 const MAX_VISIBLE_RESULT_LINES = 80;
 
@@ -26,9 +27,15 @@ export function AgentFileQueryActivity({ activity, onOpenFile }: { activity: Age
       icon={iconFor(tool)}
       className={`desktop-agent-file-query is-${tool}`}
     >
-      {output && (searchable
-        ? <SearchResults lines={lines} onOpenFile={onOpenFile} />
-        : <pre className="desktop-agent-tool-output" data-po-scrollbar="content" dir="ltr">{output}</pre>)}
+      {output && (
+        <AgentToolEvidenceTree>
+          <AgentToolEvidenceNode kind="result">
+            {searchable
+              ? <SearchResults lines={lines} onOpenFile={onOpenFile} />
+              : <pre className="desktop-agent-tool-output" data-po-scrollbar="content" dir="ltr">{output}</pre>}
+          </AgentToolEvidenceNode>
+        </AgentToolEvidenceTree>
+      )}
     </AgentActivityShell>
   );
 }

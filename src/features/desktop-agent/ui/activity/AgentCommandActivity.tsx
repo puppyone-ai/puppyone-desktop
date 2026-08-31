@@ -10,6 +10,7 @@ import {
 } from "../../domain/agent-activity-presentation";
 import type { AgentActivity } from "../../domain/agent-projection-types";
 import { AgentActivityShell } from "./AgentActivityShell";
+import { AgentToolEvidenceNode, AgentToolEvidenceTree } from "./AgentToolEvidenceTree";
 
 export function AgentCommandActivity({ activity }: { activity: AgentActivity }) {
   const { t } = useLocalization();
@@ -24,14 +25,20 @@ export function AgentCommandActivity({ activity }: { activity: AgentActivity }) 
       icon={commandIcon(presentation.tool)}
       className={`desktop-agent-command is-${presentation.tool}`}
     >
-      {(command || output) && <div className="desktop-agent-command-surface">
-        {command && <div className="desktop-agent-command-line"><span>$</span><code>{command}</code></div>}
-        {output && (
-          <pre className="desktop-agent-command-output" data-po-scrollbar="content">
-            {output}
-          </pre>
-        )}
-      </div>}
+      {(command || output) && (
+        <AgentToolEvidenceTree>
+          {command && (
+            <AgentToolEvidenceNode kind="command" marker="$">
+              <code className="desktop-agent-command-line">{command}</code>
+            </AgentToolEvidenceNode>
+          )}
+          {output && (
+            <AgentToolEvidenceNode kind="result">
+              <pre className="desktop-agent-command-output" data-po-scrollbar="content">{output}</pre>
+            </AgentToolEvidenceNode>
+          )}
+        </AgentToolEvidenceTree>
+      )}
     </AgentActivityShell>
   );
 }

@@ -265,43 +265,40 @@
 .desktop-agent-markdown-disclosure:hover { border-color: var(--po-border-strong); background: var(--po-hover); color: var(--po-text); }
 
 .desktop-agent-code-block {
-  margin: 14px 0;
+  position: relative;
+  margin: 10px 0;
   overflow: hidden;
   border: 1px solid var(--agent-border);
   border-radius: 10px;
   background: color-mix(in srgb, var(--agent-control-surface) 88%, var(--agent-canvas));
 }
-.desktop-agent-code-block > div {
-  display: flex;
-  min-height: 36px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--agent-border-subtle);
-  color: var(--agent-text-muted);
-  font-size: var(--agent-font-size-meta);
-}
-.desktop-agent-code-block button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
+.desktop-agent-code-copy {
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 6px;
+  z-index: 1;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
   border: 0;
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
-  color: inherit;
+  color: var(--agent-text-subtle);
   font: inherit;
   cursor: var(--po-clickable-cursor, pointer);
 }
-.desktop-agent-code-block button:hover { background: var(--po-hover); color: var(--po-text); }
+.desktop-agent-code-copy:hover { background: var(--po-hover); color: var(--agent-text); }
 .desktop-agent-code-block pre {
   max-height: 360px;
   margin: 0;
   overflow: auto;
-  padding: 14px;
+  padding: 9px 38px 9px 12px;
+  color: var(--agent-text-muted);
   font-family: var(--po-font-mono);
   font-size: var(--agent-code-font-size);
-  line-height: 1.58;
+  line-height: 1.5;
   tab-size: 2;
 }
 .desktop-agent-stream-caret {

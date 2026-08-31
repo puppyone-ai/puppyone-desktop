@@ -160,15 +160,16 @@ function safeHref(value: string) {
 function CodeBlock({ language, value }: { language: string; value: string }) {
   const { t } = useLocalization();
   const [copied, setCopied] = useState(false);
+  const copyLabel = copied ? t("common.action.copied") : t("common.action.copy");
   return (
-    <div className="desktop-agent-code-block">
-      <div><span>{language || "text"}</span><button type="button" onClick={() => {
+    <div className="desktop-agent-code-block" data-language={language || "text"}>
+      <button type="button" className="desktop-agent-code-copy" aria-label={copyLabel} title={copyLabel} onClick={() => {
         const copy = navigator.clipboard?.writeText(value);
         void copy?.then(() => {
           setCopied(true);
           window.setTimeout(() => setCopied(false), 1_200);
         }).catch(() => {});
-      }}>{copied ? <Check size={12} /> : <Copy size={12} />} {copied ? t("common.action.copied") : t("common.action.copy")}</button></div>
+      }}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>
       <pre data-po-scrollbar="content"><code>{value}</code></pre>
     </div>
   );

@@ -62,7 +62,7 @@
 /* Cursor-style work evidence: compact disclosures, not a Research timeline. */
 .desktop-agent-tool-call {
   min-width: 0;
-  margin: 0 4px;
+  margin: 0 4px var(--agent-work-handoff-gap);
   padding: 0;
   border: 0;
   border-radius: 6px;
@@ -147,14 +147,76 @@
   background: transparent;
   animation: desktop-agent-disclosure-in 120ms ease-out;
 }
+.desktop-agent-tool-branch:has(> .desktop-agent-evidence-tree) {
+  margin: 1px 4px 2px;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+}
+
+/* Tool detail is evidence, not a second message. Every native tool uses the
+ * same command/request/result tree so hierarchy and density cannot drift. */
+.desktop-agent-evidence-tree {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: 2px 0 2px 34px;
+  color: var(--agent-text-subtle);
+  font-family: var(--po-font-mono);
+  font-size: var(--agent-font-size-meta);
+  line-height: 1.5;
+}
+.desktop-agent-evidence-node {
+  --agent-evidence-junction: 15px;
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 26px;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: 7px;
+  padding: 4px 0;
+}
+.desktop-agent-evidence-node::before {
+  position: absolute;
+  top: -4px;
+  inset-inline-start: -16px;
+  width: 11px;
+  height: calc(var(--agent-evidence-junction) + 4px);
+  border-inline-start: 1px solid var(--agent-border-subtle);
+  border-bottom: 1px solid var(--agent-border-subtle);
+  border-end-start-radius: 5px;
+  content: "";
+}
+.desktop-agent-evidence-node:not(:last-child)::after {
+  position: absolute;
+  top: var(--agent-evidence-junction);
+  bottom: -6px;
+  inset-inline-start: -16px;
+  border-inline-start: 1px solid var(--agent-border-subtle);
+  content: "";
+}
+.desktop-agent-evidence-marker {
+  display: inline-flex;
+  grid-column: 1;
+  justify-content: center;
+  color: color-mix(in srgb, var(--agent-accent) 68%, var(--agent-text-muted));
+  font-weight: 500;
+  user-select: none;
+}
+.desktop-agent-evidence-content {
+  min-width: 0;
+  grid-column: 1 / -1;
+  color: var(--agent-text-subtle);
+}
+.desktop-agent-evidence-marker + .desktop-agent-evidence-content { grid-column: 2; }
+.desktop-agent-evidence-node.is-command .desktop-agent-evidence-content { color: var(--agent-text-muted); }
 
 .desktop-agent-command {
   overflow: visible;
   border: 0;
   border-radius: 6px;
 }
-.desktop-agent-command .desktop-agent-command-surface { border: 0; border-radius: 0; background: transparent; }
-
 .desktop-agent-reasoning { margin-block: 1px 4px; opacity: 0.86; }
 .desktop-agent-tool-call.desktop-agent-reasoning.has-detail .desktop-agent-tool-row {
   width: fit-content;
@@ -182,9 +244,7 @@
   from { opacity: 0; transform: translateY(-2px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.desktop-agent-command-surface,
-.desktop-agent-inline-diff,
-.desktop-agent-tool-output {
+.desktop-agent-inline-diff {
   margin: 0;
   border: 1px solid var(--agent-border-subtle);
   border-radius: 10px;
@@ -192,33 +252,35 @@
   font-family: var(--po-font-mono);
   font-size: var(--agent-code-font-size);
 }
-.desktop-agent-inline-diff,
-.desktop-agent-tool-output { overflow: auto; }
+.desktop-agent-inline-diff { overflow: auto; }
 .desktop-agent-command-line {
-  display: grid;
+  display: block;
   min-width: 0;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 8px;
-  padding: 10px 12px;
-  color: var(--agent-text);
+  padding: 0;
+  color: inherit;
+  font-family: var(--po-font-mono);
+  font-size: inherit;
+  line-height: inherit;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
-.desktop-agent-command-line > span { color: var(--po-accent-text); user-select: none; }
-.desktop-agent-command-line code { overflow-wrap: anywhere; white-space: pre-wrap; }
 .desktop-agent-command-output,
 .desktop-agent-tool-output {
   max-height: 260px;
   margin: 0;
-  padding: 11px 12px;
+  padding: 0;
   overflow: auto;
   border: 0;
-  border-top: 1px solid var(--agent-border-subtle);
   border-radius: 0;
   background: transparent;
-  color: var(--agent-text-muted);
+  color: var(--agent-text-subtle);
+  font-family: var(--po-font-mono);
+  font-size: inherit;
   line-height: 1.5;
   white-space: pre-wrap;
 }
-.desktop-agent-tool-output { border: 1px solid var(--agent-border-subtle); border-radius: 10px; }
+.desktop-agent-evidence-content .desktop-agent-search-results,
+.desktop-agent-evidence-content .desktop-agent-file-list { font-size: inherit; }
 .desktop-agent-file-change-detail { display: grid; gap: 7px; }
 .desktop-agent-file-list {
   display: grid;
