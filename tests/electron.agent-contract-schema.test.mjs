@@ -34,12 +34,14 @@ describe("shared Agent contract", () => {
       effort: "high",
       unknownPrivilegedField: { shell: true },
       attachments: [{ path: "/workspace/a.md", name: "a.md", bytes: "not-authorized" }],
+      promptMentions: [{ referenceId: "ref-a", start: 2, end: 7, privatePath: "/private/a.md" }],
     })).toEqual({
       rootPath: "/workspace",
       sessionId: "session-1",
       prompt: "  keep whitespace  ",
       effort: "high",
       attachments: [{ path: "/workspace/a.md", name: "a.md" }],
+      promptMentions: [{ referenceId: "ref-a", start: 2, end: 7 }],
     });
     expect(() => parseAgentIpcRequest("agent:approval-resolve", {
       rootPath: "/workspace",
@@ -99,6 +101,15 @@ describe("shared Agent contract", () => {
     expect(assertAgentEventEnvelope(event("assistant.delta", { delta: "safe" }))).toBeTruthy();
     const referenceDisplay = { id: "ref-1", kind: "attachment", displayName: "capture.png", mime: "image/png", size: 3 };
     expect(assertAgentEventEnvelope(event("turn.started", { referenceDisplays: [referenceDisplay] }))).toBeTruthy();
+    expect(assertAgentEventEnvelope(event("turn.started", {
+      prompt: "See @capture.png",
+      referenceDisplays: [referenceDisplay],
+      promptMentions: [{ referenceId: "ref-1", start: 4, end: 16 }],
+    }))).toBeTruthy();
+    expect(() => assertAgentEventEnvelope(event("turn.started", {
+      prompt: "short",
+      promptMentions: [{ referenceId: "ref-1", start: 0, end: 99 }],
+    }))).toThrow(/range/i);
     expect(() => assertAgentEventEnvelope(event("turn.started", {
       referenceDisplays: [{ ...referenceDisplay, token: "opaque-secret" }],
     }))).toThrow(/renderer-safe reference metadata/i);
@@ -186,6 +197,9 @@ describe("shared Agent contract", () => {
           binary: { accepted: false },
         },
       });
+    expect(normalizeReferenceInputCapabilities({
+      attachments: { binary: { accepted: true, delivery: "unsafe" } },
+    }).attachments.binary).not.toHaveProperty("delivery");
   });
 });
 

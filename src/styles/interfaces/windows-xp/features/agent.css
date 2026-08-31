@@ -33,12 +33,6 @@
   box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.22), 0 0 0 1px #0054e3;
 }
 
-:root[data-interface-style="windows-xp"] .desktop-agent-composer textarea {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
 :root[data-interface-style="windows-xp"] .desktop-agent-composer-action {
   border: 1px solid #003c74;
   border-radius: 50%;

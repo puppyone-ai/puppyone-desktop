@@ -2,6 +2,7 @@ import type { AgentPart } from "../domain/agent-projection-types";
 import { useLocalization } from "@puppyone/localization/react";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { AgentReferenceDisplayList } from "./AgentReferenceDisplayList";
+import { AgentPromptInlineContent } from "./AgentPromptInlineContent";
 
 type AgentMessagePartProps = {
   part: Extract<AgentPart, { kind: "user" | "assistant" }>;
@@ -25,8 +26,8 @@ export function AgentMessagePart({ part, runtimeLabel }: AgentMessagePartProps) 
       {isAssistant
         ? <SafeMarkdown text={part.text || (part.streaming ? "…" : "")} streaming={part.streaming} />
         : <>
-            <AgentReferenceDisplayList references={part.references ?? []} />
-            {part.text && <div className="desktop-agent-message-text">{part.text}</div>}
+            <AgentReferenceDisplayList references={(part.references ?? []).filter((reference) => reference.mime?.startsWith("image/") === true)} />
+            {part.text && <AgentPromptInlineContent text={part.text} mentions={part.promptMentions} />}
           </>}
       {isAssistant && part.terminalState && part.terminalState !== "completed" && (
         <footer className="desktop-agent-message-status">

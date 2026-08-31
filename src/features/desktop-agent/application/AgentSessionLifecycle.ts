@@ -40,6 +40,7 @@ export class AgentSessionLifecycle {
         sessionPreparation: "preparing",
         submitting: false,
         references: [],
+        draftMentions: [],
       });
       const snapshot = await this.options.createSession();
       this.options.applySnapshot(snapshot);

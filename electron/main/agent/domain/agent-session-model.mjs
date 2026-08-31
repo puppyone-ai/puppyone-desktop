@@ -34,6 +34,7 @@ export function createAgentSessionRecord({
     activeTurnStartedAtMs: null,
     lastStartedTurnId: null,
     pendingPrompt: null,
+    pendingPromptMentions: [],
     pendingReferenceDisplays: [],
     privateReferencePaths: new Map(),
     activeReferenceTokens: [],

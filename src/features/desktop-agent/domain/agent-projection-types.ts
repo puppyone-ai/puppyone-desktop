@@ -1,4 +1,4 @@
-import type { AgentReferenceDisplay, AgentTurnTerminalState } from "./agent-contract";
+import type { AgentPromptReferenceMention, AgentReferenceDisplay, AgentTurnTerminalState } from "./agent-contract";
 
 export type AgentTranscriptMessage = {
   id: string;
@@ -7,6 +7,7 @@ export type AgentTranscriptMessage = {
   itemId: string | null;
   text: string;
   references?: AgentReferenceDisplay[];
+  promptMentions?: AgentPromptReferenceMention[];
   streaming: boolean;
   terminalState: AgentTurnTerminalState | null;
   sequence: number;
@@ -94,7 +95,7 @@ type AgentPartBase = {
 };
 
 export type AgentPart =
-  | (AgentPartBase & { kind: "user"; text: string; references?: AgentReferenceDisplay[]; streaming: boolean; terminalState: AgentTurnTerminalState | null })
+  | (AgentPartBase & { kind: "user"; text: string; references?: AgentReferenceDisplay[]; promptMentions?: AgentPromptReferenceMention[]; streaming: boolean; terminalState: AgentTurnTerminalState | null })
   | (AgentPartBase & { kind: "assistant"; text: string; streaming: boolean; terminalState: AgentTurnTerminalState | null })
   | (AgentPartBase & { kind: "turn-summary"; durationMs: number; status: AgentTurnTerminalState })
   | (AgentPartBase & { kind: "reasoning" | "plan" | "tool" | "command" | "file-change" | "warning" | "error"; label: string; labelCode?: AgentActivityLabelCode; status: AgentActivityStatus; output: string; detail: Record<string, unknown> })

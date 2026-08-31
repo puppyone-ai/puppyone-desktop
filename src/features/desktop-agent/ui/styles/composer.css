@@ -70,27 +70,52 @@
   padding: var(--agent-composer-input-padding);
 }
 
-.desktop-agent-composer textarea {
-  box-sizing: border-box;
+.desktop-agent-prompt-editor-host,
+.desktop-agent-prompt-editor,
+.desktop-agent-prompt-editor .cm-editor {
   width: 100%;
   min-width: 0;
+}
+.desktop-agent-prompt-editor .cm-editor {
   min-height: var(--agent-composer-text-min-height);
   max-height: var(--agent-composer-text-max-height);
-  field-sizing: content;
-  overflow-y: auto;
-  resize: none;
-  padding: 0;
-  border: 0;
-  outline: 0 !important;
+  overflow: hidden;
   background: transparent;
   color: var(--agent-text);
-  cursor: text;
   font: inherit;
   font-size: var(--agent-font-size);
   line-height: var(--agent-composer-line-height);
 }
-.desktop-agent-composer textarea::placeholder { color: var(--agent-text-subtle); font-size: inherit; }
-.desktop-agent-composer textarea:disabled { cursor: default; opacity: 0.6; }
+.desktop-agent-prompt-editor .cm-editor.cm-focused { outline: 0; }
+.desktop-agent-prompt-editor .cm-scroller {
+  max-height: var(--agent-composer-text-max-height);
+  overflow-y: auto;
+  font: inherit;
+}
+.desktop-agent-prompt-editor .cm-content {
+  min-height: var(--agent-composer-text-min-height);
+  padding: 0;
+  caret-color: var(--agent-text);
+}
+.desktop-agent-prompt-editor .cm-line { padding: 0; }
+.desktop-agent-prompt-editor .cm-placeholder { color: var(--agent-text-subtle); }
+.desktop-agent-prompt-editor .cm-cursor { border-inline-start-color: var(--agent-text); }
+.desktop-agent-prompt-editor .cm-selectionBackground,
+.desktop-agent-prompt-editor .cm-content ::selection {
+  background: var(--po-selection, color-mix(in srgb, var(--agent-text) 16%, transparent)) !important;
+}
+.desktop-agent-prompt-mention {
+  display: inline;
+  padding: 1px 4px;
+  border: 1px solid var(--agent-border-subtle);
+  border-radius: 4px;
+  background: var(--agent-row-hover-surface);
+  color: var(--agent-text-muted);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  font-weight: 450;
+  white-space: pre-wrap;
+}
 .desktop-agent-composer-actions {
   display: flex;
   min-width: 0;

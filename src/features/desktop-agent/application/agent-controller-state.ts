@@ -1,6 +1,7 @@
 import type { AgentProjection } from "../domain/agent-projection-types";
 import type {
   AgentDraftReference,
+  AgentPromptReferenceMention,
   AgentLocalConnection,
   AgentRuntimeInspection,
   AgentRuntimeId,
@@ -37,6 +38,8 @@ export type AgentControllerState = {
   localConnectionsScannedAt: string | null;
   localConnectionsError: AgentErrorDescriptor | null;
   draft: string;
+  /** Atomic file-reference spans inside draft. Images remain media references. */
+  draftMentions: AgentPromptReferenceMention[];
   /** Optimistic prompt shown while the native backend accepts the turn. */
   pendingPrompt: string | null;
   /** Immutable prompt/config/reference capture while native turn acceptance is pending. */

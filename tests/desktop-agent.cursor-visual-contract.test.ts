@@ -122,7 +122,7 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(composerToolbar).toContain('<ArrowUp size={17} strokeWidth={1.6} />');
     expect(attachmentButton).toContain('<Paperclip size={16} strokeWidth={1.7} aria-hidden="true" />');
     expect(attachmentButton).not.toContain("<Plus");
-    expect(css).toMatch(/\.desktop-agent-composer textarea\s*\{[^}]*min-height:\s*var\(--agent-composer-text-min-height\)[^}]*max-height:\s*var\(--agent-composer-text-max-height\)[^}]*field-sizing:\s*content[^}]*overflow-y:\s*auto[^}]*padding:\s*0[^}]*cursor:\s*text[^}]*font-size:\s*var\(--agent-font-size\)[^}]*line-height:\s*var\(--agent-composer-line-height\)/s);
+    expect(css).toMatch(/\.desktop-agent-prompt-editor \.cm-editor\s*\{[^}]*min-height:\s*var\(--agent-composer-text-min-height\)[^}]*max-height:\s*var\(--agent-composer-text-max-height\)[^}]*background:\s*transparent[^}]*font-size:\s*var\(--agent-font-size\)[^}]*line-height:\s*var\(--agent-composer-line-height\)/s);
     expect(css).toMatch(/\.desktop-agent-composer-picker \.desktop-agent-picker-trigger\s*\{[^}]*padding-block:\s*0[^}]*padding-inline:\s*var\(--agent-composer-picker-padding-inline\)[^}]*border:\s*0[^}]*color:\s*var\(--agent-text-subtle\)[^}]*font-weight:\s*400/s);
     expect(css).not.toMatch(/\.desktop-agent-composer-picker\.is-effort \.desktop-agent-picker-trigger\s*\{[^}]*padding-inline-(?:start|end):/s);
     expect(css).toMatch(/\.desktop-agent-composer-picker \.desktop-agent-picker-trigger:focus-visible\s*\{[^}]*box-shadow:\s*inset 0 0 0 1px var\(--agent-border\)/s);
@@ -147,11 +147,11 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-reference-card-actions\s*\{[^}]*inset-block-start:\s*-14px[^}]*inset-inline-end:\s*-14px/s);
     expect(css).toMatch(/\.desktop-agent-reference-card-actions > button\s*\{[^}]*width:\s*20px[^}]*height:\s*20px[^}]*background:\s*var\(--po-menu-bg\)/s);
     expect(css).toMatch(/\.desktop-agent-reference-card\.is-error\s*\{[^}]*border-color:\s*color-mix\(in srgb, var\(--po-danger\) 46%, var\(--agent-border-subtle\)\)/s);
-    expect(composer.indexOf("<AgentDraftReferenceList")).toBeLessThan(composer.indexOf("<textarea"));
+    expect(composer.indexOf("<AgentDraftReferenceList")).toBeLessThan(composer.indexOf("<AgentPromptEditor"));
     expect(composer.indexOf("<AgentDraftReferenceList")).toBeLessThan(composer.indexOf("<AgentComposerToolbar"));
     expect(composerToolbar).toContain('className="desktop-agent-composer-actions"');
     expect(composer).toContain("onMouseDown={handleSurfaceMouseDown}");
-    expect(composer).toContain("textareaRef.current?.focus()");
+    expect(composer).toContain('querySelector(".cm-content")');
     expect(composerToolbar.indexOf('className="desktop-agent-composer-trailing"')).toBeLessThan(composerToolbar.indexOf("aria-label={primaryActionLabel}"));
     expect(composer).toContain("const primaryActionBusy = running ? stopping : submitting");
     expect(composer).toContain("const primaryActionDisabled = running ? stopping : !canSubmit");

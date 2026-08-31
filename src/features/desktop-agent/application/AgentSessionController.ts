@@ -74,6 +74,7 @@ export class AgentSessionController {
       localConnectionsScannedAt: null,
       localConnectionsError: null,
       draft: "",
+      draftMentions: [],
       pendingPrompt: null,
       pendingIntent: null,
       sessionPreparation: "idle",
@@ -102,7 +103,7 @@ export class AgentSessionController {
       references: this.referenceDrafts,
       readState: this.getSnapshot,
       patch: (patch) => this.patch(patch),
-      writeDraft: (draft) => this.writeCurrentSessionUi({ draft }),
+      writeDraft: (draft, draftMentions) => this.writeCurrentSessionUi({ draft, draftMentions }),
       prepareSession: () => this.prepareSession(),
     });
     this.eventSynchronizer = new AgentEventSynchronizer(
@@ -401,8 +402,13 @@ export class AgentSessionController {
   }
 
   setDraft(draft: string) {
-    this.patch({ draft });
-    this.writeCurrentSessionUi({ draft });
+    this.setDraftDocument(draft, []);
+  }
+
+  setDraftDocument(draft: string, draftMentions: AgentControllerState["draftMentions"]) {
+    const mentions = draftMentions.map((mention) => ({ ...mention }));
+    this.patch({ draft, draftMentions: mentions });
+    this.writeCurrentSessionUi({ draft, draftMentions: mentions });
   }
 
   async addWorkspacePaths(
@@ -438,7 +444,7 @@ export class AgentSessionController {
     const value = text.trim();
     if (!value) return;
     const draft = this.state.draft ? `${this.state.draft}\n${value}` : value;
-    this.setDraft(draft);
+    this.setDraftDocument(draft, this.state.draftMentions);
   }
 
   rememberViewport(scrollTop: number, measurements: Record<string, number> = {}, pinned = true) {

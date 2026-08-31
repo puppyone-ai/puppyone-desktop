@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import type { ClipboardEvent, DragEvent } from "react";
+import type { DragEvent } from "react";
 import {
   classifyReferenceDataTransfer,
   hasReferenceDataTransferSource,
@@ -98,7 +98,7 @@ export function useAgentReferenceIngestion({
     });
   }, [announceBatchResult, controller, resolveWorkspaceReference, t, workspaceId]);
 
-  const onPaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
+  const onPaste = useCallback((event: { clipboardData: DataTransfer; preventDefault: () => void }) => {
     const files = Array.from(event.clipboardData.files).filter((file) => acceptsAgentAttachment(capabilities, {
       mime: file.type,
       name: file.name,

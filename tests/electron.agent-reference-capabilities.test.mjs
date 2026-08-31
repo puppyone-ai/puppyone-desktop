@@ -45,4 +45,14 @@ describe("semantic Agent reference capabilities", () => {
       ".md",
     ]);
   });
+
+  it("leaves the native picker unrestricted when any path-delivered class accepts all file types", () => {
+    expect(acceptedAgentAttachmentPickerTypes({
+      ...capabilities,
+      attachments: {
+        ...capabilities.attachments,
+        binary: { accepted: true },
+      },
+    })).toEqual([]);
+  });
 });

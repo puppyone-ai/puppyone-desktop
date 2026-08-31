@@ -76,6 +76,19 @@ describe("Codex app-server normalization", () => {
       { type: "localImage", path: "/private/staging/b.snapshot" },
     ]);
     expect(JSON.stringify(input)).not.toContain('"type":"mention"');
+    expect(buildCodexTurnInput("Review `/private/staging/report.pdf`", [{
+      authorized: true,
+      kind: "staged-attachment",
+      path: "/private/staging/report.pdf",
+      displayName: "report.pdf",
+      mime: "application/pdf",
+      inlineMentioned: true,
+      mentionDelivery: "path",
+    }], "/workspace")).toEqual([{
+      type: "text",
+      text: "Review `/private/staging/report.pdf`",
+      text_elements: [],
+    }]);
     expect(() => buildCodexTurnInput("Inspect", [{
       kind: "staged-attachment",
       path: "/private/staging/report.pdf",

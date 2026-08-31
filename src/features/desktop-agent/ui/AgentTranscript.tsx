@@ -5,7 +5,7 @@ import { useLocalization } from "@puppyone/localization/react";
 import { ArrowDown, CircleAlert, LoaderCircle } from "lucide-react";
 import { PageLoading } from "../../../components/loading";
 import type { AgentSubmissionStage } from "../application/agent-controller-state";
-import type { AgentDraftReference, AgentReferenceDisplay } from "../domain/agent-contract";
+import type { AgentDraftReference, AgentPromptReferenceMention, AgentReferenceDisplay } from "../domain/agent-contract";
 import type { AgentPart, AgentProjection, TimelineRow } from "../domain/agent-projection-types";
 import { AgentMessagePart } from "./AgentMessagePart";
 import { AgentPartRenderer } from "./AgentPartRenderer";
@@ -19,6 +19,7 @@ type AgentTranscriptProps = {
   projection: AgentProjection;
   loading: boolean;
   pendingPrompt?: string | null;
+  pendingPromptMentions?: AgentPromptReferenceMention[];
   pendingReferences?: AgentDraftReference[];
   submissionStage?: AgentSubmissionStage;
   working?: boolean;
@@ -38,6 +39,7 @@ function AgentTranscriptView({
   projection,
   loading,
   pendingPrompt = null,
+  pendingPromptMentions = [],
   pendingReferences = [],
   submissionStage = null,
   working = false,
@@ -210,6 +212,7 @@ function AgentTranscriptView({
               itemId: null,
               text: pendingPrompt || "",
               references: pendingReferences.map(draftReferenceDisplay),
+              promptMentions: pendingPromptMentions,
               streaming: false,
               terminalState: null,
               sequence: Number.MAX_SAFE_INTEGER,

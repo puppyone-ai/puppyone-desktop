@@ -49,15 +49,15 @@ describe("Claude Agent SDK native reference mapping", () => {
     });
   });
 
-  it("rejects non-image staged files and cross-workspace paths with typed failures", async () => {
+  it("accepts an authorized external file path mention and rejects cross-workspace paths", async () => {
     const root = await temporaryRoot();
     const markdown = path.join(root, "notes.md");
     await fs.promises.writeFile(markdown, "notes");
     await expect(buildClaudeUserMessageContent({
-      prompt: "Review",
+      prompt: `Review \`${markdown}\``,
       workspaceRoot: path.join(root, "workspace-a"),
-      references: [{ kind: "staged-attachment", path: markdown, name: "notes.md", mime: "text/markdown" }],
-    })).rejects.toMatchObject({ code: "REFERENCE_KIND_UNSUPPORTED" });
+      references: [{ authorized: true, kind: "staged-attachment", path: markdown, name: "notes.md", mime: "text/markdown", inlineMentioned: true, mentionDelivery: "path" }],
+    })).resolves.toBe(`Review \`${markdown}\``);
     await expect(buildClaudeUserMessageContent({
       prompt: "Review",
       workspaceRoot: path.join(root, "workspace-a"),

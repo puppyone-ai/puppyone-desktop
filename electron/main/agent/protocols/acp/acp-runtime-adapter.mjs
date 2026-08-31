@@ -97,6 +97,8 @@ export const BASE_ACP_CAPABILITIES = Object.freeze({
 
 /** Provider-neutral, workspace-bound adapter for a local ACP Agent harness. */
 export class AcpRuntimeAdapter {
+  referenceMentionDelivery() { return "resource"; }
+
   constructor({
     readiness,
     workspaceRoot,

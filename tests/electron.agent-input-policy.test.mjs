@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { requireSupportedAgentReferences } from "../electron/main/agent/application/agent-input-policy.mjs";
+import {
+  compileAgentPromptReferenceMentions,
+  normalizePromptReferenceMentions,
+  requireSupportedAgentReferences,
+} from "../electron/main/agent/application/agent-input-policy.mjs";
 
 describe("Agent semantic reference admission policy", () => {
   const referenceInputs = {
@@ -44,5 +48,60 @@ describe("Agent semantic reference admission policy", () => {
       mime: "image/png",
       size: 10,
     }])).toThrow(expect.objectContaining({ code: "REFERENCE_RUNTIME_CAPABILITY_MISSING" }));
+  });
+
+  it("compiles only authenticated atomic mention ranges into native paths", () => {
+    const references = [{
+      authorized: true,
+      id: "ref-notes",
+      kind: "staged-attachment",
+      path: "/private/snapshots/a.snapshot",
+      displayName: "notes.md",
+      mime: "text/markdown",
+      size: 10,
+    }];
+    const prompt = "Review @notes.md and summarize it.";
+    const mentions = normalizePromptReferenceMentions([
+      { referenceId: "ref-notes", start: 7, end: 16 },
+    ], prompt, references, () => "path");
+
+    expect(compileAgentPromptReferenceMentions(prompt, mentions, references))
+      .toBe("Review `/private/snapshots/a.snapshot` and summarize it.");
+    expect(references[0].inlineMentioned).toBe(true);
+  });
+
+  it("keeps the display mention in prompt text when the Harness negotiated a resource block", () => {
+    const references = [{
+      id: "ref-resource",
+      kind: "workspace-entry",
+      path: "/workspace/notes.md",
+      displayName: "notes.md",
+      mime: "text/markdown",
+    }];
+    const prompt = "Review @notes.md";
+    const mentions = normalizePromptReferenceMentions([
+      { referenceId: "ref-resource", start: 7, end: 16 },
+    ], prompt, references, () => "resource");
+
+    expect(compileAgentPromptReferenceMentions(prompt, mentions, references)).toBe(prompt);
+    expect(references[0]).toMatchObject({ inlineMentioned: true, mentionDelivery: "resource" });
+  });
+
+  it("rejects forged, overlapping, missing and image mention ranges", () => {
+    const file = { id: "ref-a", path: "/workspace/a.md", displayName: "a.md", mime: "text/markdown" };
+    expect(() => normalizePromptReferenceMentions([
+      { referenceId: "ref-a", start: 0, end: 5 },
+    ], "@other.md", [file])).toThrow(/does not match/i);
+    expect(() => normalizePromptReferenceMentions([
+      { referenceId: "missing", start: 0, end: 5 },
+    ], "@a.md", [file])).toThrow(/not backed/i);
+    expect(() => normalizePromptReferenceMentions([
+      { referenceId: "ref-a", start: 0, end: 5 },
+      { referenceId: "ref-a", start: 2, end: 5 },
+    ], "@a.md", [file])).toThrow(/range/i);
+    expect(() => normalizePromptReferenceMentions([
+      { referenceId: "ref-image", start: 0, end: 10 },
+    ], "@image.png", [{ ...file, id: "ref-image", displayName: "image.png", mime: "image/png" }]))
+      .toThrow(/native media/i);
   });
 });

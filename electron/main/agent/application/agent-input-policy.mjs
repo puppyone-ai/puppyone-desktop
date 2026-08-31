@@ -113,12 +113,13 @@ export function normalizeAuthorizedReferences(value) {
     const kind = entry.kind;
     const entryType = entry.entryType === "directory" ? "directory" : "file";
     return {
+      authorized: true,
       id: normalizeReferenceId(entry.id, entry.path),
       kind,
       ...(kind === "workspace-entry" ? { entryType } : {}),
       path: entry.path,
-      name: normalizeOptionalString(entry.name ?? entry.displayName),
-      displayName: normalizeOptionalString(entry.displayName ?? entry.name) || "reference",
+      name: normalizeReferenceDisplayName(entry.name ?? entry.displayName),
+      displayName: normalizeReferenceDisplayName(entry.displayName ?? entry.name) || "reference",
       ...(kind === "workspace-entry" && typeof entry.relativePath === "string"
         ? { relativePath: entry.relativePath.slice(0, 4_096) }
         : {}),
@@ -127,6 +128,48 @@ export function normalizeAuthorizedReferences(value) {
       ...(isBoundedDataUrl(entry.snapshotUrl) ? { snapshotUrl: entry.snapshotUrl } : {}),
     };
   });
+}
+
+export function normalizePromptReferenceMentions(value, prompt, references, deliveryForReference = () => "resource") {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.length > 32) throw new Error("Agent prompt reference mentions are invalid.");
+  const byId = new Map(references.map((reference) => [reference.id, reference]));
+  let boundary = 0;
+  return value.map((entry) => {
+    if (!entry || typeof entry !== "object") throw new Error("Agent prompt reference mention is invalid.");
+    const referenceId = normalizeRequiredId(entry.referenceId, "Reference mention id");
+    const reference = byId.get(referenceId);
+    if (!reference) throw new Error("Agent prompt reference mention is not backed by an authorized reference.");
+    if (reference.mime?.startsWith("image/")) throw new Error("Image references must use the native media input channel.");
+    const start = Number.isSafeInteger(entry.start) ? entry.start : -1;
+    const end = Number.isSafeInteger(entry.end) ? entry.end : -1;
+    if (start < boundary || end <= start || end > prompt.length) throw new Error("Agent prompt reference mention range is invalid.");
+    const expected = `@${reference.displayName.replace(/[\r\n\t]/g, " ").trim() || "file"}`;
+    if (prompt.slice(start, end) !== expected) throw new Error("Agent prompt reference mention text does not match its authorized reference.");
+    boundary = end;
+    reference.inlineMentioned = true;
+    reference.mentionDelivery = deliveryForReference(reference) === "path" ? "path" : "resource";
+    return { referenceId, start, end };
+  });
+}
+
+export function compileAgentPromptReferenceMentions(prompt, mentions, references) {
+  if (!mentions.length) return prompt;
+  const byId = new Map(references.map((reference) => [reference.id, reference]));
+  let compiled = prompt;
+  for (let index = mentions.length - 1; index >= 0; index -= 1) {
+    const mention = mentions[index];
+    const reference = byId.get(mention.referenceId);
+    if (!reference) throw new Error("Agent prompt reference mention lost its authorized reference.");
+    if (reference.mentionDelivery === "path") {
+      compiled = `${compiled.slice(0, mention.start)}${quoteNativePath(reference.path)}${compiled.slice(mention.end)}`;
+    }
+  }
+  return compiled;
+}
+
+function quoteNativePath(filename) {
+  return `\`${String(filename).replace(/`/g, "\\`")}\``;
 }
 
 export function requireSupportedAgentReferences(capabilities, references) {
@@ -199,13 +242,17 @@ export function normalizeReferenceDisplays(references) {
     kind: reference.kind === "staged-attachment"
       ? "attachment"
       : reference.entryType === "directory" ? "workspace-directory" : "workspace-file",
-    displayName: normalizeOptionalString(reference.displayName ?? reference.name) || "reference",
+    displayName: normalizeReferenceDisplayName(reference.displayName ?? reference.name) || "reference",
     ...(reference.kind === "workspace-entry" && typeof reference.relativePath === "string"
       ? { relativePath: reference.relativePath.slice(0, 4_096) }
       : {}),
     ...(reference.kind === "staged-attachment" && reference.mime ? { mime: reference.mime } : {}),
     ...(reference.kind === "staged-attachment" && Number.isSafeInteger(reference.size) ? { size: reference.size } : {}),
   }));
+}
+
+function normalizeReferenceDisplayName(value) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim().slice(0, 512) : null;
 }
 
 export function normalizeQuestionAnswers(value, questions) {

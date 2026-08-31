@@ -122,6 +122,7 @@ export function parseAgentIpcRequest(channel, value) {
         attachments: optionalReferences(input.attachments, "attachments"),
         contextReferences: optionalReferences(input.contextReferences, "contextReferences"),
         references: optionalDraftReferences(input.references, "references"),
+        promptMentions: optionalPromptMentions(input.promptMentions, "promptMentions"),
       });
     case "agent:turn-steer":
       return {
@@ -131,6 +132,7 @@ export function parseAgentIpcRequest(channel, value) {
         message: requiredString(input.message, "message", MAX_MESSAGE_LENGTH, { allowEmpty: true, preserveWhitespace: true }),
         referenceEpoch: optionalOpaqueId(input.referenceEpoch, "referenceEpoch"),
         references: optionalDraftReferences(input.references, "references"),
+        promptMentions: optionalPromptMentions(input.promptMentions, "promptMentions"),
       };
     case "agent:turn-interrupt":
     case "agent:session-compact":
@@ -310,6 +312,20 @@ function optionalDraftReferences(value, label) {
   const references = assertArray(value, label);
   if (references.length > MAX_REFERENCE_COUNT) throw contractError(label, `may contain at most ${MAX_REFERENCE_COUNT} entries`);
   return references.map((entry, index) => sanitizeDraftReference(entry, `${label}[${index}]`, true));
+}
+
+function optionalPromptMentions(value, label) {
+  if (value === undefined || value === null) return undefined;
+  const mentions = assertArray(value, label);
+  if (mentions.length > MAX_REFERENCE_COUNT) throw contractError(label, `may contain at most ${MAX_REFERENCE_COUNT} entries`);
+  return mentions.map((entry, index) => {
+    const mention = assertRecord(entry, `${label}[${index}]`);
+    return {
+      referenceId: requiredOpaqueId(mention.referenceId, `${label}[${index}].referenceId`),
+      start: nonNegativeInteger(mention.start, `${label}[${index}].start`),
+      end: nonNegativeInteger(mention.end, `${label}[${index}].end`),
+    };
+  });
 }
 
 function sanitizeDraftReference(value, label, requireReady) {

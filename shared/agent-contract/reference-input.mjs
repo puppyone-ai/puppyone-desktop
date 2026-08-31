@@ -39,9 +39,10 @@ export function hasAgentAttachmentSupport(capabilities) {
 }
 
 export function acceptedAgentAttachmentPickerTypes(capabilities) {
-  return Array.from(new Set(ATTACHMENT_KINDS.flatMap((kind) => {
-    const input = capabilities?.attachments?.[kind];
-    if (input?.accepted !== true) return [];
+  const accepted = ATTACHMENT_KINDS.map((kind) => capabilities?.attachments?.[kind])
+    .filter((input) => input?.accepted === true);
+  if (accepted.some((input) => array(input.mimeTypes).length === 0 && array(input.extensions).length === 0)) return [];
+  return Array.from(new Set(accepted.flatMap((input) => {
     return [...array(input.mimeTypes), ...array(input.extensions)]
       .map((value) => String(value).trim().toLowerCase())
       .filter(Boolean);

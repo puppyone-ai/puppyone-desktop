@@ -194,7 +194,7 @@ describe("Desktop Agent panel lifecycle", () => {
     expect(launcher.textContent).toContain("Claude Agent");
     expect(container.querySelector('.desktop-agent-header-region')).toBeNull();
     expect(container.querySelector('button[aria-label="Coding Agent"]')).toBeNull();
-    expect(container.querySelector("textarea")).toBeNull();
+    expect(container.querySelector(".cm-content")).toBeNull();
     expect(harness.bridge.resumeAgentSession).not.toHaveBeenCalled();
     expect(harness.bridge.createAgentSession).not.toHaveBeenCalled();
 
@@ -209,7 +209,7 @@ describe("Desktop Agent panel lifecycle", () => {
     expect(container.querySelector(".desktop-agent-runtime-launcher")).toBeNull();
     expect(container.querySelector(".desktop-agent-header-region")).toBeNull();
     expect(container.querySelector('button[aria-label="Coding Agent"]')).toBeNull();
-    expect(stripBidiIsolation(container.querySelector("textarea")?.getAttribute("aria-label"))).toBe("Message Claude Agent");
+    expect(stripBidiIsolation(container.querySelector(".cm-content")?.getAttribute("aria-label"))).toBe("Message Claude Agent");
   });
 
   it("uses one centered product loader while the chat runtime starts", async () => {
@@ -231,26 +231,26 @@ describe("Desktop Agent panel lifecycle", () => {
     expect(loadingSurface.style.justifyContent).toBe("center");
     expect(container.querySelector(".desktop-agent-status-region")).toBeNull();
     expect(container.querySelector(".desktop-agent-dock-region")).toBeNull();
-    expect(container.querySelector("textarea")).toBeNull();
+    expect(container.querySelector(".cm-content")).toBeNull();
     expect(container.textContent).not.toMatch(/Preparing Agent|Checking Agent|Restoring session|Starting session/);
 
     await act(async () => { finishDiscovery?.(readyInspection()); });
     await flushEffects();
     expect(container.querySelector(".desktop-agent-startup-loading")).toBeNull();
     expect(container.querySelector(".desktop-agent-dock-region")).not.toBeNull();
-    expect(container.querySelector("textarea")).not.toBeNull();
+    expect(container.querySelector(".cm-content")).not.toBeNull();
   });
 
   it("keeps the failed tab available while opening recovery work in another tab", async () => {
     const harness = createBridgeHarness();
     const container = renderPanel(harness.bridge);
     await flushEffects();
-    expect((container.querySelector("textarea") as HTMLTextAreaElement).disabled).toBe(false);
+    expect(container.querySelector(".cm-content")?.getAttribute("aria-disabled")).toBe("false");
 
     act(() => harness.exitListener?.({ sessionId: "session-1", reason: "provider-exited" }));
 
     expect(stripBidiIsolation(container.textContent)).toContain("OpenCode stopped unexpectedly");
-    expect((container.querySelector("textarea") as HTMLTextAreaElement).disabled).toBe(false);
+    expect(container.querySelector(".cm-content")?.getAttribute("aria-disabled")).toBe("false");
     expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
     expect(container.querySelector(".desktop-agent-tab-status.is-provider-exited")).not.toBeNull();
 
@@ -281,7 +281,7 @@ describe("Desktop Agent panel lifecycle", () => {
     const firstTab = container.querySelector<HTMLButtonElement>('[role="tab"]');
     expect(firstTab?.getAttribute("aria-selected")).toBe("true");
     expect(activeTabPanel(container).querySelector(".desktop-agent-header-region")).toBeNull();
-    expect(activeTabPanel(container).querySelector("textarea")).not.toBeNull();
+    expect(activeTabPanel(container).querySelector(".cm-content")).not.toBeNull();
 
     act(() => container.querySelector<HTMLButtonElement>('button[aria-label="New chat tab"]')?.click());
     await flushEffects();
@@ -294,7 +294,7 @@ describe("Desktop Agent panel lifecycle", () => {
     act(() => tabs[0].click());
     expect(tabs[0].getAttribute("aria-selected")).toBe("true");
     expect(activeTabPanel(container).querySelector(".desktop-agent-header-region")).toBeNull();
-    expect(activeTabPanel(container).querySelector("textarea")).not.toBeNull();
+    expect(activeTabPanel(container).querySelector(".cm-content")).not.toBeNull();
 
     act(() => tabs[1].click());
     const closeSecond = container.querySelector<HTMLButtonElement>('button[aria-label="Close New chat"]');
@@ -303,7 +303,7 @@ describe("Desktop Agent panel lifecycle", () => {
     await flushEffects();
     expect(container.querySelectorAll('[role="tab"]')).toHaveLength(1);
     expect(activeTabPanel(container).querySelector(".desktop-agent-header-region")).toBeNull();
-    expect(activeTabPanel(container).querySelector("textarea")).not.toBeNull();
+    expect(activeTabPanel(container).querySelector(".cm-content")).not.toBeNull();
   });
 
   it("retains workspace tab topology across Sidebar remounts", async () => {
@@ -362,9 +362,9 @@ describe("Desktop Agent panel lifecycle", () => {
     const container = renderPanel(harness.bridge);
     await flushEffects();
 
-    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
-    expect(textarea.disabled).toBe(false);
-    expect(textarea.getAttribute("style")).toBeNull();
+    const promptEditor = container.querySelector(".cm-content") as HTMLElement;
+    expect(promptEditor.getAttribute("aria-disabled")).toBe("false");
+    expect(promptEditor.getAttribute("contenteditable")).toBe("true");
     const text = stripBidiIsolation(container.textContent);
     expect(text).toContain("Update OpenCode");
     expect(text).toContain("The configured Agent engine is incompatible");

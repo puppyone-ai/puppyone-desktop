@@ -34,7 +34,27 @@ export function assertAgentEventEnvelope(value) {
   if (event.type === "turn.started" && payload.referenceDisplays !== undefined) {
     assertReferenceDisplays(payload.referenceDisplays);
   }
+  if (event.type === "turn.started" && payload.promptMentions !== undefined) {
+    assertPromptMentions(payload.promptMentions, payload.prompt);
+  }
   return value;
+}
+
+function assertPromptMentions(value, prompt) {
+  if (!Array.isArray(value) || value.length > 32) {
+    throw contractError("AgentEvent(turn.started).payload.promptMentions", "must contain at most 32 entries");
+  }
+  const text = typeof prompt === "string" ? prompt : "";
+  let boundary = 0;
+  value.forEach((entry, index) => {
+    const label = `AgentEvent(turn.started).payload.promptMentions[${index}]`;
+    const mention = assertRecord(entry, label);
+    if (!isOpaqueId(mention.referenceId)) throw contractError(`${label}.referenceId`, "is invalid");
+    const start = nonNegativeInteger(mention.start, `${label}.start`);
+    const end = nonNegativeInteger(mention.end, `${label}.end`);
+    if (start < boundary || end <= start || end > text.length) throw contractError(label, "has an invalid or overlapping range");
+    boundary = end;
+  });
 }
 
 function assertReferenceDisplays(value) {

@@ -161,6 +161,17 @@
   line-height: 1.55;
   white-space: pre-wrap;
 }
+.desktop-agent-history-mention {
+  display: inline;
+  padding: 1px 4px;
+  border: 1px solid var(--agent-border-subtle);
+  border-radius: 4px;
+  background: var(--agent-row-hover-surface);
+  color: var(--agent-text-muted);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  font-weight: 450;
+}
 .desktop-agent-message-references {
   display: flex;
   min-width: 0;

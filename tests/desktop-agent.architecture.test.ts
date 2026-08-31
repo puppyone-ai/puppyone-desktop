@@ -101,8 +101,9 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(draftReferences).not.toMatch(/useState|AgentSessionController/);
     expect(composer).not.toMatch(/\.style(?:\.|\[)/);
     expect(composer).not.toContain("ResizeObserver");
-    expect(composer).toContain("rows={1}");
-    expect(css).toMatch(/\.desktop-agent-composer textarea\s*\{[^}]*field-sizing:\s*content[^}]*overflow-y:\s*auto/s);
+    expect(composer).toContain("<AgentPromptEditor");
+    expect(source("src/features/desktop-agent/ui/composer/AgentPromptEditor.tsx")).toContain("EditorView.atomicRanges");
+    expect(css).toMatch(/\.desktop-agent-prompt-editor \.cm-scroller\s*\{[^}]*max-height:\s*var\(--agent-composer-text-max-height\)[^}]*overflow-y:\s*auto/s);
     expect(composer).not.toContain("<select");
     expect(picker).toContain("DesktopOverlayLayer");
     expect(picker).toContain("useAnchoredOverlayPosition");

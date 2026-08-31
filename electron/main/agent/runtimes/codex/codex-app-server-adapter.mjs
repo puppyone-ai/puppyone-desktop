@@ -44,10 +44,10 @@ export const CODEX_CAPABILITIES = Object.freeze({
     workspace: Object.freeze({ files: true, directories: true }),
     attachments: Object.freeze({
       image: Object.freeze({ accepted: true, mimeTypes: CODEX_NATIVE_IMAGE_MIME_TYPES }),
-      text: Object.freeze({ accepted: false }),
+      text: Object.freeze({ accepted: true }),
       audio: Object.freeze({ accepted: false }),
       video: Object.freeze({ accepted: false }),
-      binary: Object.freeze({ accepted: false }),
+      binary: Object.freeze({ accepted: true }),
     }),
     limits: Object.freeze({
       maxCount: 32,
@@ -60,6 +60,8 @@ export const CODEX_CAPABILITIES = Object.freeze({
 });
 
 export class CodexAppServerAdapter {
+  referenceMentionDelivery() { return "path"; }
+
   constructor({
     executablePath,
     environment,

@@ -223,7 +223,7 @@ export function createAgentService({
     const mode = normalizeOptionalString(request?.mode) || session.selectedMode;
     requireAvailableModel(session, model);
     requireAvailableEffort(session, model, effort);
-    const { references, referenceDisplays, prompt } = beginAgentTurnReferences(session, request);
+    const { references, referenceDisplays, prompt, displayPrompt, promptMentions } = beginAgentTurnReferences(session, request);
     session.turnStarting = true;
     session.activeTurnStartedAtMs = Date.now();
     session.selectedModel = model;
@@ -246,10 +246,11 @@ export function createAgentService({
           type: "turn.started",
           providerSessionId: session.providerSessionId,
           turnId: result.turnId,
-          payload: { status: "running", prompt, model, effort, mode, referenceDisplays },
+          payload: { status: "running", prompt: displayPrompt, model, effort, mode, referenceDisplays, promptMentions },
         });
       }
       session.pendingPrompt = null;
+      session.pendingPromptMentions = [];
       session.pendingReferenceDisplays = [];
       session.turnStarting = false;
       persistSoon(session);
@@ -271,7 +272,10 @@ export function createAgentService({
     if (!session.capabilities?.steer || typeof session.adapter.steerTurn !== "function") {
       throw new Error("The active Agent runtime does not support steering a running turn.");
     }
-    const { message, references } = prepareAgentSteerReferenceInput(request, session.capabilities);
+    const deliveryForReference = typeof session.adapter?.referenceMentionDelivery === "function"
+      ? (reference) => session.adapter.referenceMentionDelivery(reference)
+      : undefined;
+    const { message, references } = prepareAgentSteerReferenceInput(request, session.capabilities, deliveryForReference);
     await withAgentSteerReferenceTokens(session, request, () => session.adapter.steerTurn({ turnId, message, references }));
     return { sessionId: session.id, turnId, steered: true };
   }
@@ -619,6 +623,7 @@ export function createAgentService({
         event.payload = {
           ...(event.payload || {}),
           prompt: session.pendingPrompt,
+          promptMentions: session.pendingPromptMentions,
           model: session.selectedModel,
           effort: session.selectedEffort,
           referenceDisplays: session.pendingReferenceDisplays,

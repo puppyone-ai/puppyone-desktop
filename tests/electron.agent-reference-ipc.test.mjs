@@ -39,13 +39,17 @@ describe("Agent reference IPC authorization", () => {
     await handlers.get("agent:turn-start")(owner, {
       rootPath: workspace,
       sessionId: "session-1",
-      prompt: "use this",
+      prompt: "use @outside.txt",
+      promptMentions: [{ referenceId: draft.id, start: 4, end: 16 }],
       referenceEpoch: "draft-a",
       references: [draft],
     });
     const authorized = startTurn.mock.calls[0][1].references[0];
     expect(authorized).toMatchObject({ authorized: true, kind: "staged-attachment", name: "outside.txt" });
     expect(authorized.path).not.toBe(source);
+    expect(startTurn.mock.calls[0][1].promptMentions).toEqual([
+      { referenceId: draft.id, start: 4, end: 16 },
+    ]);
     expect(adapterInput).toBe("immutable input");
     await expect(fs.promises.stat(authorized.path)).resolves.toBeDefined();
 

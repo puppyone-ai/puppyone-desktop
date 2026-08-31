@@ -286,6 +286,7 @@ export type AgentEventPayloadMap = {
     prompt?: string;
     status?: string;
     referenceDisplays?: AgentReferenceDisplay[];
+    promptMentions?: AgentPromptReferenceMention[];
   };
   "turn.completed": AgentEventPayloadBase & { status?: string; durationMs?: number };
   "turn.failed": AgentEventPayloadBase & { status?: string; message?: string; durationMs?: number };
@@ -509,6 +510,14 @@ export type AgentStagedAttachmentReference = {
 /** Renderer draft/request representation. It never contains external paths or bytes. */
 export type AgentDraftReference = AgentWorkspaceEntryReference | AgentStagedAttachmentReference;
 
+/** A renderer-safe atomic file mention embedded in the user's prompt text. */
+export type AgentPromptReferenceMention = {
+  referenceId: string;
+  /** UTF-16 offsets into the associated prompt string. */
+  start: number;
+  end: number;
+};
+
 /** Renderer-safe transcript representation. */
 export type AgentReferenceDisplay = {
   id: string;
@@ -527,6 +536,7 @@ export type AgentSubmissionIntent = {
   effort: string | null;
   mode: string | null;
   references: AgentDraftReference[];
+  promptMentions: AgentPromptReferenceMention[];
 };
 
 export type AgentTurnStartRequest = {
@@ -537,6 +547,7 @@ export type AgentTurnStartRequest = {
   effort?: string | null;
   mode?: string | null;
   referenceEpoch?: string;
+  promptMentions?: AgentPromptReferenceMention[];
   attachments?: AgentFileReference[];
   contextReferences?: AgentFileReference[];
   references?: AgentDraftReference[];
@@ -548,6 +559,7 @@ export type AgentTurnSteerRequest = {
   turnId: string;
   message: string;
   referenceEpoch?: string;
+  promptMentions?: AgentPromptReferenceMention[];
   references?: AgentDraftReference[];
 };
 

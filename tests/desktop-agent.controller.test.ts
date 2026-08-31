@@ -140,6 +140,7 @@ describe("AgentSessionController", () => {
     controller.rememberViewport(320, { "row:assistant:message-1": 88 }, false);
     expect(controller.readViewport()).toEqual({
       draft: "",
+      draftMentions: [],
       scrollTop: 320,
       measurements: { "row:assistant:message-1": 88 },
       pinned: false,
@@ -496,6 +497,25 @@ describe("AgentSessionController", () => {
     expect(controller.getSnapshot().submitting).toBe(false);
   });
 
+  it("captures reference mention ranges in the immutable submission intent", async () => {
+    const bridge = bridgeFixture(() => {});
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+    await controller.addWorkspacePaths(["architecture.md"]);
+    const reference = controller.getSnapshot().references[0]!;
+    const prompt = "Explain @architecture.md";
+    controller.setDraftDocument(prompt, [{ referenceId: reference.id, start: 8, end: 24 }]);
+
+    await expect(controller.submit(prompt)).resolves.toBe(true);
+
+    expect(bridge.startAgentTurn).toHaveBeenCalledWith(expect.objectContaining({
+      prompt,
+      promptMentions: [{ referenceId: reference.id, start: 8, end: 24 }],
+      references: [expect.objectContaining({ id: reference.id })],
+    }));
+    expect(controller.getSnapshot()).toMatchObject({ draft: "", draftMentions: [] });
+  });
+
   it("shares one background session preparation with the first submit and exposes truthful transport stages", async () => {
     let eventListener: ((event: AgentEvent) => void) | null = null;
     let resolveCreate: ((value: AgentSessionSnapshot) => void) | null = null;
@@ -648,13 +668,17 @@ describe("AgentSessionController", () => {
     const failed = new AgentSessionController("/workspace", () => failedBridge as never);
     await failed.initialize();
     await failed.addWorkspacePaths(["restore.md"]);
-    failed.setDraft("Retry me");
-    await expect(failed.submit("Retry me")).resolves.toBe(false);
+    const restoreReference = failed.getSnapshot().references[0]!;
+    const retryPrompt = "Retry with @restore.md";
+    failed.setDraftDocument(retryPrompt, [{ referenceId: restoreReference.id, start: 11, end: 22 }]);
+    await expect(failed.submit(retryPrompt)).resolves.toBe(false);
     expect(failed.getSnapshot()).toMatchObject({
-      draft: "Retry me",
+      draft: retryPrompt,
+      draftMentions: [{ referenceId: restoreReference.id, start: 11, end: 22 }],
       pendingIntent: null,
       references: [expect.objectContaining({ relativePath: "restore.md" })],
     });
+    expect(failedBridge.startAgentTurn).not.toHaveBeenCalled();
   });
 
   it("merges a failed immutable intent with edits and references added while session preparation is pending", async () => {

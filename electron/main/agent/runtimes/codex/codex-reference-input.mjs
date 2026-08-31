@@ -27,7 +27,11 @@ export function buildCodexTurnInput(prompt, references = [], workspaceRoot = nul
       nativeImages.push({ type: "localImage", path: authorizedReference.path });
       continue;
     }
-    if (authorizedReference.kind === "workspace-entry") {
+    if (authorizedReference.kind === "workspace-entry" || (
+      authorizedReference.kind === "staged-attachment"
+      && authorizedReference.inlineMentioned === true
+      && authorizedReference.mentionDelivery === "path"
+    )) {
       workspaceReferences.push(authorizedReference);
       continue;
     }

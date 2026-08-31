@@ -230,7 +230,7 @@ export class AgentReferenceDraftManager {
 
   async reset(references: AgentDraftReference[]) {
     await this.rotate(references);
-    this.options.patch({ references: [], pendingIntent: null });
+    this.options.patch({ references: [], draftMentions: [], pendingIntent: null });
   }
 
   releasePreviews(references: AgentDraftReference[]) {

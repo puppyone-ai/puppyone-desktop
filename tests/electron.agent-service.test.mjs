@@ -480,6 +480,43 @@ describe("Electron AgentService ownership and lifecycle", () => {
     expect(serialized).toContain("[attachment:photo.png]");
   });
 
+  it("compiles an external file mention for the Harness while persisting only display-safe prompt data", async () => {
+    const referenceInputs = semanticReferenceCapabilities();
+    referenceInputs.attachments.text = { accepted: true };
+    const harness = createServiceHarness({ capabilities: { referenceInputs } });
+    const owner = createSender(66);
+    const snapshot = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace-a");
+    const privatePath = "/private/staging/immutable.snapshot";
+    const prompt = "Review @notes.md in this turn";
+
+    await harness.service.startTurn(owner, {
+      sessionId: snapshot.session.id,
+      prompt,
+      promptMentions: [{ referenceId: "ref-notes", start: 7, end: 16 }],
+      references: [{
+        authorized: true,
+        id: "ref-notes",
+        kind: "staged-attachment",
+        path: privatePath,
+        displayName: "notes.md",
+        mime: "text/markdown",
+        size: 12,
+      }],
+    });
+
+    expect(harness.adapters[0].startTurn).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: `Review \`${privatePath}\` in this turn`,
+      references: [expect.objectContaining({ id: "ref-notes", inlineMentioned: true })],
+    }));
+    const started = sentAgentEvents(owner).find((event) => event.type === "turn.started");
+    expect(started.payload).toMatchObject({
+      prompt,
+      promptMentions: [{ referenceId: "ref-notes", start: 7, end: 16 }],
+      referenceDisplays: [{ id: "ref-notes", displayName: "notes.md" }],
+    });
+    expect(JSON.stringify(started)).not.toContain(privatePath);
+  });
+
   it("rejects references that did not pass main-process authorization", async () => {
     const harness = createServiceHarness();
     const owner = createSender(64);
@@ -728,6 +765,7 @@ function createFakeAdapter(options, capabilities, resumeSessionError = null, nat
       options.onEvent({ type: "turn.started", providerSessionId: "thread-1", turnId: "turn-1", payload: { status: "running" } });
       return { turnId: "turn-1" };
     }),
+    referenceMentionDelivery: vi.fn(() => "path"),
     interruptTurn: vi.fn(async () => undefined),
     resolveApproval: vi.fn(),
     dispose: vi.fn(function dispose() { this.disposed = true; }),

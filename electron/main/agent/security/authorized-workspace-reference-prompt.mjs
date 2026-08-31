@@ -19,7 +19,8 @@ export function formatAuthorizedWorkspaceReferencePrompt(prompt, references, wor
 export function authorizedWorkspaceReferencePaths(references, workspaceRoot) {
   const root = path.resolve(workspaceRoot);
   return Array.from(new Set((Array.isArray(references) ? references : [])
-    .filter((entry) => entry?.kind !== "staged-attachment")
+    .filter((entry) => entry?.kind !== "staged-attachment"
+      && !(entry?.inlineMentioned === true && entry?.mentionDelivery === "path"))
     .map((entry) => typeof entry?.path === "string" ? path.resolve(entry.path) : null)
     .filter((filename) => filename && isSameOrInside(root, filename))));
 }

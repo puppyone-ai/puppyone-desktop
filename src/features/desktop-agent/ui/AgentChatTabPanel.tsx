@@ -3,6 +3,7 @@ import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentSessionController } from "../application/AgentSessionController";
 import type { AgentSubmissionStage } from "../application/agent-controller-state";
+import type { AgentPromptReferenceMention } from "../domain/agent-contract";
 import { listAgentRuntimes, listEnabledAgentRuntimes } from "../domain/agent-backend-routing";
 import type { AgentChatTabPresentation } from "../domain/agent-chat-tabs";
 import type { AgentRoutePreference } from "../domain/agent-route-preference";
@@ -151,6 +152,9 @@ export function AgentChatTabPanel({
     controller.rememberViewport(scrollTop, measurements, pinned);
   }, [controller]);
   const handleDraftChange = useCallback((draft: string) => controller.setDraft(draft), [controller]);
+  const handleDraftDocumentChange = useCallback((draft: string, mentions: AgentPromptReferenceMention[]) => {
+    controller.setDraftDocument(draft, mentions);
+  }, [controller]);
   const handleSubmit = useCallback((prompt: string) => controller.submit(prompt), [controller]);
 
   if (state.initialized && inspection && !agentRuntimeSelected && !loading && !failed) {
@@ -197,6 +201,7 @@ export function AgentChatTabPanel({
     conversation={<AgentTranscript
       key={sessionKey} projection={state.projection} loading={startupLoading}
       pendingPrompt={state.pendingPrompt} pendingReferences={state.pendingIntent?.references ?? []}
+      pendingPromptMentions={state.pendingIntent?.promptMentions ?? []}
       submissionStage={submissionStage} working={state.submitting || Boolean(state.projection.runningTurnId)}
       runtimeLabel={runtimeLabel} initialScrollTop={viewport.scrollTop}
       initialMeasurements={viewport.measurements} initialPinned={viewport.pinned}
@@ -215,7 +220,8 @@ export function AgentChatTabPanel({
       />}
       <AgentComposer
         floatingAccessory={state.projection.approvals.length === 0 && state.projection.questions.length === 0 ? <AgentChangesPill projection={state.projection} onViewChanges={onViewChanges} /> : null}
-        draft={state.draft} onDraftChange={handleDraftChange}
+        draft={state.draft} draftMentions={state.draftMentions} onDraftChange={handleDraftChange}
+        onDraftDocumentChange={handleDraftDocumentChange}
         disabled={loading || unavailable || failed || !routingReady || state.projection.approvals.length > 0 || state.projection.questions.length > 0}
         running={Boolean(state.projection.runningTurnId)} stopping={state.stopping} submitting={submissionPending}
         placeholder={composerPlaceholder} runtimeLabel={runtimeLabel}

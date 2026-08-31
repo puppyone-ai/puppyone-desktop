@@ -1,12 +1,16 @@
 /**
  * @vitest-environment happy-dom
  */
-import React from "react";
+import React, { useState } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EXPLORER_REFERENCE_DRAG_TYPE } from "@puppyone/shared-ui";
-import type { AgentReferenceInputCapabilities } from "../src/features/desktop-agent/domain/agent-contract";
+import type {
+  AgentDraftReference,
+  AgentPromptReferenceMention,
+  AgentReferenceInputCapabilities,
+} from "../src/features/desktop-agent/domain/agent-contract";
 import { AgentComposer } from "../src/features/desktop-agent/ui/AgentComposer";
 import { AgentPanelLayout } from "../src/features/desktop-agent/ui/AgentPanelLayout";
 import {
@@ -144,7 +148,7 @@ describe("Desktop Agent reference ingestion", () => {
     const controller = controllerFixture();
     const container = render(<IngestionHarness controller={controller} withComposer />);
     const boundary = container.querySelector<HTMLElement>(".desktop-agent-boundary")!;
-    const textarea = container.querySelector<HTMLTextAreaElement>("textarea")!;
+    const promptEditor = container.querySelector<HTMLElement>(".cm-content")!;
     const image = new File(["image"], "capture.png", { type: "image/png" });
     const markdown = new File(["# Notes"], "notes.md", { type: "text/markdown" });
 
@@ -154,10 +158,10 @@ describe("Desktop Agent reference ingestion", () => {
     act(() => input.dispatchEvent(new Event("change", { bubbles: true })));
     const paste = new Event("paste", { bubbles: true, cancelable: true });
     Object.defineProperty(paste, "clipboardData", { value: fileTransfer([image]) });
-    act(() => textarea.dispatchEvent(paste));
+    act(() => promptEditor.dispatchEvent(paste));
     const textPaste = new Event("paste", { bubbles: true, cancelable: true });
     Object.defineProperty(textPaste, "clipboardData", { value: fileTransfer([markdown]) });
-    act(() => textarea.dispatchEvent(textPaste));
+    act(() => promptEditor.dispatchEvent(textPaste));
 
     await vi.waitFor(() => expect(controller.stageExternalFiles).toHaveBeenCalledTimes(4));
     expect(controller.stageExternalFiles.mock.calls.slice(0, 3).every(([files]) => files[0] === image)).toBe(true);
@@ -213,11 +217,13 @@ describe("Desktop Agent reference ingestion", () => {
     expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("renders Markdown and images as distinct cards above the draft inside the Composer", () => {
+  it("renders images in the media area and Markdown as an atomic inline prompt mention", async () => {
     const onSelectEffort = vi.fn();
+    const onDraftDocumentChange = vi.fn();
     const container = render(<AgentComposer
       draft="Describe this image"
       onDraftChange={vi.fn()}
+      onDraftDocumentChange={onDraftDocumentChange}
       disabled={false}
       running={false}
       stopping={false}
@@ -265,10 +271,9 @@ describe("Desktop Agent reference ingestion", () => {
 
     const composer = container.querySelector(".desktop-agent-composer")!;
     const cards = composer.querySelector(".desktop-agent-reference-cards")!;
-    const fileCard = composer.querySelector(".desktop-agent-reference-card.is-file-card")!;
     const imageCard = composer.querySelector(".desktop-agent-reference-card.is-image-card")!;
     const preview = imageCard.querySelector<HTMLImageElement>(".desktop-agent-reference-image-preview img");
-    const textarea = composer.querySelector("textarea")!;
+    const promptEditor = composer.querySelector(".desktop-agent-prompt-editor")!;
     const toolbar = composer.querySelector(".desktop-agent-composer-trailing")!;
     const leading = toolbar.querySelector(".desktop-agent-composer-leading")!;
     const actions = toolbar.querySelector(".desktop-agent-composer-actions")!;
@@ -279,11 +284,18 @@ describe("Desktop Agent reference ingestion", () => {
     const modelTrigger = modelPicker.querySelector<HTMLButtonElement>('[aria-label="Agent model"]')!;
     const effortTrigger = effortPicker.querySelector<HTMLButtonElement>('[aria-label="Reasoning effort"]')!;
     const remove = imageCard.querySelector<HTMLButtonElement>(".desktop-agent-reference-card-actions button:last-child")!;
-    expect(fileCard.textContent).toContain("SECURITY.md");
-    expect(fileCard.textContent).toContain("MD");
+    await vi.waitFor(() => expect(composer.querySelector(".desktop-agent-prompt-mention")?.textContent).toContain("@SECURITY.md"));
+    expect(onDraftDocumentChange).toHaveBeenCalledWith(
+      expect.stringContaining("@SECURITY.md"),
+      [expect.objectContaining({ referenceId: "markdown-ref", start: expect.any(Number), end: expect.any(Number) })],
+    );
+    expect(onDraftDocumentChange.mock.calls.some(([, mentions]) => (
+      mentions.some((mention: { referenceId: string }) => mention.referenceId === "image-ref")
+    ))).toBe(false);
+    expect(composer.querySelector(".desktop-agent-reference-card.is-file-card")).toBeNull();
     expect(preview?.getAttribute("src")).toBe("blob:agent-preview");
-    expect(cards.compareDocumentPosition(textarea) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
-    expect(textarea.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(cards.compareDocumentPosition(promptEditor) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(promptEditor.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(leading.contains(attachment)).toBe(true);
     expect(modelTrigger.textContent).toContain("GPT-5.6");
     expect(effortTrigger.textContent).toBe("High");
@@ -314,6 +326,19 @@ describe("Desktop Agent reference ingestion", () => {
       new File(["pdf"], "paper.pdf", { type: "application/pdf" }),
     ]))));
     await vi.waitFor(() => expect(container.querySelector("[role='status']")?.textContent).toContain("1 could not be added"));
+  });
+
+  it("deletes an inline file mention atomically and releases its semantic reference", async () => {
+    const onRemove = vi.fn();
+    const container = render(<StructuredMentionHarness onRemove={onRemove} />);
+    await vi.waitFor(() => expect(container.querySelector(".desktop-agent-prompt-mention")?.textContent).toBe("@notes.md"));
+    const content = container.querySelector<HTMLElement>(".cm-content")!;
+
+    act(() => content.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace", bubbles: true, cancelable: true })));
+
+    await vi.waitFor(() => expect(onRemove).toHaveBeenCalledWith("ref-notes"));
+    expect(container.querySelector(".desktop-agent-prompt-mention")).toBeNull();
+    expect(content.querySelector(".cm-placeholder")).not.toBeNull();
   });
 });
 
@@ -357,6 +382,43 @@ function IngestionHarness({
       onSubmit={vi.fn(async () => true)}
       onStop={vi.fn()}
     /> : null}
+  />;
+}
+
+function StructuredMentionHarness({ onRemove }: { onRemove: (id: string) => void }) {
+  const [draft, setDraft] = useState("");
+  const [mentions, setMentions] = useState<AgentPromptReferenceMention[]>([]);
+  const [references, setReferences] = useState<AgentDraftReference[]>([{
+    id: "ref-notes",
+    kind: "workspace-entry",
+    entryType: "file",
+    path: "notes.md",
+    relativePath: "notes.md",
+    displayName: "notes.md",
+    mime: "text/markdown",
+    size: 10,
+    status: "ready",
+  }]);
+  return <AgentComposer
+    draft={draft}
+    draftMentions={mentions}
+    onDraftChange={setDraft}
+    onDraftDocumentChange={(value, nextMentions) => {
+      setDraft(value);
+      setMentions(nextMentions);
+    }}
+    disabled={false}
+    running={false}
+    stopping={false}
+    submitting={false}
+    references={references}
+    referenceCapabilities={capabilities()}
+    onRemoveReference={(id) => {
+      setReferences((current) => current.filter((reference) => reference.id !== id));
+      onRemove(id);
+    }}
+    onSubmit={vi.fn(async () => true)}
+    onStop={vi.fn()}
   />;
 }
 

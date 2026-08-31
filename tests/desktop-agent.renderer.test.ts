@@ -186,11 +186,11 @@ describe("Desktop Agent renderer surfaces", () => {
       onStop: vi.fn(),
     }));
     const composerSurface = container.querySelector(".desktop-agent-composer") as HTMLElement;
-    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    const promptEditor = container.querySelector(".cm-content") as HTMLElement;
     const sendControl = container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement;
 
     act(() => composerSurface.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 })));
-    expect(document.activeElement).toBe(textarea);
+    expect(document.activeElement).toBe(promptEditor);
 
     act(() => sendControl.focus());
     act(() => sendControl.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 })));
@@ -245,11 +245,12 @@ describe("Desktop Agent renderer surfaces", () => {
       {
         id: "user-1",
         role: "user",
-        text: "Review this architecture",
+        text: "Review @README.md architecture",
         references: [
           { id: "image-1", kind: "attachment", displayName: "capture.png", mime: "image/png", size: 128 },
           { id: "file-1", kind: "workspace-file", displayName: "README.md", relativePath: "docs/README.md" },
         ],
+        promptMentions: [{ referenceId: "file-1", start: 7, end: 17 }],
         sequence: 1,
         turnId: "turn-1",
         itemId: null,
@@ -275,9 +276,10 @@ describe("Desktop Agent renderer surfaces", () => {
     const userText = userMessage.querySelector(".desktop-agent-message-text")!;
     expect(userMessage.getAttribute("aria-label")).toBe("You");
     expect(userReferences.getAttribute("role")).toBe("list");
-    expect(userReferences.querySelectorAll('[role="listitem"]')).toHaveLength(2);
+    expect(userReferences.querySelectorAll('[role="listitem"]')).toHaveLength(1);
     expect(userReferences.textContent).toContain("capture.png");
-    expect(userReferences.textContent).toContain("README.md");
+    expect(userReferences.textContent).not.toContain("README.md");
+    expect(userText.querySelector(".desktop-agent-history-mention")?.textContent).toBe("@README.md");
     expect(userReferences.compareDocumentPosition(userText) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(container.querySelector(".desktop-agent-message.is-assistant")?.getAttribute("aria-label")).toBe("OpenCode");
     expect(container.querySelector(".desktop-agent-message.is-user")?.getAttribute("data-message-surface")).toBe("row");
@@ -386,8 +388,8 @@ describe("Desktop Agent renderer surfaces", () => {
       const container = render(React.createElement(AgentComposer, { ...props, draft: "a" }));
       act(() => root?.render(withTestLocalization(React.createElement(AgentComposer, { ...props, draft: "ab" }))));
       act(() => root?.render(withTestLocalization(React.createElement(AgentComposer, { ...props, draft: "abc" }))));
-      expect(constructions).toBe(0);
-      expect(container.querySelector("textarea")?.getAttribute("style")).toBeNull();
+      expect(constructions).toBe(1);
+      expect(container.querySelectorAll(".cm-editor")).toHaveLength(1);
     } finally {
       globalThis.ResizeObserver = OriginalResizeObserver;
     }
@@ -406,7 +408,7 @@ describe("Desktop Agent renderer surfaces", () => {
       onStop: vi.fn(),
     }));
 
-    expect((container.querySelector("textarea") as HTMLTextAreaElement).placeholder).toBe("Ask about this project");
+    expect(container.querySelector(".cm-content")?.getAttribute("aria-placeholder")).toBe("Ask about this project");
     const sendButton = container.querySelector(
       'button[aria-label="Send message"]',
     ) as HTMLButtonElement | null;
@@ -464,7 +466,7 @@ describe("Desktop Agent renderer surfaces", () => {
     }));
 
     expect(container.querySelector('button[aria-label="Agent model"]')).toBeNull();
-    expect(stripBidiIsolation(container.querySelector("textarea")?.getAttribute("aria-label"))).toBe("Message Agent");
+    expect(stripBidiIsolation(container.querySelector(".cm-content")?.getAttribute("aria-label"))).toBe("Message Agent");
     expect(container.querySelector('button[aria-label="Send message"]')).not.toBeNull();
   });
 
@@ -512,8 +514,8 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.textContent).not.toContain("Google");
     expect(container.querySelector('button[aria-label="Agent model"]')?.textContent).toContain("GPT");
     expect(container.textContent).not.toContain("OpenCode runtime");
-    expect(container.querySelector("textarea")?.getAttribute("rows")).toBe("1");
-    expect(container.querySelector("textarea")?.getAttribute("style")).toBeNull();
+    expect(container.querySelector(".cm-content")?.getAttribute("aria-multiline")).toBe("true");
+    expect(container.querySelectorAll(".cm-editor")).toHaveLength(1);
     expect(container.querySelector(".desktop-agent-composer-row")).not.toBeNull();
     expect(container.querySelector(".desktop-agent-composer-input-row button[aria-label='Send message']")).toBeNull();
     expect(container.querySelector(".desktop-agent-composer-trailing button[aria-label='Send message']")).not.toBeNull();

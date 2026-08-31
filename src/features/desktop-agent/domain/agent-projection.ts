@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentReferenceDisplay, AgentTurnTerminalState } from "./agent-contract";
+import type { AgentEvent, AgentPromptReferenceMention, AgentReferenceDisplay, AgentTurnTerminalState } from "./agent-contract";
 import type {
   AgentActivity,
   AgentProjection,
@@ -34,6 +34,22 @@ export type * from "./agent-projection-types";
 const MAX_COMMAND_OUTPUT = 64 * 1024;
 const MAX_MESSAGE_TEXT = 128 * 1024;
 const MAX_ACTIVITY_TEXT = 64 * 1024;
+
+function readPromptMentions(value: unknown, prompt: string, references: AgentReferenceDisplay[]) {
+  if (!Array.isArray(value)) return [];
+  const referenceIds = new Set(references.map((reference) => reference.id));
+  let boundary = 0;
+  return value.flatMap((entry): AgentPromptReferenceMention[] => {
+    if (!entry || typeof entry !== "object") return [];
+    const candidate = entry as Record<string, unknown>;
+    const referenceId = typeof candidate.referenceId === "string" ? candidate.referenceId : "";
+    const start = Number.isSafeInteger(candidate.start) ? Number(candidate.start) : -1;
+    const end = Number.isSafeInteger(candidate.end) ? Number(candidate.end) : -1;
+    if (!referenceIds.has(referenceId) || start < boundary || end <= start || end > prompt.length) return [];
+    boundary = end;
+    return [{ referenceId, start, end }];
+  });
+}
 
 export function createAgentProjection(options: { partialHistory?: boolean } = {}): AgentProjection {
   return {
@@ -108,6 +124,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
       next.terminalState = null;
       const prompt = readString(payload.prompt).slice(0, MAX_MESSAGE_TEXT);
       const references = readReferenceDisplays(payload.referenceDisplays);
+      const promptMentions = readPromptMentions(payload.promptMentions, prompt, references);
       const indexes = projectionIndexes(next);
       const turnMessages = event.turnId ? indexes.messagesByTurn.get(event.turnId) ?? [] : [];
       if ((prompt || references.length > 0) && !turnMessages.some((index) => next.messages[index]?.role === "user")) {
@@ -119,6 +136,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
           itemId: null,
           text: prompt,
           references,
+          promptMentions,
           streaming: false,
           terminalState: null,
           sequence: event.sequence,
