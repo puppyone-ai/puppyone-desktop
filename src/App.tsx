@@ -27,6 +27,7 @@ import {
   isDesktopAgentChatEnabled,
   loadAgentChatWorkbenchItem,
   prepareAgentChatWorkbenchItem,
+  resolveAgentWorkspaceProviderPath,
 } from "./features/desktop-agent/lazy";
 import {
   isDesktopTerminalEnabled,
@@ -941,7 +942,11 @@ function AppContent() {
       (candidate) => candidate.workspace.path === workspaceRootPath,
     );
     if (!folder) return;
-    const resource = qualifyDataResourcePath(folder.uri, path);
+    const providerPath = isDataResourceUri(path)
+      ? path
+      : resolveAgentWorkspaceProviderPath(workspaceRootPath, path);
+    if (!providerPath) return;
+    const resource = qualifyDataResourcePath(folder.uri, providerPath);
     handleActiveDataPathChange(resource);
     navigateDesktopView("data");
   }, [handleActiveDataPathChange, navigateDesktopView, workbenchWorkspace?.folders]);

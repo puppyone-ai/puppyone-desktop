@@ -6,7 +6,7 @@ import {
   parseResourceUri,
   type ResourceUri,
 } from "./resourceUri";
-import { looksLikeResourceUri } from "./resourcePath";
+import { isRootedFilesystemPath, looksLikeResourceUri } from "./resourcePath";
 
 const resourceIdentity = new ResourceUriIdentityService();
 
@@ -52,6 +52,9 @@ export function qualifyDataResourcePath(
     return canonicalizeResourceUri(value);
   }
   assertValidDataResourceReference(value);
+  if (isRootedFilesystemPath(value)) {
+    throw new TypeError("Host filesystem paths must be converted to provider-relative paths before qualification.");
+  }
   return createWorkspaceResourceUri(rootUri, value);
 }
 

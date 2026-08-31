@@ -1,5 +1,6 @@
 import type { AuxiliaryWorkbenchPreparationContext } from "../app-shell/auxiliary-workbench/types";
 export { isDesktopAgentChatEnabled } from "./featureGate";
+export { resolveAgentWorkspaceProviderPath } from "./domain/agent-workspace-path";
 
 /** Public lazy entrypoint for the experimental Agent Chat renderer. */
 export function loadRightAgentPanel() {

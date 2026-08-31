@@ -1,5 +1,6 @@
 import { countTextBytes, isAgentEventEnvelope } from "../agent-events.mjs";
 import { normalizeCapabilitySnapshot, sanitizeAgentRuntimeDescriptor } from "../../../../shared/agent-contract/schema.mjs";
+import { normalizeAgentEventWorkspacePaths } from "./agent-event-workspace-paths.mjs";
 
 const MAX_REPLAY_EVENTS = 1_000;
 const MAX_TERMINAL_TURN_IDS = 128;
@@ -19,7 +20,12 @@ export function createAgentSessionRecord({
   createdAt,
   title,
 }) {
-  const restoredEvents = Array.isArray(events) ? events.filter(isAgentEventEnvelope).slice(-MAX_REPLAY_EVENTS) : [];
+  const restoredEvents = Array.isArray(events)
+    ? events
+      .filter(isAgentEventEnvelope)
+      .slice(-MAX_REPLAY_EVENTS)
+      .map((event) => normalizeAgentEventWorkspacePaths(event, workspaceRoot))
+    : [];
   const highestSequence = restoredEvents.reduce((highest, event) => Math.max(highest, event.sequence), 0);
   return {
     id,

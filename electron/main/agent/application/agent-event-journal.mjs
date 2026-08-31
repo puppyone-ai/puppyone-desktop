@@ -1,4 +1,5 @@
 import { createAgentEventEnvelope, countTextBytes, redactSecretText } from "../agent-events.mjs";
+import { normalizeAgentEventWorkspacePaths } from "../domain/agent-event-workspace-paths.mjs";
 
 const MAX_REPLAY_EVENTS = 1_000;
 const MAX_REPLAY_BYTES = 2 * 1024 * 1024;
@@ -16,15 +17,16 @@ export function createAgentEventJournal({ sessionCache, logger = console }) {
   }
 
   function emit(session, adapterEvent, { deliver = true } = {}) {
+    const normalizedEvent = normalizeAgentEventWorkspacePaths(adapterEvent, session.workspaceRoot);
     const envelope = createAgentEventEnvelope({
       sequence: ++session.sequence,
       sessionId: session.id,
       runtimeId: session.runtimeId,
-      providerSessionId: adapterEvent.providerSessionId ?? session.providerSessionId,
-      turnId: adapterEvent.turnId ?? null,
-      itemId: adapterEvent.itemId ?? null,
-      type: adapterEvent.type,
-      payload: adapterEvent.payload ?? {},
+      providerSessionId: normalizedEvent.providerSessionId ?? session.providerSessionId,
+      turnId: normalizedEvent.turnId ?? null,
+      itemId: normalizedEvent.itemId ?? null,
+      type: normalizedEvent.type,
+      payload: normalizedEvent.payload ?? {},
     });
     session.events.push(envelope);
     session.replayBytes += countTextBytes(envelope);
