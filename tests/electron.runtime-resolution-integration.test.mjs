@@ -137,6 +137,24 @@ describe("Authoritative runtime resolution", () => {
       providerSessionId: "cursor-history",
     }));
   });
+
+  it("invalidates protocol readiness after an unexpected live process exit", async () => {
+    const harness = createHarness(cursorProbeFailure());
+    const owner = sender();
+    await harness.service.discoverProviders(owner, { runtimeId: "cursor" }, "/workspace");
+    await harness.service.createSession(
+      owner,
+      { runtimeId: "cursor", model: "cursor/auto" },
+      "/workspace",
+    );
+    expect(harness.adapters).toHaveLength(2);
+
+    harness.adapters[1].emitExit({ expected: false, diagnostics: "process exited" });
+    await harness.service.discoverProviders(owner, { runtimeId: "cursor" }, "/workspace");
+
+    expect(harness.adapters).toHaveLength(3);
+    expect(harness.adapters[2].inspect).toHaveBeenCalledTimes(1);
+  });
 });
 
 function createHarness(readiness) {
@@ -159,8 +177,8 @@ function createHarness(readiness) {
       },
     },
     discovery: { discover: vi.fn(async () => readiness) },
-    createAdapter: () => {
-      const adapter = fakeAcpAdapter();
+    createAdapter: (options) => {
+      const adapter = fakeAcpAdapter(options);
       adapters.push(adapter);
       return adapter;
     },
@@ -191,7 +209,7 @@ function createHarness(readiness) {
   };
 }
 
-function fakeAcpAdapter() {
+function fakeAcpAdapter({ onExit = () => {} } = {}) {
   return {
     inspect: vi.fn(async () => inspection()),
     bootstrapSession: vi.fn(async ({ kind, threadId }) => ({
@@ -221,6 +239,7 @@ function fakeAcpAdapter() {
     startTurn: vi.fn(),
     interruptTurn: vi.fn(),
     dispose: vi.fn(async () => undefined),
+    emitExit: onExit,
   };
 }
 

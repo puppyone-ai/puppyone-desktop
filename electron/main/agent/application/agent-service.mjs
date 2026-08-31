@@ -571,6 +571,7 @@ export function createAgentService({
     await Promise.all(sessionStore.values()
       .map((session) => closeSessionRecord(session, { persist: true })));
     await attachmentStore?.close?.();
+    runtimeResolutionCoordinator.clear();
     await runtimeRegistry.dispose?.();
   }
 
@@ -732,6 +733,10 @@ export function createAgentService({
 
   function handleAdapterExit(session, info) {
     if (!sessionStore.isCurrent(session) || session.closing || session.providerExited || info?.expected || !session.providerSessionId) return;
+    runtimeResolutionCoordinator.recordOperationFailure({
+      runtimeId: session.runtimeId,
+      workspaceRoot: session.workspaceRoot,
+    });
     retireProviderSession(session, {
       turnMessage: `${session.runtime?.displayName || "Agent runtime"} exited before the turn completed.`,
       providerMessage: `${session.runtime?.displayName || "Agent runtime"} exited. Files already changed on disk were not reverted.`,
