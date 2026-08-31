@@ -1,6 +1,7 @@
 {
   "name": "Agent",
   "panel.chat": "Discussion avec {agent}",
+  "empty.prompt": "Sur quoi travaillons-nous ?",
   "visual.title": "Architecture des agents",
   "launcher.title": "Démarrer avec un agent",
   "launcher.description": "Choisissez un agent disponible sur cet appareil. La discussion démarre après votre sélection.",

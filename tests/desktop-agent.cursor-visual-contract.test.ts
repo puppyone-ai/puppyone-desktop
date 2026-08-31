@@ -135,7 +135,9 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-session-menu\s*\{[^}]*inset-inline:\s*auto[^}]*inset-inline-start:\s*0/s);
     expect(transcript).not.toContain("What do you want to do in this project?");
     expect(transcript).not.toContain("What should we build?");
-    expect(transcript).not.toContain("desktop-agent-empty");
+    expect(transcript).toContain("showEmptyState && emptyState");
+    expect(css).toMatch(/\.desktop-agent-empty-state\s*\{[^}]*height:\s*100%[^}]*align-items:\s*center[^}]*justify-content:\s*center[^}]*pointer-events:\s*none/s);
+    expect(css).toMatch(/\.desktop-agent-empty-state \.desktop-agent-brand-mark\s*\{[^}]*width:\s*32px[^}]*height:\s*32px[^}]*filter:\s*grayscale\(1\) saturate\(0\) contrast\(0\.82\)[^}]*opacity:\s*0\.46/s);
     expect(panel).toContain("loading={startupLoading}");
     expect(panel).toContain("dock={startupLoading ? null");
     expect(panel).toContain("floatingAccessory=");

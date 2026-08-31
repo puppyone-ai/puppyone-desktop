@@ -210,6 +210,8 @@ describe("Desktop Agent panel lifecycle", () => {
     expect(container.querySelector(".desktop-agent-header-region")).toBeNull();
     expect(container.querySelector('button[aria-label="Coding Agent"]')).toBeNull();
     expect(stripBidiIsolation(container.querySelector(".cm-content")?.getAttribute("aria-label"))).toBe("Message Claude Agent");
+    expect(container.querySelector(".desktop-agent-empty-state .desktop-agent-brand-mark.is-claude")).not.toBeNull();
+    expect(container.querySelector(".desktop-agent-empty-state")?.textContent).toContain("What should we work on?");
   });
 
   it("uses one centered product loader while the chat runtime starts", async () => {

@@ -40,6 +40,7 @@ describe("Desktop Agent architecture boundaries", () => {
 
   it("enforces virtual, responsive, safe presentation contracts", () => {
     const timeline = source("src/features/desktop-agent/ui/AgentTranscript.tsx");
+    const emptyState = source("src/features/desktop-agent/ui/AgentEmptyState.tsx");
     const markdown = source("src/features/desktop-agent/ui/SafeMarkdown.tsx");
     const composer = source("src/features/desktop-agent/ui/AgentComposer.tsx");
     const promptEditor = source("src/features/desktop-agent/ui/composer/AgentPromptEditor.tsx");
@@ -61,6 +62,13 @@ describe("Desktop Agent architecture boundaries", () => {
     const css = agentStyles();
     const globalLayout = source("src/styles/layout.css");
     expect(timeline).toContain("MAX_MOUNTED_ROWS = 120");
+    expect(timeline).toContain("emptyState?: ReactNode");
+    expect(timeline).toContain("showEmptyState && emptyState");
+    expect(emptyState).toContain("<AgentBrandMark");
+    expect(emptyState).not.toMatch(/selectedModel|AgentModelPicker/);
+    expect(source("src/features/desktop-agent/ui/AgentChatTabPanel.tsx")).toContain(
+      "const showReadyEmptyState = routingReady",
+    );
     expect(markdown).not.toContain("dangerouslySetInnerHTML");
     expect(markdown).toContain('["https:", "http:", "mailto:"]');
     expect(cssEntry).toContain('@import "./styles/foundation.css"');

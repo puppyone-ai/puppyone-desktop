@@ -1,6 +1,7 @@
 {
   "name": "エージェント",
   "panel.chat": "{agent} チャット",
+  "empty.prompt": "何に取り組みますか？",
   "visual.title": "エージェントアーキテクチャ",
   "launcher.title": "エージェントを選んで開始",
   "launcher.description": "このデバイスで利用できるエージェントを選択してください。選択後にチャットが開始されます。",

@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentApprovalDock } from "../src/features/desktop-agent/ui/AgentApprovalDock";
 import { AgentChangesPill, summarizeAgentChanges } from "../src/features/desktop-agent/ui/AgentChangesPill";
 import { AgentComposer } from "../src/features/desktop-agent/ui/AgentComposer";
+import { AgentEmptyState } from "../src/features/desktop-agent/ui/AgentEmptyState";
 import { AgentPanelLayout } from "../src/features/desktop-agent/ui/AgentPanelLayout";
 import { AgentPanelStatus } from "../src/features/desktop-agent/ui/AgentPanelStatus";
 import { AgentPickerPopover } from "../src/features/desktop-agent/ui/AgentPickerPopover";
@@ -101,7 +102,7 @@ describe("Desktop Agent renderer surfaces", () => {
     if (reason.code === "AUTHENTICATION_PROBE_CRASHED") expect(text).not.toContain("Sign in to Cursor Agent");
   });
 
-  it("keeps the ready empty transcript visually blank", () => {
+  it("keeps the transcript generic when no product empty-state slot is supplied", () => {
     const container = render(React.createElement(AgentTranscript, {
       projection: createAgentProjection(),
       loading: false,
@@ -110,6 +111,38 @@ describe("Desktop Agent renderer surfaces", () => {
 
     expect(container.textContent).toBe("");
     expect(container.querySelector(".desktop-agent-empty")).toBeNull();
+  });
+
+  it("renders the quiet runtime identity only for a ready empty conversation", () => {
+    const emptyState = React.createElement(AgentEmptyState, {
+      runtimeIconKey: "codex",
+      runtimeLabel: "Codex",
+    });
+    const container = render(React.createElement(AgentTranscript, {
+      projection: createAgentProjection(),
+      loading: false,
+      runtimeLabel: "Codex",
+      emptyState,
+    }));
+
+    expect(container.textContent).toContain(testT("agent.empty.prompt"));
+    expect(container.querySelector(".desktop-agent-empty-state .desktop-agent-brand-mark.is-codex")).not.toBeNull();
+  });
+
+  it("removes the empty-state cue as soon as a prompt enters the live tail", () => {
+    const container = render(React.createElement(AgentTranscript, {
+      projection: createAgentProjection(),
+      loading: false,
+      pendingPrompt: "Start here",
+      runtimeLabel: "Codex",
+      emptyState: React.createElement(AgentEmptyState, {
+        runtimeIconKey: "codex",
+        runtimeLabel: "Codex",
+      }),
+    }));
+
+    expect(container.querySelector(".desktop-agent-empty-state")).toBeNull();
+    expect(container.textContent).toContain("Start here");
   });
 
   it("renders the structural regions and applies the real layout CSS contract", () => {

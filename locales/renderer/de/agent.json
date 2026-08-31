@@ -1,6 +1,7 @@
 {
   "name": "Agent",
   "panel.chat": "{agent}-Chat",
+  "empty.prompt": "Woran arbeiten wir?",
   "visual.title": "Agent-Architektur",
   "launcher.title": "Mit einem Agent starten",
   "launcher.description": "Wähle einen auf diesem Gerät verfügbaren Agent. Der Chat startet nach deiner Auswahl.",

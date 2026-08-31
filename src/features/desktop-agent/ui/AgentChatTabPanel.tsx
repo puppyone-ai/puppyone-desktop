@@ -10,6 +10,7 @@ import type { AgentRoutePreference } from "../domain/agent-route-preference";
 import { AgentApprovalDock } from "./AgentApprovalDock";
 import { AgentChangesPill } from "./AgentChangesPill";
 import { AgentComposer, DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID } from "./AgentComposer";
+import { AgentEmptyState } from "./AgentEmptyState";
 import { AgentPanelLayout } from "./AgentPanelLayout";
 import { AgentPanelStatus } from "./AgentPanelStatus";
 import { AgentQuestionDock } from "./AgentQuestionDock";
@@ -129,6 +130,12 @@ export function AgentChatTabPanel({
   const statusCode = state.session ? sessionStatusCode(sessionStatus) : readinessStatusCode(readiness);
   const title = state.session?.title || (agentRuntimeSelected ? runtimeLabel : t("agent.header.newChat"));
   const hasStatus = unavailable || failed || Boolean(state.error);
+  const showReadyEmptyState = routingReady
+    && !hasStatus
+    && !state.draft.trim()
+    && state.references.length === 0
+    && state.projection.approvals.length === 0
+    && state.projection.questions.length === 0;
   const history = useAgentConversationHistory({
     active: commandTarget,
     enabled: historyOpen && state.initialized && Boolean(inspection) && !agentRuntimeSelected && !loading && !failed,
@@ -202,6 +209,9 @@ export function AgentChatTabPanel({
       pendingPromptMentions={state.pendingIntent?.promptMentions ?? []}
       submissionStage={submissionStage} working={state.submitting || Boolean(state.projection.runningTurnId)}
       runtimeLabel={runtimeLabel} initialScrollTop={viewport.scrollTop}
+      emptyState={showReadyEmptyState
+        ? <AgentEmptyState runtimeIconKey={runtimeIconKey} runtimeLabel={runtimeLabel} />
+        : null}
       initialMeasurements={viewport.measurements} initialPinned={viewport.pinned}
       onViewportChange={handleViewportChange} onOpenFile={onOpenFile}
     />}

@@ -1,6 +1,7 @@
 {
   "name": "智能体",
   "panel.chat": "{agent} 对话",
+  "empty.prompt": "想从哪里开始？",
   "visual.title": "智能体架构",
   "launcher.title": "选择要启动的智能体",
   "launcher.description": "选择此设备上可用的智能体。完成选择后才会启动对话。",

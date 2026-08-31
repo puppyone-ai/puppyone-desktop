@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useScrollEdgeState } from "@puppyone/shared-ui";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
@@ -24,6 +24,7 @@ type AgentTranscriptProps = {
   submissionStage?: AgentSubmissionStage;
   working?: boolean;
   runtimeLabel?: string;
+  emptyState?: ReactNode;
   initialScrollTop?: number;
   initialMeasurements?: Record<string, number>;
   initialPinned?: boolean;
@@ -44,6 +45,7 @@ function AgentTranscriptView({
   submissionStage = null,
   working = false,
   runtimeLabel: runtimeLabelProp,
+  emptyState = null,
   initialScrollTop = 0,
   initialMeasurements = {},
   initialPinned = true,
@@ -76,6 +78,11 @@ function AgentTranscriptView({
   const showThinking = !submissionStatus && shouldShowAgentThinking(projection, working);
   const workingStatus = submissionStatus || (showThinking ? t("agent.activity.thinking") : null);
   const hasLiveTail = Boolean(pendingPrompt) || pendingReferences.length > 0 || Boolean(workingStatus);
+  const showEmptyState = Boolean(emptyState)
+    && !loading
+    && timeline.rows.length === 0
+    && !hasLiveTail
+    && !projection.partialHistory;
   const scrollEdgeState = useScrollEdgeState(scrollRef, {
     revision: `${timeline.rows.length}:${layout.totalHeight}:${hasLiveTail ? "live" : "settled"}`,
   });
@@ -187,6 +194,7 @@ function AgentTranscriptView({
             className="desktop-agent-startup-loading"
           />
         )}
+        {showEmptyState && emptyState}
         {timeline.rows.length > 0 && (
           <div className="desktop-agent-virtual-canvas" style={agentVirtualCanvasGeometry(layout.totalHeight)}>
             {visibleRows.map((row, relativeIndex) => {
