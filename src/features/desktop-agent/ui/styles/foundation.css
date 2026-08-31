@@ -143,12 +143,17 @@
 .desktop-agent-brand-mark img { object-fit: cover; }
 .desktop-agent-brand-mark.is-codex { background: transparent; }
 .desktop-agent-brand-mark.is-claude { --desktop-agent-brand-mark-scale: 0.84; background: transparent; }
-.desktop-agent-brand-mark.is-cursor { background: #111418; }
+.desktop-agent-brand-mark.is-cursor { background: transparent; }
+.desktop-agent-brand-mark.is-cursor img { object-fit: contain; }
 .desktop-agent-brand-mark.is-opencode { --desktop-agent-brand-mark-scale: 1.3; background: #131010; }
 .desktop-agent-brand-mark.is-fallback { border: 1px solid var(--agent-border-subtle); background: var(--agent-control-surface); color: var(--agent-text-muted); }
 
 .dark .desktop-agent-brand-mark.is-codex img {
   content: url("/assets/icons/agents/codex-dark.png");
+}
+
+.dark .desktop-agent-brand-mark.is-cursor img {
+  content: url("/assets/icons/agents/cursor-dark.svg");
 }
 
 .desktop-agent-header-region {

@@ -134,9 +134,11 @@
 .desktop-agent-empty-state .desktop-agent-brand-mark {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
-  filter: grayscale(1) saturate(0) contrast(0.82);
-  opacity: 0.46;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  filter: none;
+  opacity: 1;
 }
 .desktop-agent-empty-state p {
   margin: 0;

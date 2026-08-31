@@ -137,7 +137,10 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(transcript).not.toContain("What should we build?");
     expect(transcript).toContain("showEmptyState && emptyState");
     expect(css).toMatch(/\.desktop-agent-empty-state\s*\{[^}]*height:\s*100%[^}]*align-items:\s*center[^}]*justify-content:\s*center[^}]*pointer-events:\s*none/s);
-    expect(css).toMatch(/\.desktop-agent-empty-state \.desktop-agent-brand-mark\s*\{[^}]*width:\s*32px[^}]*height:\s*32px[^}]*filter:\s*grayscale\(1\) saturate\(0\) contrast\(0\.82\)[^}]*opacity:\s*0\.46/s);
+    expect(css).toMatch(/\.desktop-agent-empty-state \.desktop-agent-brand-mark\s*\{[^}]*width:\s*32px[^}]*height:\s*32px[^}]*overflow:\s*visible[^}]*border-radius:\s*0[^}]*background:\s*transparent[^}]*filter:\s*none[^}]*opacity:\s*1/s);
+    expect(css).toMatch(/\.desktop-agent-brand-mark\.is-cursor\s*\{[^}]*background:\s*transparent/s);
+    expect(css).toMatch(/\.desktop-agent-brand-mark\.is-cursor img\s*\{[^}]*object-fit:\s*contain/s);
+    expect(css).toMatch(/\.dark \.desktop-agent-brand-mark\.is-cursor img\s*\{[^}]*content:\s*url\("\/assets\/icons\/agents\/cursor-dark\.svg"\)/s);
     expect(panel).toContain("loading={startupLoading}");
     expect(panel).toContain("dock={startupLoading ? null");
     expect(panel).toContain("floatingAccessory=");
