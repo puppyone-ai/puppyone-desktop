@@ -1,5 +1,6 @@
 import type { AgentActivity } from "./agent-projection-types";
 import type { LocaleFormatters, MessageFormatter } from "@puppyone/localization/core";
+import { stringifyAgentToolInput } from "./agent-tool-evidence";
 
 export type AgentFileChangeSummary = {
   path: string;
@@ -242,7 +243,7 @@ export function structuredInputForActivity(activity: AgentActivity) {
   const visible = Object.fromEntries(Object.entries(input as Record<string, unknown>)
     .filter(([key]) => !["command", "cmd", "patch", "diff", "content"].includes(key))
     .slice(0, 20));
-  return Object.keys(visible).length ? JSON.stringify(visible, null, 2).slice(0, 32 * 1024) : null;
+  return stringifyAgentToolInput(visible);
 }
 
 function record(value: unknown): Record<string, unknown> {

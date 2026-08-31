@@ -14,6 +14,9 @@ const renderers = new Map<string, ComponentType<ToolRendererProps>>();
 
 export function registerAgentToolRenderer(tool: string, renderer: ComponentType<ToolRendererProps>) {
   renderers.set(tool, renderer);
+  return () => {
+    if (renderers.get(tool) === renderer) renderers.delete(tool);
+  };
 }
 
 export function isAgentToolPart(part: AgentPart): part is AgentToolPart {

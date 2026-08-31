@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentPart } from "../domain/agent-projection-types";
 import { AgentActivityItem } from "./AgentActivityItem";
+import { AgentActivityRenderBoundary } from "./AgentActivityRenderBoundary";
 import { AgentMessagePart } from "./AgentMessagePart";
 import { AgentToolRenderer, isAgentToolPart } from "./AgentToolRendererRegistry";
 import { AgentTurnSummary } from "./AgentTurnSummary";
@@ -30,20 +31,23 @@ function MessagePart({ part, runtimeLabel }: PartRendererProps) {
 
 function ActivityPart({ part, onOpenFile }: PartRendererProps) {
   if (!("label" in part) || !("status" in part) || !("detail" in part)) return null;
-  if (isAgentToolPart(part)) {
-    return <AgentToolRenderer part={part} onOpenFile={onOpenFile} />;
-  }
-  return <AgentActivityItem activity={{
-    id: part.id,
-    turnId: part.turnId,
-    itemId: part.itemId,
-    kind: part.kind,
-    label: part.label,
-    status: part.status,
-    detail: part.detail,
-    output: part.output,
-    sequence: part.sequence,
-  }} onOpenFile={onOpenFile} />;
+  return (
+    <AgentActivityRenderBoundary activityId={part.id} resetKey={`${part.id}:${part.sequence}`}>
+      {isAgentToolPart(part)
+        ? <AgentToolRenderer part={part} onOpenFile={onOpenFile} />
+        : <AgentActivityItem activity={{
+            id: part.id,
+            turnId: part.turnId,
+            itemId: part.itemId,
+            kind: part.kind,
+            label: part.label,
+            status: part.status,
+            detail: part.detail,
+            output: part.output,
+            sequence: part.sequence,
+          }} onOpenFile={onOpenFile} />}
+    </AgentActivityRenderBoundary>
+  );
 }
 
 function StatusPart({ part }: PartRendererProps) {

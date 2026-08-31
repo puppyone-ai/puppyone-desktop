@@ -7,17 +7,17 @@ import {
   formatAgentToolName,
   outputForActivity,
 } from "../../domain/agent-activity-presentation";
+import { collectAgentToolResultLines } from "../../domain/agent-tool-evidence";
 import type { AgentActivity } from "../../domain/agent-projection-types";
 import { AgentActivityShell } from "./AgentActivityShell";
 import { AgentToolEvidenceNode, AgentToolEvidenceTree } from "./AgentToolEvidenceTree";
-
-const MAX_VISIBLE_RESULT_LINES = 80;
+import { AgentToolTextEvidence } from "./AgentToolTextEvidence";
 
 export function AgentFileQueryActivity({ activity, onOpenFile }: { activity: AgentActivity; onOpenFile?: (path: string) => void }) {
   const { t } = useLocalization();
   const tool = agentActivityToolId(activity);
   const output = outputForActivity(activity);
-  const lines = output ? output.split(/\r?\n/u).filter((line) => line.trim()).slice(0, 1_000) : [];
+  const results = collectAgentToolResultLines(output);
   const searchable = ["grep", "glob", "search", "list"].includes(tool);
   return (
     <AgentActivityShell
@@ -31,8 +31,8 @@ export function AgentFileQueryActivity({ activity, onOpenFile }: { activity: Age
         <AgentToolEvidenceTree>
           <AgentToolEvidenceNode kind="result">
             {searchable
-              ? <SearchResults lines={lines} onOpenFile={onOpenFile} />
-              : <pre className="desktop-agent-tool-output" data-po-scrollbar="content" dir="ltr">{output}</pre>}
+              ? <SearchResults results={results} onOpenFile={onOpenFile} />
+              : <AgentToolTextEvidence text={output} dir="ltr" />}
           </AgentToolEvidenceNode>
         </AgentToolEvidenceTree>
       )}
@@ -40,19 +40,18 @@ export function AgentFileQueryActivity({ activity, onOpenFile }: { activity: Age
   );
 }
 
-function SearchResults({ lines, onOpenFile }: { lines: string[]; onOpenFile?: (path: string) => void }) {
+function SearchResults({ results, onOpenFile }: { results: ReturnType<typeof collectAgentToolResultLines>; onOpenFile?: (path: string) => void }) {
   const { t, formatNumber } = useLocalization();
-  const visible = lines.slice(0, MAX_VISIBLE_RESULT_LINES);
   return (
-    <div className="desktop-agent-search-results" data-po-scrollbar="content" dir="ltr">
-      {visible.length === 0 && <span className="desktop-agent-tool-empty">{t("agent.activity.noResults")}</span>}
-      {visible.map((line, index) => {
+    <div className="desktop-agent-search-results" data-po-scrollbar="content" dir="ltr" data-source-lines={results.totalLines}>
+      {results.lines.length === 0 && <span className="desktop-agent-tool-empty">{t("agent.activity.noResults")}</span>}
+      {results.lines.map((line, index) => {
         const path = resultPath(line);
         return path && onOpenFile
           ? <button type="button" key={`${index}:${line}`} title={line} onClick={() => onOpenFile(path)}>{line}</button>
           : <span key={`${index}:${line}`} title={line}>{line}</span>;
       })}
-      {lines.length > visible.length && <small>{t("agent.activity.moreResults", { count: lines.length - visible.length, value: formatNumber(lines.length - visible.length) })}</small>}
+      {results.omittedLines > 0 && <small>{t("agent.activity.moreResults", { count: results.omittedLines, value: formatNumber(results.omittedLines) })}</small>}
     </div>
   );
 }

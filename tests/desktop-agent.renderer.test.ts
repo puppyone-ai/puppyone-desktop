@@ -20,6 +20,8 @@ import {
   agentSubmissionStatusLabel,
   shouldShowAgentThinking,
 } from "../src/features/desktop-agent/ui/AgentTranscript";
+import { registerAgentToolRenderer } from "../src/features/desktop-agent/ui/AgentToolRendererRegistry";
+import { agentToolEvidenceLimits } from "../src/features/desktop-agent/domain/agent-tool-evidence";
 import { resolveAnchoredOverlayPosition } from "../src/features/app-shell/useAnchoredOverlayPosition";
 import { createAgentProjection } from "../src/features/desktop-agent/agentProjection";
 import {
@@ -997,6 +999,91 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.querySelector(".desktop-agent-tool-output")?.textContent).toContain("export function AgentComposer");
     expect(container.querySelector('button[aria-label^="Open"]')).toBeNull();
     expect(onOpenFile).not.toHaveBeenCalled();
+  });
+
+  it("mounts a bounded tool preview instead of the complete provider output", () => {
+    const projection = createAgentProjection();
+    const output = Array.from({ length: 10_000 }, (_, index) => `line-${index}`).join("\n");
+    projection.activities.push({
+      id: "command-large",
+      turnId: "turn-large",
+      itemId: "tool-large",
+      kind: "command",
+      label: "Large output",
+      status: "completed",
+      output,
+      detail: { tool: "bash", command: "generate-output" },
+      sequence: 1,
+    });
+    const container = render(React.createElement(AgentTranscript, { projection, loading: false }));
+    act(() => (container.querySelector(".desktop-agent-tool-row") as HTMLButtonElement).click());
+    const visibleOutput = container.querySelector(".desktop-agent-command-output") as HTMLElement;
+    const evidence = visibleOutput.closest(".desktop-agent-tool-text-evidence") as HTMLElement;
+    const visible = visibleOutput.textContent ?? "";
+
+    expect(evidence.dataset.truncated).toBe("true");
+    expect(Number(evidence.dataset.sourceLength)).toBe(64 * 1024);
+    expect(visible.length).toBeLessThan(agentToolEvidenceLimits.maxChars + 200);
+    expect(visible).toContain("omitted");
+  });
+
+  it("mounts at most eighty searchable result elements", () => {
+    const projection = createAgentProjection();
+    projection.activities.push({
+      id: "grep-large",
+      turnId: "turn-large",
+      itemId: "grep-large",
+      kind: "tool",
+      label: "Large search",
+      status: "completed",
+      output: Array.from({ length: 1_000 }, (_, index) => `src/file-${index}.ts:${index + 1}:match`).join("\n"),
+      detail: { tool: "grep", input: { pattern: "match" } },
+      sequence: 1,
+    });
+    const container = render(React.createElement(AgentTranscript, { projection, loading: false }));
+    act(() => (container.querySelector(".desktop-agent-tool-row") as HTMLButtonElement).click());
+
+    expect(container.querySelectorAll(".desktop-agent-search-results > span, .desktop-agent-search-results > button")).toHaveLength(80);
+    expect(container.querySelector(".desktop-agent-search-results")?.textContent).toContain("more results");
+  });
+
+  it("isolates one crashing tool renderer and preserves following transcript rows", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const dispose = registerAgentToolRenderer("fixture-crash", () => {
+      throw new Error("fixture tool detail failed");
+    });
+    const projection = createAgentProjection();
+    projection.activities.push({
+      id: "broken-tool",
+      turnId: "turn-1",
+      itemId: "broken-tool",
+      kind: "tool",
+      label: "Broken tool",
+      status: "completed",
+      output: "ignored",
+      detail: { tool: "fixture-crash" },
+      sequence: 1,
+    });
+    projection.messages.push({
+      id: "assistant-after-tool",
+      role: "assistant",
+      turnId: "turn-1",
+      itemId: null,
+      text: "The transcript survived.",
+      streaming: false,
+      terminalState: "completed",
+      sequence: 2,
+    });
+
+    try {
+      const container = render(React.createElement(AgentTranscript, { projection, loading: false }));
+      expect(container.querySelector(".desktop-agent-activity-render-fallback")).not.toBeNull();
+      expect(container.textContent).toContain("The transcript survived.");
+      expect(error).toHaveBeenCalled();
+    } finally {
+      dispose();
+      error.mockRestore();
+    }
   });
 
   it("renders reasoning as a quiet disclosure branch instead of a message bubble", () => {

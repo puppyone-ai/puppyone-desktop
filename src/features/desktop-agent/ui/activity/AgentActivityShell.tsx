@@ -24,6 +24,7 @@ export function AgentActivityShell({
 }: AgentActivityShellProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const hasDetail = children !== undefined && children !== null && children !== false && children !== "";
+  const visibleSummary = summary?.slice(0, 2_048);
   return (
     <div className={`desktop-agent-tool-call is-${status}${hasDetail ? " has-detail" : ""}${expanded ? " is-expanded" : ""} ${className}`.trim()}>
       <div className="desktop-agent-tool-header">
@@ -37,7 +38,7 @@ export function AgentActivityShell({
           <span className="desktop-agent-tool-icon" aria-hidden="true">{icon}</span>
           <strong className="desktop-agent-tool-name">{title}</strong>
           {hasDetail && <ChevronDown className={`desktop-agent-tool-chevron${expanded ? " is-expanded" : ""}`} size={12} aria-hidden="true" />}
-          {summary && <span className="desktop-agent-tool-summary">{summary}</span>}
+          {visibleSummary && <span className="desktop-agent-tool-summary">{visibleSummary}</span>}
           <StatusIcon status={status} />
         </button>
       </div>

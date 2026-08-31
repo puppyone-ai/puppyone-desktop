@@ -21,6 +21,7 @@ const transcript = fs.readFileSync(path.join(root, "src/features/desktop-agent/u
 const commandActivity = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/activity/AgentCommandActivity.tsx"), "utf8");
 const fileQueryActivity = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/activity/AgentFileQueryActivity.tsx"), "utf8");
 const evidenceTree = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/activity/AgentToolEvidenceTree.tsx"), "utf8");
+const evidenceModel = fs.readFileSync(path.join(root, "src/features/desktop-agent/domain/agent-tool-evidence.ts"), "utf8");
 const safeMarkdown = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/SafeMarkdown.tsx"), "utf8");
 const panelStatus = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentPanelStatus.tsx"), "utf8");
 const dataSidebarCss = fs.readFileSync(path.join(root, "src/features/data-workspace/data-shell.css"), "utf8");
@@ -241,7 +242,7 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-tool-name\s*\{[^}]*font-weight:\s*500/s);
     expect(css).toMatch(/\.desktop-agent-tool-branch\s*\{[^}]*border:\s*0[^}]*border-inline-start:\s*2px solid var\(--agent-border-subtle\)[^}]*background:\s*transparent/s);
     expect(css).toMatch(/\.desktop-agent-tool-call\s*\{[^}]*margin:\s*0 4px var\(--agent-work-handoff-gap\)/s);
-    expect(css).toMatch(/\.desktop-agent-tool-branch:has\(> \.desktop-agent-evidence-tree\)\s*\{[^}]*padding:\s*0[^}]*overflow:\s*visible[^}]*border:\s*0/s);
+    expect(css).toMatch(/\.desktop-agent-tool-branch:has\(> \.desktop-agent-evidence-tree\)\s*\{[^}]*padding:\s*0[^}]*overflow:\s*clip[^}]*border:\s*0/s);
     expect(css).toMatch(/\.desktop-agent-evidence-tree\s*\{[^}]*font-family:\s*var\(--po-font-mono\)[^}]*font-size:\s*var\(--agent-font-size-meta\)[^}]*line-height:\s*1\.5/s);
     expect(css).toMatch(/\.desktop-agent-evidence-node::before\s*\{[^}]*border-inline-start:\s*1px solid var\(--agent-border-subtle\)[^}]*border-bottom:\s*1px solid var\(--agent-border-subtle\)/s);
     expect(css).toMatch(/\.desktop-agent-command-output,[^{]*\.desktop-agent-tool-output\s*\{[^}]*padding:\s*0[^}]*border:\s*0[^}]*color:\s*var\(--agent-text-subtle\)[^}]*font-size:\s*inherit/s);
@@ -252,7 +253,11 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(commandActivity).not.toContain("commandMetadata");
     expect(commandActivity).not.toContain("CommandActions");
     expect(commandActivity).toContain("commandPresentationForActivity");
-    expect(fileQueryActivity).toContain("MAX_VISIBLE_RESULT_LINES = 80");
+    expect(commandActivity).toContain("AgentToolTextEvidence");
+    expect(fileQueryActivity).toContain("collectAgentToolResultLines");
+    expect(evidenceModel).toContain("maxChars: 24 * 1024");
+    expect(evidenceModel).toContain("maxLines: 400");
+    expect(evidenceModel).toContain("maxLineChars: 4 * 1024");
     expect(fileQueryActivity).toContain("desktop-agent-search-results");
   });
 

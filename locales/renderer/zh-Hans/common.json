@@ -10,6 +10,8 @@
   "action.copy": "复制",
   "action.clear": "清除",
   "action.copied": "已复制",
+  "renderFailure.title": "PuppyOne 无法显示此窗口",
+  "renderFailure.description": "你的文件是安全的。请刷新窗口以恢复界面。",
   "action.change": "更改",
   "action.save": "保存",
   "status.loading": "正在加载…"

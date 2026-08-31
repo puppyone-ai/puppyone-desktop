@@ -12,6 +12,7 @@ import {
 import type { AgentActivity } from "../../domain/agent-projection-types";
 import { AgentActivityShell } from "./AgentActivityShell";
 import { AgentToolEvidenceNode, AgentToolEvidenceTree } from "./AgentToolEvidenceTree";
+import { AgentToolTextEvidence } from "./AgentToolTextEvidence";
 
 export function AgentGenericActivity({ activity }: { activity: AgentActivity }) {
   const { t } = useLocalization();
@@ -40,12 +41,12 @@ export function AgentGenericActivity({ activity }: { activity: AgentActivity }) 
         <AgentToolEvidenceTree>
           {input && (
             <AgentToolEvidenceNode kind="request">
-              <pre className="desktop-agent-tool-output" data-po-scrollbar="content">{input}</pre>
+              <AgentToolTextEvidence text={input} />
             </AgentToolEvidenceNode>
           )}
           {output && (
             <AgentToolEvidenceNode kind="result">
-              <pre className="desktop-agent-tool-output" data-po-scrollbar="content">{output}</pre>
+              <AgentToolTextEvidence text={output} />
             </AgentToolEvidenceNode>
           )}
         </AgentToolEvidenceTree>

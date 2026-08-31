@@ -8,6 +8,7 @@ import { flushActiveDocumentSessions } from "@puppyone/shared-ui";
 import { LocalizationProvider } from "@puppyone/localization/react";
 import { App } from "./App";
 import { ScrollbarActivity } from "./components/ScrollbarActivity";
+import { ApplicationRenderBoundary } from "./components/ApplicationRenderBoundary";
 import { FeatureFlagsProvider } from "./features/flags";
 import { TypographyCatalogProvider } from "./features/typography";
 import { bootstrapRendererLocalization } from "./localization";
@@ -88,6 +89,9 @@ async function renderApplication() {
   } else if (window.location.hash === "#agent-visual-smoke") {
     const { AgentVisualSmokeHarness } = await import("./features/desktop-agent/visual-smoke");
     surface = <AgentVisualSmokeHarness />;
+  } else if (window.location.hash === "#agent-tool-stability-smoke") {
+    const { AgentToolStabilitySmokeHarness } = await import("./features/desktop-agent/visual-smoke");
+    surface = <AgentToolStabilitySmokeHarness />;
   } else if (window.location.hash === "#renderer-performance-smoke") {
     const { RendererPerformanceSmokeHarness } = await import("./performance/RendererPerformanceSmokeHarness");
     surface = <RendererPerformanceSmokeHarness />;
@@ -126,8 +130,10 @@ async function renderApplication() {
         loadCatalog={localization.loadCatalog}
         client={localization.client}
       >
-        <ScrollbarActivity />
-        {surface}
+        <ApplicationRenderBoundary>
+          <ScrollbarActivity />
+          {surface}
+        </ApplicationRenderBoundary>
       </LocalizationProvider>
     </React.StrictMode>,
   );

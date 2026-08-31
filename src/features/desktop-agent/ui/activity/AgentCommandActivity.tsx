@@ -11,6 +11,7 @@ import {
 import type { AgentActivity } from "../../domain/agent-projection-types";
 import { AgentActivityShell } from "./AgentActivityShell";
 import { AgentToolEvidenceNode, AgentToolEvidenceTree } from "./AgentToolEvidenceTree";
+import { AgentToolTextEvidence } from "./AgentToolTextEvidence";
 
 export function AgentCommandActivity({ activity }: { activity: AgentActivity }) {
   const { t } = useLocalization();
@@ -29,12 +30,12 @@ export function AgentCommandActivity({ activity }: { activity: AgentActivity }) 
         <AgentToolEvidenceTree>
           {command && (
             <AgentToolEvidenceNode kind="command" marker="$">
-              <code className="desktop-agent-command-line">{command}</code>
+              <AgentToolTextEvidence text={command} className="desktop-agent-command-line" />
             </AgentToolEvidenceNode>
           )}
           {output && (
             <AgentToolEvidenceNode kind="result">
-              <pre className="desktop-agent-command-output" data-po-scrollbar="content">{output}</pre>
+              <AgentToolTextEvidence text={output} className="desktop-agent-command-output" />
             </AgentToolEvidenceNode>
           )}
         </AgentToolEvidenceTree>

@@ -10,6 +10,8 @@
   "action.copy": "コピー",
   "action.clear": "クリア",
   "action.copied": "コピー済み",
+  "renderFailure.title": "PuppyOne でこのウインドウを表示できません",
+  "renderFailure.description": "ファイルは安全です。ウインドウを更新して画面を復元してください。",
   "action.change": "変更",
   "action.save": "保存",
   "status.loading": "読み込み中…"

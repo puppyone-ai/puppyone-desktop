@@ -1,0 +1,182 @@
+import { useEffect, useMemo } from "react";
+import { createAgentProjection } from "../domain/agent-projection";
+import { agentToolEvidenceLimits } from "../domain/agent-tool-evidence";
+import { AgentTranscript, agentTimelineLimits } from "./AgentTranscript";
+import { registerAgentToolRenderer } from "./AgentToolRendererRegistry";
+import "./desktop-agent.css";
+
+const smokeToolId = "fixture-render-crash";
+registerAgentToolRenderer(smokeToolId, () => {
+  throw new Error("intentional smoke renderer failure");
+});
+
+type SmokeResult = {
+  passed: boolean;
+  durationMs: number;
+  fallbackCount: number;
+  mountedRows: number;
+  maxPreviewChars: number;
+  maxSearchRows: number;
+  previewCount: number;
+  searchContainerCount: number;
+  sentinelVisible: boolean;
+  uncaughtErrors: string[];
+  longTasks: number[];
+  error?: string;
+};
+
+export function AgentToolStabilitySmokeHarness() {
+  const projection = useMemo(createSmokeProjection, []);
+
+  useEffect(() => {
+    const uncaughtErrors: string[] = [];
+    const longTasks: number[] = [];
+    const onError = (event: ErrorEvent) => uncaughtErrors.push(event.message || "window error");
+    const onRejection = (event: PromiseRejectionEvent) => uncaughtErrors.push(String(event.reason));
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    const observer = typeof PerformanceObserver === "function"
+      ? new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) longTasks.push(entry.duration);
+        })
+      : null;
+    try {
+      observer?.observe({ entryTypes: ["longtask"] });
+    } catch {
+      // Older Chromium builds may not expose the long-task entry type.
+    }
+
+    let cancelled = false;
+    void runSmoke().then((result) => {
+      if (!cancelled) publish({ ...result, uncaughtErrors, longTasks });
+    }).catch((error) => {
+      if (!cancelled) publish({
+        passed: false,
+        durationMs: 0,
+        fallbackCount: 0,
+        mountedRows: 0,
+        maxPreviewChars: 0,
+        maxSearchRows: 0,
+        previewCount: 0,
+        searchContainerCount: 0,
+        sentinelVisible: false,
+        uncaughtErrors,
+        longTasks,
+        error: error instanceof Error ? error.stack || error.message : String(error),
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      observer?.disconnect();
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
+
+  return (
+    <main className="desktop-agent-visual-smoke dark desktop-agent-tool-stability-smoke">
+      <section className="desktop-agent-boundary desktop-agent-tool-stability-panel">
+        <AgentTranscript projection={projection} loading={false} runtimeLabel="Codex" />
+      </section>
+    </main>
+  );
+}
+
+async function runSmoke(): Promise<Omit<SmokeResult, "uncaughtErrors" | "longTasks">> {
+  await frames(2);
+  const start = performance.now();
+  for (let cycle = 0; cycle < 11; cycle += 1) {
+    const disclosures = Array.from(document.querySelectorAll<HTMLButtonElement>(".desktop-agent-tool-row:not(:disabled)"));
+    for (const disclosure of disclosures) disclosure.click();
+    await frames(2);
+  }
+  const durationMs = performance.now() - start;
+  const fallbackCount = document.querySelectorAll(".desktop-agent-activity-render-fallback").length;
+  const mountedRows = document.querySelectorAll(".desktop-agent-virtual-row").length;
+  const previewLengths = Array.from(document.querySelectorAll<HTMLElement>(".desktop-agent-tool-text-evidence pre"))
+    .map((node) => node.textContent?.length ?? 0);
+  const searchRows = Array.from(document.querySelectorAll(".desktop-agent-search-results"))
+    .map((node) => node.querySelectorAll(":scope > span, :scope > button").length);
+  const sentinelVisible = document.querySelector('.desktop-agent-virtual-row[data-kind="assistant"]') !== null;
+  const maxPreviewChars = Math.max(0, ...previewLengths);
+  const maxSearchRows = Math.max(0, ...searchRows);
+  const passed = fallbackCount === 1
+    && sentinelVisible
+    && mountedRows <= agentTimelineLimits.maxMountedRows
+    && previewLengths.length >= 3
+    && maxPreviewChars <= agentToolEvidenceLimits.maxChars + 256
+    && searchRows.length === 1
+    && maxSearchRows <= 80;
+  return {
+    passed,
+    durationMs,
+    fallbackCount,
+    mountedRows,
+    maxPreviewChars,
+    maxSearchRows,
+    previewCount: previewLengths.length,
+    searchContainerCount: searchRows.length,
+    sentinelVisible,
+    ...(passed ? {} : { error: "Agent tool stability DOM contract failed." }),
+  };
+}
+
+function createSmokeProjection() {
+  const projection = createAgentProjection();
+  projection.sessionState = "active";
+  projection.activities = [
+    activity("many-lines", "command", "bash", Array.from({ length: 12_000 }, (_, index) => `line-${index}`).join("\n"), {
+      command: "generate-many-lines",
+    }),
+    activity("long-line", "tool", "read", "x".repeat(64 * 1024), { path: "large-generated.txt" }),
+    activity("search", "tool", "grep", Array.from({ length: 2_000 }, (_, index) => `src/file-${index}.ts:${index + 1}:match`).join("\n"), {
+      pattern: "match",
+    }),
+    activity("nested", "tool", "webfetch", "request complete", {
+      request: Object.fromEntries(Array.from({ length: 200 }, (_, index) => [`field-${index}`, "x".repeat(4_096)])),
+    }),
+    activity("crash", "tool", smokeToolId, "ignored", {}),
+  ];
+  projection.messages = [{
+    id: "assistant-sentinel",
+    role: "assistant",
+    turnId: "turn-smoke",
+    itemId: null,
+    text: "TOOL_STABILITY_SENTINEL",
+    streaming: false,
+    terminalState: "completed",
+    sequence: 100,
+  }];
+  return projection;
+}
+
+function activity(
+  id: string,
+  kind: "command" | "tool",
+  tool: string,
+  output: string,
+  input: Record<string, unknown>,
+) {
+  return {
+    id: `activity:${id}`,
+    turnId: "turn-smoke",
+    itemId: id,
+    kind,
+    label: id,
+    status: "completed" as const,
+    detail: { tool, input },
+    output,
+    sequence: ["many-lines", "long-line", "search", "nested", "crash"].indexOf(id) + 1,
+  };
+}
+
+function frames(count: number): Promise<void> {
+  if (count <= 0) return Promise.resolve();
+  return new Promise((resolve) => requestAnimationFrame(() => void frames(count - 1).then(resolve)));
+}
+
+function publish(result: SmokeResult) {
+  (window as typeof window & { __PUPPYONE_AGENT_TOOL_STABILITY_SMOKE_RESULT__?: SmokeResult })
+    .__PUPPYONE_AGENT_TOOL_STABILITY_SMOKE_RESULT__ = result;
+}

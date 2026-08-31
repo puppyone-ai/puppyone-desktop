@@ -3,6 +3,7 @@ import { useLocalization } from "@puppyone/localization/react";
 import { commandMetadata, formatAgentDuration, outputForActivity } from "../../domain/agent-activity-presentation";
 import type { AgentActivity } from "../../domain/agent-projection-types";
 import { AgentActivityShell } from "./AgentActivityShell";
+import { AgentToolTextEvidence } from "./AgentToolTextEvidence";
 
 export function AgentReasoningActivity({ activity }: { activity: AgentActivity }) {
   const { t, formatNumber } = useLocalization();
@@ -19,9 +20,7 @@ export function AgentReasoningActivity({ activity }: { activity: AgentActivity }
       className="desktop-agent-reasoning"
     >
       {reasoning && (
-        <div className="desktop-agent-reasoning-copy" data-po-scrollbar="content">
-          {reasoning}
-        </div>
+        <AgentToolTextEvidence text={reasoning} className="desktop-agent-reasoning-copy" />
       )}
     </AgentActivityShell>
   );

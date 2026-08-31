@@ -288,9 +288,20 @@ function MeasuredRow({ rowId, kind, top, animate, onMeasure, children }: {
     if (!element) return undefined;
     const commit = () => onMeasure(rowId, element.getBoundingClientRect().height);
     commit();
-    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(commit) : null;
+    let frame: number | null = null;
+    const schedule = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        commit();
+      });
+    };
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(schedule) : null;
     observer?.observe(element);
-    return () => observer?.disconnect();
+    return () => {
+      observer?.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
   }, [onMeasure, rowId]);
   return <div
     ref={ref}
