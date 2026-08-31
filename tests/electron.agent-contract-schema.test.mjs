@@ -43,6 +43,49 @@ describe("shared Agent contract", () => {
       attachments: [{ path: "/workspace/a.md", name: "a.md" }],
       promptMentions: [{ referenceId: "ref-a", start: 2, end: 7 }],
     });
+    expect(parseAgentIpcRequest("agent:turn-start", {
+      rootPath: "/workspace",
+      sessionId: "session-1",
+      prompt: "Review @docs/a.md",
+      references: [{
+        id: "ref-a",
+        kind: "workspace-entry",
+        entryType: "file",
+        path: "/private/renderer-path-must-not-cross",
+        relativePath: "docs/a.md",
+        displayName: "a.md",
+        mime: "text/markdown",
+        size: 4,
+        status: "ready",
+      }],
+    })).toEqual({
+      rootPath: "/workspace",
+      sessionId: "session-1",
+      prompt: "Review @docs/a.md",
+      references: [{
+        id: "ref-a",
+        kind: "workspace-entry",
+        entryType: "file",
+        relativePath: "docs/a.md",
+        displayName: "a.md",
+        mime: "text/markdown",
+        size: 4,
+        status: "ready",
+      }],
+    });
+    expect(() => parseAgentIpcRequest("agent:turn-start", {
+      rootPath: "/workspace",
+      sessionId: "session-1",
+      prompt: "Review",
+      references: [{
+        id: "ref-a",
+        kind: "workspace-entry",
+        entryType: "file",
+        relativePath: "../private/a.md",
+        displayName: "a.md",
+        status: "ready",
+      }],
+    })).toThrow(/workspace-relative/i);
     expect(() => parseAgentIpcRequest("agent:approval-resolve", {
       rootPath: "/workspace",
       sessionId: "s",

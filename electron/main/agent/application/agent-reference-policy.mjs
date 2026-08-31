@@ -1,5 +1,6 @@
 import {
   normalizeAuthorizedReferences,
+  bindPromptReferenceMentionDelivery,
   compileAgentPromptReferenceMentions,
   normalizePrompt,
   normalizePromptReferenceMentions,
@@ -8,16 +9,17 @@ import {
 } from "./agent-input-policy.mjs";
 
 export function prepareAgentTurnReferenceInput(request, capabilities, deliveryForReference) {
-  const references = normalizeAuthorizedReferences([
+  const authorizedReferences = normalizeAuthorizedReferences([
     ...(Array.isArray(request?.references) ? request.references : []),
     ...(Array.isArray(request?.contextReferences) ? request.contextReferences : []),
     ...(Array.isArray(request?.attachments) ? request.attachments : []),
   ]);
-  requireSupportedAgentReferences(capabilities, references);
+  requireSupportedAgentReferences(capabilities, authorizedReferences);
   const displayPrompt = normalizePrompt(request?.prompt, {
-    allowEmpty: references.length > 0 && capabilities?.referenceInputs?.attachmentOnly === true,
+    allowEmpty: authorizedReferences.length > 0 && capabilities?.referenceInputs?.attachmentOnly === true,
   });
-  const promptMentions = normalizePromptReferenceMentions(request?.promptMentions, displayPrompt, references, deliveryForReference);
+  const promptMentions = normalizePromptReferenceMentions(request?.promptMentions, displayPrompt, authorizedReferences);
+  const references = bindPromptReferenceMentionDelivery(authorizedReferences, promptMentions, deliveryForReference);
   return {
     references,
     referenceDisplays: normalizeReferenceDisplays(references),
@@ -55,15 +57,16 @@ export function abandonAgentTurnReferences(session) {
 }
 
 export function prepareAgentSteerReferenceInput(request, capabilities, deliveryForReference) {
-  const references = normalizeAuthorizedReferences(request?.references);
-  if (references.length > 0 && capabilities?.referenceInputs?.steer !== true) {
+  const authorizedReferences = normalizeAuthorizedReferences(request?.references);
+  if (authorizedReferences.length > 0 && capabilities?.referenceInputs?.steer !== true) {
     throw new Error("The active Agent runtime does not support references while steering.");
   }
-  requireSupportedAgentReferences(capabilities, references);
+  requireSupportedAgentReferences(capabilities, authorizedReferences);
   const displayMessage = normalizePrompt(request?.message, {
-    allowEmpty: references.length > 0 && capabilities?.referenceInputs?.attachmentOnly === true,
+    allowEmpty: authorizedReferences.length > 0 && capabilities?.referenceInputs?.attachmentOnly === true,
   });
-  const promptMentions = normalizePromptReferenceMentions(request?.promptMentions, displayMessage, references, deliveryForReference);
+  const promptMentions = normalizePromptReferenceMentions(request?.promptMentions, displayMessage, authorizedReferences);
+  const references = bindPromptReferenceMentionDelivery(authorizedReferences, promptMentions, deliveryForReference);
   return {
     references,
     promptMentions,

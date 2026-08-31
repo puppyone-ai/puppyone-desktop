@@ -27,6 +27,7 @@ type AgentReferenceDraftManagerOptions = {
 /** Owns draft reference acquisition, validation, retry material and grant release. */
 export class AgentReferenceDraftManager {
   private retryFiles = new Map<string, File>();
+  private retryWorkspacePaths = new Map<string, string>();
   private readonly previews = new AgentReferencePreviewStore();
   private epoch = createReferenceEpoch();
 
@@ -68,6 +69,7 @@ export class AgentReferenceDraftManager {
         return references.map((reference) => this.withCapabilityStatus(reference));
       } catch (error) {
         const reference = workspaceReferenceError(path, error);
+        this.retryWorkspacePaths.set(reference.id, path);
         this.previews.set(reference.id, visualPreviews.get(path));
         return [reference];
       }
@@ -172,6 +174,7 @@ export class AgentReferenceDraftManager {
     const reference = state.references.find((entry) => entry.id === id);
     if (!reference) return;
     this.retryFiles.delete(id);
+    this.retryWorkspacePaths.delete(id);
     this.options.patch({ references: state.references.filter((entry) => entry.id !== id) });
     void this.revoke([reference]);
   }
@@ -181,12 +184,14 @@ export class AgentReferenceDraftManager {
     const reference = state.references.find((entry) => entry.id === id);
     if (!reference || reference.status !== "error") return;
     const file = this.retryFiles.get(id);
+    const workspacePath = this.retryWorkspacePaths.get(id);
     this.retryFiles.delete(id);
+    this.retryWorkspacePaths.delete(id);
     this.options.patch({ references: state.references.filter((entry) => entry.id !== id) });
     void (async () => {
       await this.revoke([reference]);
       if (file) await this.stageExternalFiles([file]);
-      else if (reference.kind === "workspace-entry") await this.addWorkspacePaths([reference.path]);
+      else if (reference.kind === "workspace-entry") await this.addWorkspacePaths([workspacePath ?? reference.relativePath]);
     })();
   }
 
@@ -224,6 +229,7 @@ export class AgentReferenceDraftManager {
   async rotate(references: AgentDraftReference[]) {
     await this.revoke(references);
     this.retryFiles.clear();
+    this.retryWorkspacePaths.clear();
     this.previews.clear();
     this.epoch = createReferenceEpoch();
   }
@@ -239,6 +245,7 @@ export class AgentReferenceDraftManager {
 
   disposeRendererResources() {
     this.retryFiles.clear();
+    this.retryWorkspacePaths.clear();
     this.previews.clear();
   }
 
@@ -292,7 +299,6 @@ function workspaceReferenceError(referencePath: string, error: unknown): AgentDr
     id: `error-${createReferenceEpoch()}`,
     kind: "workspace-entry",
     entryType: "file",
-    path: referencePath.slice(0, 4_096),
     relativePath: displayName,
     displayName,
     status: "error",

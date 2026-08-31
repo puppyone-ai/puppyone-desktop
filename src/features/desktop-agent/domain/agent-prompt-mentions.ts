@@ -3,14 +3,15 @@ import type {
   AgentPromptReferenceMention,
   AgentReferenceDisplay,
 } from "./agent-contract";
+import { agentReferenceMentionText } from "../../../../shared/agent-contract/reference-identity.mjs";
 
 /** Images are native media inputs. Every other reference is an inline path mention. */
 export function isAgentMediaReference(reference: Pick<AgentDraftReference | AgentReferenceDisplay, "mime">) {
   return reference.mime?.startsWith("image/") === true;
 }
 
-export function agentPromptMentionText(reference: Pick<AgentDraftReference, "displayName">) {
-  return `@${reference.displayName.replace(/[\r\n\t]/g, " ").trim() || "file"}`;
+export function agentPromptMentionText(reference: AgentDraftReference) {
+  return agentReferenceMentionText(reference);
 }
 
 export function normalizeAgentPromptMentions(

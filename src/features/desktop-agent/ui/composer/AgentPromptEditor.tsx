@@ -30,7 +30,12 @@ type AgentPromptEditorProps = {
   onSubmit: () => void;
 };
 
-const replaceMentionDecorations = StateEffect.define<AgentPromptReferenceMention[]>();
+type AgentPromptReferenceDecoration = AgentPromptReferenceMention & {
+  title: string;
+  referenceKind: AgentDraftReference["kind"];
+};
+
+const replaceMentionDecorations = StateEffect.define<AgentPromptReferenceDecoration[]>();
 const mentionDecorations = StateField.define<DecorationSet>({
   create: () => Decoration.none,
   update(value, transaction) {
@@ -39,7 +44,11 @@ const mentionDecorations = StateField.define<DecorationSet>({
       if (!effect.is(replaceMentionDecorations)) continue;
       next = Decoration.set(effect.value.map((mention) => Decoration.mark({
         class: "desktop-agent-prompt-mention",
-        attributes: { "data-reference-id": mention.referenceId },
+        attributes: {
+          "data-reference-id": mention.referenceId,
+          "data-reference-kind": mention.referenceKind,
+          title: mention.title,
+        },
       }).range(mention.start, mention.end)), true);
     }
     return next;
@@ -137,7 +146,7 @@ export function AgentPromptEditor({
     });
     const view = new EditorView({ state, parent: host });
     viewRef.current = view;
-    view.dispatch({ effects: replaceMentionDecorations.of(normalizeAgentPromptMentions(value, mentions)) });
+    view.dispatch({ effects: replaceMentionDecorations.of(referenceDecorations(value, mentions, references)) });
     return () => {
       viewRef.current = null;
       view.destroy();
@@ -151,12 +160,15 @@ export function AgentPromptEditor({
     if (!view) return;
     const current = view.state.doc.toString();
     const normalized = normalizeAgentPromptMentions(value, mentions);
-    if (current === value && sameMentions(readMentions(view.state), normalized)) return;
+    if (current === value && sameMentions(readMentions(view.state), normalized)) {
+      view.dispatch({ effects: replaceMentionDecorations.of(referenceDecorations(value, normalized, references)) });
+      return;
+    }
     view.dispatch({
       ...(current === value ? {} : { changes: { from: 0, to: current.length, insert: value } }),
-      effects: replaceMentionDecorations.of(normalized),
+      effects: replaceMentionDecorations.of(referenceDecorations(value, normalized, references)),
     });
-  }, [mentions, value]);
+  }, [mentions, references, value]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -205,12 +217,33 @@ export function AgentPromptEditor({
     view.dispatch({
       changes: { from: position, insert: inserted },
       selection: { anchor: position + inserted.length },
-      effects: replaceMentionDecorations.of([...mapped, ...added].sort((left, right) => left.start - right.start)),
+      effects: replaceMentionDecorations.of(referenceDecorations(
+        transaction.state.doc.toString(),
+        [...mapped, ...added].sort((left, right) => left.start - right.start),
+        references,
+      )),
     });
     view.focus();
   }, [disabled, references]);
 
   return <div ref={hostRef} className="desktop-agent-prompt-editor" dir="auto" />;
+}
+
+function referenceDecorations(
+  prompt: string,
+  mentions: readonly AgentPromptReferenceMention[],
+  references: readonly AgentDraftReference[],
+): AgentPromptReferenceDecoration[] {
+  const byId = new Map(references.map((reference) => [reference.id, reference]));
+  return normalizeAgentPromptMentions(prompt, mentions, new Set(byId.keys())).flatMap((mention) => {
+    const reference = byId.get(mention.referenceId);
+    if (!reference) return [];
+    return [{
+      ...mention,
+      title: reference.kind === "workspace-entry" ? reference.relativePath : reference.displayName,
+      referenceKind: reference.kind,
+    }];
+  });
 }
 
 function readMentions(state: EditorState) {

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { normalizeAgentWorkspaceRelativePath } from "../../../shared/agent-contract/reference-identity.mjs";
 
 const MAX_REFERENCES = 32;
 const MAX_REFERENCE_BYTES = 25 * 1024 * 1024;
@@ -23,7 +24,13 @@ export async function authorizeAgentReferences({
   const seen = new Set();
 
   for (const reference of references.slice(0, MAX_REFERENCES)) {
-    const requestedPath = typeof reference === "string" ? reference : reference?.path;
+    const portablePath = typeof reference === "object" && reference !== null && "relativePath" in reference
+      ? normalizeAgentWorkspaceRelativePath(reference.relativePath)
+      : null;
+    if (typeof reference === "object" && reference !== null && "relativePath" in reference && !portablePath) {
+      throw new Error("Agent workspace references require a valid workspace-relative identity.");
+    }
+    const requestedPath = typeof reference === "string" ? reference : portablePath ?? reference?.path;
     if (typeof requestedPath !== "string" || requestedPath.trim().length === 0) {
       throw new Error("Agent workspace references require a valid path.");
     }
@@ -68,15 +75,15 @@ export async function authorizeAgentReferences({
     budget.remainingReferences -= 1;
     seen.add(canonicalPath);
     const requestPath = path.relative(canonicalRoot, canonicalPath) || ".";
-    const relativePath = safeRelativePath(requestPath);
+    const relativePath = normalizeAgentWorkspaceRelativePath(requestPath);
+    if (!relativePath) throw new Error("Agent workspace reference identity could not be normalized.");
     const name = safeDisplayName(reference?.displayName || reference?.name || path.basename(canonicalPath) || path.basename(canonicalRoot));
     authorized.push({
       authorized: true,
-      id: workspaceReferenceId(canonicalPath, entryType),
+      id: workspaceReferenceId(relativePath, entryType),
       kind: "workspace-entry",
       entryType,
       path: canonicalPath,
-      requestPath,
       relativePath,
       displayName: name,
       name,
@@ -94,7 +101,6 @@ export function workspaceDraftReferences(references) {
     id: reference.id,
     kind: "workspace-entry",
     entryType: reference.entryType,
-    path: reference.requestPath,
     relativePath: reference.relativePath,
     displayName: reference.displayName,
     mime: reference.mime,
@@ -134,16 +140,12 @@ function inferMimeType(filePath) {
   return MIME_BY_EXTENSION.get(extension) || "application/octet-stream";
 }
 
-function workspaceReferenceId(filePath, entryType) {
-  return `workspace-${createHash("sha256").update(entryType).update("\0").update(filePath).digest("base64url").slice(0, 32)}`;
+function workspaceReferenceId(relativePath, entryType) {
+  return `workspace-${createHash("sha256").update(entryType).update("\0").update(relativePath).digest("base64url").slice(0, 32)}`;
 }
 
 function safeDisplayName(value) {
   return String(value || "workspace item").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 512) || "workspace item";
-}
-
-function safeRelativePath(value) {
-  return String(value || ".").replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 4_096) || ".";
 }
 
 const MIME_BY_EXTENSION = new Map([

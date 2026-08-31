@@ -57,7 +57,6 @@ const smokeReferences: AgentDraftReference[] = [
     id: "workspace-security",
     kind: "workspace-entry",
     entryType: "file",
-    path: "SECURITY.md",
     relativePath: "SECURITY.md",
     displayName: "SECURITY.md",
     mime: "text/markdown",

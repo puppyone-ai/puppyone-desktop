@@ -6,6 +6,7 @@ import {
   authorizeAgentReferences,
   agentReferenceLimits,
   createAgentReferenceBudget,
+  workspaceDraftReferences,
 } from "../electron/main/agent/agent-reference-authorization.mjs";
 
 const temporaryRoots = [];
@@ -58,6 +59,53 @@ describe("Agent attachment and context authorization", () => {
       relativePath: "src",
       size: 0,
     })]);
+  });
+
+  it("keeps workspace identity portable across session roots and withholds absolute paths from Renderer drafts", async () => {
+    const firstRoot = await temporaryRoot();
+    const secondRoot = await temporaryRoot();
+    await Promise.all([
+      fs.promises.mkdir(path.join(firstRoot, "docs")),
+      fs.promises.mkdir(path.join(secondRoot, "docs")),
+    ]);
+    await Promise.all([
+      fs.promises.writeFile(path.join(firstRoot, "docs", "notes.md"), "first"),
+      fs.promises.writeFile(path.join(secondRoot, "docs", "notes.md"), "second"),
+    ]);
+
+    const [first] = await authorizeAgentReferences({
+      workspaceRoot: firstRoot,
+      references: [{ relativePath: "docs/notes.md", entryType: "file" }],
+    });
+    const [second] = await authorizeAgentReferences({
+      workspaceRoot: secondRoot,
+      references: [{ relativePath: "docs/notes.md", entryType: "file" }],
+    });
+
+    expect(first.id).toBe(second.id);
+    expect(first.path).not.toBe(second.path);
+    expect(workspaceDraftReferences([first])).toEqual([expect.objectContaining({
+      id: first.id,
+      relativePath: "docs/notes.md",
+      displayName: "notes.md",
+    })]);
+    expect(workspaceDraftReferences([first])[0]).not.toHaveProperty("path");
+  });
+
+  it("rejects forged absolute and traversal identities before filesystem authorization", async () => {
+    const root = await temporaryRoot();
+    await expect(authorizeAgentReferences({
+      workspaceRoot: root,
+      references: [{ relativePath: "../outside.md", entryType: "file" }],
+    })).rejects.toThrow(/workspace-relative identity/i);
+    await expect(authorizeAgentReferences({
+      workspaceRoot: root,
+      references: [{ relativePath: "/private/outside.md", entryType: "file" }],
+    })).rejects.toThrow(/workspace-relative identity/i);
+    await expect(authorizeAgentReferences({
+      workspaceRoot: root,
+      references: [{ relativePath: "C:private\\outside.md", entryType: "file" }],
+    })).rejects.toThrow(/workspace-relative identity/i);
   });
 
   it("shares one byte and file-count budget across attachments and context", async () => {

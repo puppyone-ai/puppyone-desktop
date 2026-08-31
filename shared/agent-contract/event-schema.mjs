@@ -9,6 +9,7 @@ import {
   positiveInteger,
   requiredString,
 } from "./validation.mjs";
+import { normalizeAgentWorkspaceRelativePath } from "./reference-identity.mjs";
 
 const EVENT_TYPE_SET = new Set(AGENT_EVENT_TYPES);
 
@@ -75,7 +76,7 @@ function assertReferenceDisplays(value) {
     requiredString(reference.displayName, `${label}.displayName`, 512);
     if (reference.relativePath !== undefined) {
       const relativePath = requiredString(reference.relativePath, `${label}.relativePath`, 4_096);
-      if (/^(?:[/\\]|[A-Za-z]:[/\\])/.test(relativePath) || relativePath.split(/[/\\]/).includes("..")) {
+      if (!normalizeAgentWorkspaceRelativePath(relativePath)) {
         throw contractError(`${label}.relativePath`, "must remain workspace-relative");
       }
     }

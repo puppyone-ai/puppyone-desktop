@@ -23,6 +23,7 @@ import {
   requiredOpaqueId,
   requiredString,
 } from "./validation.mjs";
+import { normalizeAgentWorkspaceRelativePath } from "./reference-identity.mjs";
 
 export * from "./constants.mjs";
 export * from "./event-schema.mjs";
@@ -340,11 +341,12 @@ function sanitizeDraftReference(value, label, requireReady) {
     status,
   };
   if (kind === "workspace-entry") {
+    const relativePath = normalizeAgentWorkspaceRelativePath(reference.relativePath);
+    if (!relativePath) throw contractError(`${label}.relativePath`, "must remain workspace-relative");
     return {
       ...base,
       entryType: enumValue(reference.entryType, `${label}.entryType`, ["file", "directory"]),
-      path: requiredString(reference.path, `${label}.path`, MAX_PATH_LENGTH),
-      relativePath: requiredString(reference.relativePath, `${label}.relativePath`, MAX_PATH_LENGTH),
+      relativePath,
       ...(reference.mime === undefined ? {} : { mime: requiredString(reference.mime, `${label}.mime`, 160) }),
       ...(reference.size === undefined ? {} : { size: nonNegativeInteger(reference.size, `${label}.size`) }),
     };

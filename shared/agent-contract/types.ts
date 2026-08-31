@@ -487,7 +487,7 @@ export type AgentWorkspaceEntryReference = {
   id: string;
   kind: "workspace-entry";
   entryType: "file" | "directory";
-  path: string;
+  /** Portable identity resolved against the owning Agent session at send time. */
   relativePath: string;
   displayName: string;
   mime?: string;

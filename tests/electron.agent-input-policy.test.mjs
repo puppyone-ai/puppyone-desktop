@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bindPromptReferenceMentionDelivery,
   compileAgentPromptReferenceMentions,
   normalizePromptReferenceMentions,
   requireSupportedAgentReferences,
@@ -63,32 +64,37 @@ describe("Agent semantic reference admission policy", () => {
     const prompt = "Review @notes.md and summarize it.";
     const mentions = normalizePromptReferenceMentions([
       { referenceId: "ref-notes", start: 7, end: 16 },
-    ], prompt, references, () => "path");
+    ], prompt, references);
+    const deliveredReferences = bindPromptReferenceMentionDelivery(references, mentions, () => "path");
 
-    expect(compileAgentPromptReferenceMentions(prompt, mentions, references))
+    expect(compileAgentPromptReferenceMentions(prompt, mentions, deliveredReferences))
       .toBe("Review `/private/snapshots/a.snapshot` and summarize it.");
-    expect(references[0].inlineMentioned).toBe(true);
+    expect(deliveredReferences[0]).toMatchObject({ inlineMentioned: true, mentionDelivery: "path" });
+    expect(references[0]).not.toHaveProperty("inlineMentioned");
   });
 
   it("keeps the display mention in prompt text when the Harness negotiated a resource block", () => {
     const references = [{
       id: "ref-resource",
       kind: "workspace-entry",
-      path: "/workspace/notes.md",
+      path: "/workspace/docs/notes.md",
+      relativePath: "docs/notes.md",
       displayName: "notes.md",
       mime: "text/markdown",
     }];
-    const prompt = "Review @notes.md";
+    const prompt = "Review @docs/notes.md";
     const mentions = normalizePromptReferenceMentions([
-      { referenceId: "ref-resource", start: 7, end: 16 },
-    ], prompt, references, () => "resource");
+      { referenceId: "ref-resource", start: 7, end: 21 },
+    ], prompt, references);
+    const deliveredReferences = bindPromptReferenceMentionDelivery(references, mentions, () => "resource");
 
-    expect(compileAgentPromptReferenceMentions(prompt, mentions, references)).toBe(prompt);
-    expect(references[0]).toMatchObject({ inlineMentioned: true, mentionDelivery: "resource" });
+    expect(compileAgentPromptReferenceMentions(prompt, mentions, deliveredReferences)).toBe(prompt);
+    expect(deliveredReferences[0]).toMatchObject({ inlineMentioned: true, mentionDelivery: "resource" });
+    expect(references[0]).not.toHaveProperty("inlineMentioned");
   });
 
   it("rejects forged, overlapping, missing and image mention ranges", () => {
-    const file = { id: "ref-a", path: "/workspace/a.md", displayName: "a.md", mime: "text/markdown" };
+    const file = { id: "ref-a", kind: "workspace-entry", path: "/workspace/a.md", relativePath: "a.md", displayName: "a.md", mime: "text/markdown" };
     expect(() => normalizePromptReferenceMentions([
       { referenceId: "ref-a", start: 0, end: 5 },
     ], "@other.md", [file])).toThrow(/does not match/i);

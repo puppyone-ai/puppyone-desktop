@@ -6,6 +6,10 @@ import {
   AGENT_REFERENCE_ERROR_CODES,
   agentReferenceError,
 } from "../domain/agent-reference-error.mjs";
+import {
+  agentReferenceMentionText,
+  normalizeAgentWorkspaceRelativePath,
+} from "../../../../shared/agent-contract/reference-identity.mjs";
 
 const MAX_REFERENCE_SNAPSHOT_URL_LENGTH = Math.ceil(512 * 1024 * 4 / 3) + 256;
 
@@ -112,6 +116,12 @@ export function normalizeAuthorizedReferences(value) {
     }
     const kind = entry.kind;
     const entryType = entry.entryType === "directory" ? "directory" : "file";
+    const relativePath = kind === "workspace-entry"
+      ? normalizeAgentWorkspaceRelativePath(entry.relativePath)
+      : null;
+    if (kind === "workspace-entry" && !relativePath) {
+      throw new Error("Agent workspace reference identity is invalid.");
+    }
     return {
       authorized: true,
       id: normalizeReferenceId(entry.id, entry.path),
@@ -120,8 +130,8 @@ export function normalizeAuthorizedReferences(value) {
       path: entry.path,
       name: normalizeReferenceDisplayName(entry.name ?? entry.displayName),
       displayName: normalizeReferenceDisplayName(entry.displayName ?? entry.name) || "reference",
-      ...(kind === "workspace-entry" && typeof entry.relativePath === "string"
-        ? { relativePath: entry.relativePath.slice(0, 4_096) }
+      ...(kind === "workspace-entry"
+        ? { relativePath }
         : {}),
       mime: normalizeOptionalString(entry.mime),
       size: Number.isSafeInteger(entry.size) && entry.size >= 0 ? entry.size : 0,
@@ -130,7 +140,7 @@ export function normalizeAuthorizedReferences(value) {
   });
 }
 
-export function normalizePromptReferenceMentions(value, prompt, references, deliveryForReference = () => "resource") {
+export function normalizePromptReferenceMentions(value, prompt, references) {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value) || value.length > 32) throw new Error("Agent prompt reference mentions are invalid.");
   const byId = new Map(references.map((reference) => [reference.id, reference]));
@@ -144,13 +154,27 @@ export function normalizePromptReferenceMentions(value, prompt, references, deli
     const start = Number.isSafeInteger(entry.start) ? entry.start : -1;
     const end = Number.isSafeInteger(entry.end) ? entry.end : -1;
     if (start < boundary || end <= start || end > prompt.length) throw new Error("Agent prompt reference mention range is invalid.");
-    const expected = `@${reference.displayName.replace(/[\r\n\t]/g, " ").trim() || "file"}`;
+    const expected = agentReferenceMentionText(reference);
     if (prompt.slice(start, end) !== expected) throw new Error("Agent prompt reference mention text does not match its authorized reference.");
     boundary = end;
-    reference.inlineMentioned = true;
-    reference.mentionDelivery = deliveryForReference(reference) === "path" ? "path" : "resource";
     return { referenceId, start, end };
   });
+}
+
+/** Bind protocol delivery metadata without mutating main-authorized records. */
+export function bindPromptReferenceMentionDelivery(
+  references,
+  mentions,
+  deliveryForReference = () => "resource",
+) {
+  const mentionedIds = new Set(mentions.map((mention) => mention.referenceId));
+  return references.map((reference) => mentionedIds.has(reference.id)
+    ? {
+        ...reference,
+        inlineMentioned: true,
+        mentionDelivery: deliveryForReference(reference) === "path" ? "path" : "resource",
+      }
+    : reference);
 }
 
 export function compileAgentPromptReferenceMentions(prompt, mentions, references) {

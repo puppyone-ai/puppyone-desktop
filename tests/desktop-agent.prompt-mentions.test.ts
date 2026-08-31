@@ -33,6 +33,26 @@ describe("Desktop Agent structured prompt mentions", () => {
   });
 
   it("sanitizes control characters while preserving human-readable file names", () => {
-    expect(agentPromptMentionText({ displayName: "release\nnotes.md" })).toBe("@release notes.md");
+    expect(agentPromptMentionText({
+      id: "external-notes",
+      kind: "staged-attachment",
+      displayName: "release\nnotes.md",
+      mime: "text/markdown",
+      size: 1,
+      status: "ready",
+    })).toBe("@release notes.md");
+  });
+
+  it("uses the portable workspace-relative identity so same-name files stay distinguishable", () => {
+    expect(agentPromptMentionText({
+      id: "workspace-guides-notes",
+      kind: "workspace-entry",
+      entryType: "file",
+      relativePath: "docs/guides/notes.md",
+      displayName: "notes.md",
+      mime: "text/markdown",
+      size: 1,
+      status: "ready",
+    })).toBe("@docs/guides/notes.md");
   });
 });

@@ -833,7 +833,6 @@ function bridgeFixture(
       id: `workspace-${index}-${referencePath.replace(/[^A-Za-z0-9]/g, "-")}`,
       kind: "workspace-entry",
       entryType: referencePath === "src" ? "directory" : "file",
-      path: referencePath,
       relativePath: referencePath,
       displayName: referencePath.split("/").at(-1) || referencePath,
       mime: "text/markdown",

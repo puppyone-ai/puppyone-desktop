@@ -27,7 +27,11 @@ export function AgentMessagePart({ part, runtimeLabel }: AgentMessagePartProps) 
         ? <SafeMarkdown text={part.text || (part.streaming ? "…" : "")} streaming={part.streaming} />
         : <>
             <AgentReferenceDisplayList references={(part.references ?? []).filter((reference) => reference.mime?.startsWith("image/") === true)} />
-            {part.text && <AgentPromptInlineContent text={part.text} mentions={part.promptMentions} />}
+            {part.text && <AgentPromptInlineContent
+              text={part.text}
+              mentions={part.promptMentions}
+              references={part.references}
+            />}
           </>}
       {isAssistant && part.terminalState && part.terminalState !== "completed" && (
         <footer className="desktop-agent-message-status">

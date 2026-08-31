@@ -218,7 +218,6 @@ describe("Desktop Agent reference ingestion", () => {
         id: "failed-ref",
         kind: "workspace-entry",
         entryType: "file",
-        path: "missing.md",
         relativePath: "missing.md",
         displayName: "missing.md",
         status: "error",
@@ -281,8 +280,7 @@ describe("Desktop Agent reference ingestion", () => {
           id: "markdown-ref",
           kind: "workspace-entry",
           entryType: "file",
-          path: "SECURITY.md",
-          relativePath: "SECURITY.md",
+          relativePath: "docs/SECURITY.md",
           displayName: "SECURITY.md",
           mime: "text/markdown",
           size: 12,
@@ -318,9 +316,11 @@ describe("Desktop Agent reference ingestion", () => {
     const modelTrigger = modelPicker.querySelector<HTMLButtonElement>('[aria-label="Agent model"]')!;
     const effortTrigger = effortPicker.querySelector<HTMLButtonElement>('[aria-label="Reasoning effort"]')!;
     const remove = imageCard.querySelector<HTMLButtonElement>(".desktop-agent-reference-card-actions button:last-child")!;
-    await vi.waitFor(() => expect(composer.querySelector(".desktop-agent-prompt-mention")?.textContent).toContain("@SECURITY.md"));
+    await vi.waitFor(() => expect(composer.querySelector(".desktop-agent-prompt-mention")?.textContent).toContain("@docs/SECURITY.md"));
+    expect(composer.querySelector(".desktop-agent-prompt-mention")?.getAttribute("title")).toBe("docs/SECURITY.md");
+    expect(composer.querySelector(".desktop-agent-prompt-mention")?.getAttribute("data-reference-kind")).toBe("workspace-entry");
     expect(onDraftDocumentChange).toHaveBeenCalledWith(
-      expect.stringContaining("@SECURITY.md"),
+      expect.stringContaining("@docs/SECURITY.md"),
       [expect.objectContaining({ referenceId: "markdown-ref", start: expect.any(Number), end: expect.any(Number) })],
     );
     expect(onDraftDocumentChange.mock.calls.some(([, mentions]) => (
@@ -427,7 +427,6 @@ function StructuredMentionHarness({ onRemove }: { onRemove: (id: string) => void
     id: "ref-notes",
     kind: "workspace-entry",
     entryType: "file",
-    path: "notes.md",
     relativePath: "notes.md",
     displayName: "notes.md",
     mime: "text/markdown",
