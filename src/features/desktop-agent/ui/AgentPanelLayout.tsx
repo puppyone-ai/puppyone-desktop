@@ -7,13 +7,8 @@ type AgentPanelLayoutProps = {
   status?: ReactNode;
   conversation: ReactNode;
   dock?: ReactNode;
-  dropActive?: boolean;
-  dropInvalid?: boolean;
-  dropLabel?: string;
   announcement?: string;
-  onDragEnter?: DragEventHandler<HTMLElement>;
   onDragOver?: DragEventHandler<HTMLElement>;
-  onDragLeave?: DragEventHandler<HTMLElement>;
   onDrop?: DragEventHandler<HTMLElement>;
 };
 
@@ -31,13 +26,8 @@ export function AgentPanelLayout({
   status = null,
   conversation,
   dock,
-  dropActive = false,
-  dropInvalid = false,
-  dropLabel = "",
   announcement = "",
-  onDragEnter,
   onDragOver,
-  onDragLeave,
   onDrop,
 }: AgentPanelLayoutProps) {
   return (
@@ -45,11 +35,7 @@ export function AgentPanelLayout({
       className="desktop-agent-boundary"
       aria-label={ariaLabel}
       data-phase={phase}
-      data-drop-active={dropActive ? "true" : "false"}
-      data-drop-valid={dropInvalid ? "false" : "true"}
-      onDragEnter={onDragEnter}
       onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
       <div className="desktop-agent-panel">
@@ -58,7 +44,6 @@ export function AgentPanelLayout({
         <div className="desktop-agent-conversation-region">{conversation}</div>
         {dock != null && <div className="desktop-agent-dock-region">{dock}</div>}
       </div>
-      {dropActive && <div className={`desktop-agent-reference-drop-overlay${dropInvalid ? " is-invalid" : ""}`} aria-hidden="true"><span>{dropLabel}</span></div>}
       {announcement && <div className="desktop-agent-announcer" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>}
     </section>
   );

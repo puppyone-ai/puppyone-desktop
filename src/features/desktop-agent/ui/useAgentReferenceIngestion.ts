@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import type { DragEvent } from "react";
 import {
   classifyReferenceDataTransfer,
@@ -37,9 +37,6 @@ export function useAgentReferenceIngestion({
   resolveWorkspaceReference?: AgentWorkspaceReferenceResolver;
 }) {
   const { t } = useLocalization();
-  const dragDepth = useRef(0);
-  const [dropActive, setDropActive] = useState(false);
-  const [dropInvalid, setDropInvalid] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const announceBatchResult = useCallback((beforeIds: Set<string>, count: number) => {
     const failed = controller.getSnapshot().references
@@ -49,40 +46,19 @@ export function useAgentReferenceIngestion({
       : t("agent.reference.batchResult", { count }));
   }, [controller, t]);
 
-  const onDragEnter = useCallback((event: DragEvent<HTMLElement>) => {
-    if (!hasReferenceDataTransferSource(event.dataTransfer)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    dragDepth.current += 1;
-    setDropActive(true);
-    setDropInvalid(!canIngestDataTransfer(event.dataTransfer, workspaceId, capabilities));
-  }, [capabilities, workspaceId]);
-
   const onDragOver = useCallback((event: DragEvent<HTMLElement>) => {
     if (!hasReferenceDataTransferSource(event.dataTransfer)) return;
     event.preventDefault();
     event.stopPropagation();
-    event.dataTransfer.dropEffect = "copy";
-  }, []);
-
-  const onDragLeave = useCallback((event: DragEvent<HTMLElement>) => {
-    if (!dropActive) return;
-    event.preventDefault();
-    event.stopPropagation();
-    dragDepth.current = Math.max(0, dragDepth.current - 1);
-    if (dragDepth.current === 0) {
-      setDropActive(false);
-      setDropInvalid(false);
-    }
-  }, [dropActive]);
+    event.dataTransfer.dropEffect = canIngestDataTransfer(event.dataTransfer, workspaceId, capabilities)
+      ? "copy"
+      : "none";
+  }, [capabilities, workspaceId]);
 
   const ingestDrop = useCallback((event: AgentReferenceDropEvent) => {
     if (!hasReferenceDataTransferSource(event.dataTransfer)) return;
     event.preventDefault();
     event.stopPropagation();
-    dragDepth.current = 0;
-    setDropActive(false);
-    setDropInvalid(false);
     const beforeIds = new Set(controller.getSnapshot().references.map((reference) => reference.id));
     void ingestDataTransfer(
       event.dataTransfer,
@@ -135,13 +111,8 @@ export function useAgentReferenceIngestion({
   }, [announceBatchResult, controller]);
 
   return {
-    dropActive,
-    dropInvalid,
-    dropLabel: t(dropInvalid ? "agent.reference.dropUnsupported" : "agent.reference.dropLabel"),
     announcement,
-    onDragEnter,
     onDragOver,
-    onDragLeave,
     onDrop,
     onEditorDrop,
     onPaste,

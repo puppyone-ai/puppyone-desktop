@@ -189,10 +189,8 @@ export function AgentChatTabPanel({
 
   return <AgentPanelLayout
     ariaLabel={t("agent.panel.chat", { agent: bidiIsolate(runtimeLabel) })}
-    phase={state.phase} dropActive={referenceIngestion.dropActive} dropInvalid={referenceIngestion.dropInvalid}
-    dropLabel={referenceIngestion.dropLabel} announcement={referenceIngestion.announcement}
-    onDragEnter={referenceIngestion.onDragEnter} onDragOver={referenceIngestion.onDragOver}
-    onDragLeave={referenceIngestion.onDragLeave} onDrop={referenceIngestion.onDrop}
+    phase={state.phase} announcement={referenceIngestion.announcement}
+    onDragOver={referenceIngestion.onDragOver} onDrop={referenceIngestion.onDrop}
     status={hasStatus ? <AgentPanelStatus
       unavailable={unavailable} failed={failed} error={state.error}
       runtimeLabel={runtimeLabel} readiness={readiness ?? undefined}

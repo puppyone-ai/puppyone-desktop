@@ -30,21 +30,17 @@ afterEach(() => {
 });
 
 describe("Desktop Agent reference ingestion", () => {
-  it("uses the whole Chat as a copy drop target without nested drag flicker or automatic submission", async () => {
+  it("uses the whole Chat as a silent drop target without changing UI before release", async () => {
     const controller = controllerFixture();
     const container = render(<IngestionHarness controller={controller} />);
     const boundary = container.querySelector<HTMLElement>(".desktop-agent-boundary")!;
     const transfer = typedWorkspaceTransfer("workspace-1", ["README.md", "src"]);
 
-    act(() => boundary.dispatchEvent(dragEvent("dragenter", transfer)));
-    act(() => boundary.dispatchEvent(dragEvent("dragenter", transfer)));
-    expect(container.querySelector(".desktop-agent-reference-drop-overlay")?.textContent).toContain("Drop files");
-    act(() => boundary.dispatchEvent(dragEvent("dragleave", transfer)));
-    expect(container.querySelector(".desktop-agent-reference-drop-overlay")).not.toBeNull();
-    act(() => boundary.dispatchEvent(dragEvent("dragleave", transfer)));
+    act(() => boundary.dispatchEvent(dragEvent("dragover", transfer)));
+    expect(transfer.dropEffect).toBe("copy");
     expect(container.querySelector(".desktop-agent-reference-drop-overlay")).toBeNull();
-
-    act(() => boundary.dispatchEvent(dragEvent("dragenter", transfer)));
+    expect(boundary.hasAttribute("data-drop-active")).toBe(false);
+    expect(boundary.hasAttribute("data-drop-valid")).toBe(false);
     await act(async () => boundary.dispatchEvent(dragEvent("drop", transfer)));
     await vi.waitFor(() => expect(controller.addWorkspacePaths).toHaveBeenCalledWith(
       ["README.md", "src"],
@@ -59,8 +55,9 @@ describe("Desktop Agent reference ingestion", () => {
     const container = render(<IngestionHarness controller={controller} />);
     const boundary = container.querySelector<HTMLElement>(".desktop-agent-boundary")!;
     const transfer = typedWorkspaceTransfer("another-workspace", ["secret.md"]);
-    act(() => boundary.dispatchEvent(dragEvent("dragenter", transfer)));
-    expect(container.querySelector(".desktop-agent-reference-drop-overlay")?.classList.contains("is-invalid")).toBe(true);
+    act(() => boundary.dispatchEvent(dragEvent("dragover", transfer)));
+    expect(transfer.dropEffect).toBe("none");
+    expect(container.querySelector(".desktop-agent-reference-drop-overlay")).toBeNull();
     await act(async () => boundary.dispatchEvent(dragEvent("drop", transfer)));
     expect(controller.addWorkspacePaths).not.toHaveBeenCalled();
     expect(container.querySelector("[role='status']")?.textContent).toContain("another workspace");
@@ -317,8 +314,11 @@ describe("Desktop Agent reference ingestion", () => {
     const effortTrigger = effortPicker.querySelector<HTMLButtonElement>('[aria-label="Reasoning effort"]')!;
     const remove = imageCard.querySelector<HTMLButtonElement>(".desktop-agent-reference-card-actions button:last-child")!;
     await vi.waitFor(() => expect(composer.querySelector(".desktop-agent-prompt-mention")?.textContent).toContain("@docs/SECURITY.md"));
-    expect(composer.querySelector(".desktop-agent-prompt-mention")?.getAttribute("title")).toBe("docs/SECURITY.md");
-    expect(composer.querySelector(".desktop-agent-prompt-mention")?.getAttribute("data-reference-kind")).toBe("workspace-entry");
+    const mention = composer.querySelector(".desktop-agent-prompt-mention");
+    expect(mention?.getAttribute("title")).toBe("docs/SECURITY.md");
+    expect(mention?.getAttribute("data-reference-kind")).toBe("workspace-entry");
+    expect(mention?.getAttribute("data-atomic")).toBe("true");
+    expect(mention?.getAttribute("contenteditable")).toBe("false");
     expect(onDraftDocumentChange).toHaveBeenCalledWith(
       expect.stringContaining("@docs/SECURITY.md"),
       [expect.objectContaining({ referenceId: "markdown-ref", start: expect.any(Number), end: expect.any(Number) })],
@@ -394,13 +394,8 @@ function IngestionHarness({
   return <AgentPanelLayout
     ariaLabel="Agent Chat"
     conversation={<div>conversation</div>}
-    dropActive={ingestion.dropActive}
-    dropInvalid={ingestion.dropInvalid}
-    dropLabel={ingestion.dropLabel}
     announcement={ingestion.announcement}
-    onDragEnter={ingestion.onDragEnter}
     onDragOver={ingestion.onDragOver}
-    onDragLeave={ingestion.onDragLeave}
     onDrop={ingestion.onDrop}
     dock={withComposer ? <AgentComposer
       draft=""

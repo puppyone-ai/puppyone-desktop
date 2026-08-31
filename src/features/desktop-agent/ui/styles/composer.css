@@ -106,16 +106,17 @@
   background: var(--po-selection, color-mix(in srgb, var(--agent-text) 16%, transparent)) !important;
 }
 .desktop-agent-prompt-mention {
-  display: inline;
-  padding: 1px 4px;
-  border: 1px solid var(--agent-border-subtle);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--agent-accent) 36%, var(--agent-border-subtle));
   border-radius: 4px;
-  background: var(--agent-row-hover-surface);
-  color: var(--agent-text-muted);
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
+  background: color-mix(in srgb, var(--agent-accent-soft) 58%, transparent);
+  color: color-mix(in srgb, var(--agent-accent) 78%, var(--agent-text));
   font-weight: 450;
-  white-space: pre-wrap;
+  line-height: 18px;
+  vertical-align: baseline;
+  white-space: pre;
 }
 .desktop-agent-composer-actions {
   display: flex;

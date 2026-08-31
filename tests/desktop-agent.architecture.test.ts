@@ -25,6 +25,9 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(layout).toContain('className="desktop-agent-panel"');
     expect(layout).toContain('className="desktop-agent-conversation-region"');
     expect(layout).toContain('className="desktop-agent-dock-region"');
+    expect(layout).not.toContain("dropActive");
+    expect(layout).not.toContain("dropInvalid");
+    expect(layout).not.toContain("desktop-agent-reference-drop-overlay");
     expect(controller).not.toMatch(/from ["']react["']|JSX\.|<section/);
     expect(controller).toContain("agentControllerTransitions");
     expect(controller).toContain("prepareSession()");
@@ -108,6 +111,9 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(composer).not.toContain("onMouseDown=");
     expect(composer).not.toContain('querySelector(".cm-content")');
     expect(promptEditor).toContain("EditorView.atomicRanges");
+    expect(promptEditor).toContain("class AgentPromptReferenceWidget extends WidgetType");
+    expect(promptEditor).toContain("Decoration.replace");
+    expect(promptEditor).not.toContain("Decoration.mark");
     expect(promptEditor).not.toContain("focusAtCoordinates");
     expect(promptEditor).not.toMatch(/mousedown\s*:/);
     expect(css).toMatch(/\.desktop-agent-prompt-editor \.cm-scroller\s*\{[^}]*max-height:\s*calc\(var\(--agent-composer-text-max-height\) \+ var\(--agent-composer-input-padding\) \+ var\(--agent-composer-input-padding\)\)[^}]*overflow-y:\s*auto/s);

@@ -64,37 +64,6 @@
   background: var(--agent-canvas);
 }
 
-.desktop-agent-reference-drop-overlay {
-  position: absolute;
-  z-index: 100;
-  inset: 8px;
-  display: grid;
-  align-items: end;
-  justify-items: center;
-  padding: 20px 20px 126px;
-  border: 0;
-  background: color-mix(in srgb, var(--agent-canvas) 82%, transparent);
-  color: var(--agent-text);
-  font-weight: 500;
-  text-align: center;
-  pointer-events: none;
-}
-.desktop-agent-reference-drop-overlay > span {
-  padding: 7px 11px;
-  border: 1px solid color-mix(in srgb, var(--agent-accent) 60%, var(--agent-border-subtle));
-  border-radius: 999px;
-  background: var(--po-menu-bg);
-  box-shadow: var(--po-menu-shadow);
-}
-.desktop-agent-boundary[data-drop-active="true"] .desktop-agent-composer {
-  background: color-mix(in srgb, var(--agent-composer-surface) 82%, var(--agent-accent));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--agent-accent) 64%, transparent);
-}
-.desktop-agent-reference-drop-overlay.is-invalid {
-  background: color-mix(in srgb, var(--agent-canvas) 86%, transparent);
-}
-.desktop-agent-reference-drop-overlay.is-invalid > span { border-color: color-mix(in srgb, var(--po-danger) 64%, var(--agent-border-subtle)); }
-
 .dark .desktop-agent-boundary,
 .dark .desktop-agent-overlay {
   --agent-canvas: var(--po-editor-bg);

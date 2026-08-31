@@ -4,6 +4,7 @@ import { Compartment, EditorState, Prec, StateEffect, StateField } from "@codemi
 import {
   Decoration,
   EditorView,
+  WidgetType,
   keymap,
   placeholder as placeholderExtension,
   type DecorationSet,
@@ -31,9 +32,35 @@ type AgentPromptEditorProps = {
 };
 
 type AgentPromptReferenceDecoration = AgentPromptReferenceMention & {
+  label: string;
   title: string;
   referenceKind: AgentDraftReference["kind"];
 };
+
+class AgentPromptReferenceWidget extends WidgetType {
+  constructor(private readonly reference: AgentPromptReferenceDecoration) {
+    super();
+  }
+
+  override eq(other: AgentPromptReferenceWidget) {
+    return this.reference.label === other.reference.label
+      && this.reference.title === other.reference.title
+      && this.reference.referenceId === other.reference.referenceId
+      && this.reference.referenceKind === other.reference.referenceKind;
+  }
+
+  override toDOM() {
+    const element = document.createElement("span");
+    element.className = "desktop-agent-prompt-mention";
+    element.textContent = this.reference.label;
+    element.title = this.reference.title;
+    element.dataset.referenceId = this.reference.referenceId;
+    element.dataset.referenceKind = this.reference.referenceKind;
+    element.dataset.atomic = "true";
+    element.contentEditable = "false";
+    return element;
+  }
+}
 
 const replaceMentionDecorations = StateEffect.define<AgentPromptReferenceDecoration[]>();
 const mentionDecorations = StateField.define<DecorationSet>({
@@ -42,13 +69,10 @@ const mentionDecorations = StateField.define<DecorationSet>({
     let next = value.map(transaction.changes);
     for (const effect of transaction.effects) {
       if (!effect.is(replaceMentionDecorations)) continue;
-      next = Decoration.set(effect.value.map((mention) => Decoration.mark({
-        class: "desktop-agent-prompt-mention",
-        attributes: {
-          "data-reference-id": mention.referenceId,
-          "data-reference-kind": mention.referenceKind,
-          title: mention.title,
-        },
+      next = Decoration.set(effect.value.map((mention) => Decoration.replace({
+        widget: new AgentPromptReferenceWidget(mention),
+        inclusive: false,
+        referenceId: mention.referenceId,
       }).range(mention.start, mention.end)), true);
     }
     return next;
@@ -240,6 +264,7 @@ function referenceDecorations(
     if (!reference) return [];
     return [{
       ...mention,
+      label: prompt.slice(mention.start, mention.end),
       title: reference.kind === "workspace-entry" ? reference.relativePath : reference.displayName,
       referenceKind: reference.kind,
     }];
@@ -249,7 +274,7 @@ function referenceDecorations(
 function readMentions(state: EditorState) {
   const mentions: AgentPromptReferenceMention[] = [];
   state.field(mentionDecorations).between(0, state.doc.length, (start, end, decoration) => {
-    const referenceId = decoration.spec.attributes?.["data-reference-id"];
+    const referenceId = decoration.spec.referenceId;
     if (typeof referenceId === "string") mentions.push({ referenceId, start, end });
   });
   return mentions;

@@ -287,4 +287,10 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-code-copy\s*\{[^}]*position:\s*absolute[^}]*width:\s*26px[^}]*height:\s*26px[^}]*background:\s*transparent[^}]*color:\s*var\(--agent-text-subtle\)/s);
     expect(css).toMatch(/\.desktop-agent-code-block pre\s*\{[^}]*padding:\s*9px 38px 9px 12px[^}]*color:\s*var\(--agent-text-muted\)[^}]*line-height:\s*1\.5/s);
   });
+
+  it("renders file mentions as quiet accent-colored atomic references without a drag overlay", () => {
+    expect(css).toMatch(/\.desktop-agent-prompt-mention\s*\{[^}]*display:\s*inline-flex[^}]*border:\s*1px solid color-mix\(in srgb, var\(--agent-accent\) 36%, var\(--agent-border-subtle\)\)[^}]*background:\s*color-mix\(in srgb, var\(--agent-accent-soft\) 58%, transparent\)[^}]*color:\s*color-mix\(in srgb, var\(--agent-accent\) 78%, var\(--agent-text\)\)/s);
+    expect(css).not.toContain(".desktop-agent-reference-drop-overlay");
+    expect(css).not.toContain('[data-drop-active="true"]');
+  });
 });
