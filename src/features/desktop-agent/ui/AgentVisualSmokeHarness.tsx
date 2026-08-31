@@ -13,6 +13,7 @@ import { createAgentProjection } from "../domain/agent-projection";
 import type {
   AgentDraftReference,
   AgentModel,
+  AgentPromptReferenceMention,
   AgentReferenceInputCapabilities,
   AgentRuntimeCatalogEntry,
 } from "../domain/agent-contract";
@@ -86,6 +87,7 @@ const smokeReferences: AgentDraftReference[] = [
 export function AgentVisualSmokeHarness() {
   const { t } = useLocalization();
   const [draft, setDraft] = useState("");
+  const [draftMentions, setDraftMentions] = useState<AgentPromptReferenceMention[]>([]);
   const [runtimeId, setRuntimeId] = useState(agentRuntimes[0].descriptor.id);
   const [selectedModel, setSelectedModel] = useState(modelsByRuntime[runtimeId][0].model);
   const [selectedEffort, setSelectedEffort] = useState("medium");
@@ -282,7 +284,12 @@ export function AgentVisualSmokeHarness() {
             <AgentComposer
               floatingAccessory={<AgentChangesPill projection={visibleProjection} onViewChanges={() => {}} />}
               draft={draft}
+              draftMentions={draftMentions}
               onDraftChange={setDraft}
+              onDraftDocumentChange={(nextDraft, nextMentions) => {
+                setDraft(nextDraft);
+                setDraftMentions(nextMentions);
+              }}
               disabled={startupLoading}
               running={false}
               stopping={false}
@@ -306,7 +313,11 @@ export function AgentVisualSmokeHarness() {
               onRetryReference={() => {}}
               onAddExternalFiles={() => {}}
               onPickWorkspaceReferences={() => {}}
-              onSubmit={async () => { setDraft(""); return true; }}
+              onSubmit={async () => {
+                setDraft("");
+                setDraftMentions([]);
+                return true;
+              }}
               onStop={() => {}}
             />
           </>}

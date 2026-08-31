@@ -235,7 +235,8 @@ export function AgentChatTabPanel({
         referenceCapabilities={capabilities?.referenceInputs}
         steerAvailable={Boolean(capabilities?.steer)} queueAvailable={Boolean(capabilities?.queue)}
         onRemoveReference={(id) => controller.removeReference(id)} onRetryReference={(id) => controller.retryReference(id)}
-        onAddExternalFiles={referenceIngestion.addExternalFiles} onPaste={referenceIngestion.onPaste}
+        onAddExternalFiles={referenceIngestion.addExternalFiles} onDrop={referenceIngestion.onEditorDrop}
+        onPaste={referenceIngestion.onPaste}
         onPickWorkspaceReferences={referenceIngestion.pickWorkspaceReferences}
         onSubmit={handleSubmit} onStop={() => void controller.stop()}
       />

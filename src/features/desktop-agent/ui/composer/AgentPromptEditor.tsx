@@ -9,6 +9,7 @@ import {
   type DecorationSet,
 } from "@codemirror/view";
 import type { AgentDraftReference, AgentPromptReferenceMention } from "../../domain/agent-contract";
+import type { AgentReferenceDropEvent } from "../agentReferenceDropEvent";
 import {
   agentPromptMentionText,
   isAgentMediaReference,
@@ -24,6 +25,7 @@ type AgentPromptEditorProps = {
   ariaLabel: string;
   onChange: (value: string, mentions: AgentPromptReferenceMention[]) => void;
   onRemoveReference?: (id: string) => void;
+  onDrop?: (event: AgentReferenceDropEvent) => void;
   onPaste?: (event: { clipboardData: DataTransfer; preventDefault: () => void; defaultPrevented: boolean }) => void;
   onSubmit: () => void;
 };
@@ -62,6 +64,7 @@ export function AgentPromptEditor({
   ariaLabel,
   onChange,
   onRemoveReference,
+  onDrop,
   onPaste,
   onSubmit,
 }: AgentPromptEditorProps) {
@@ -69,8 +72,8 @@ export function AgentPromptEditor({
   const viewRef = useRef<EditorView | null>(null);
   const editableCompartmentRef = useRef(new Compartment());
   const placeholderCompartmentRef = useRef(new Compartment());
-  const callbacksRef = useRef({ onChange, onRemoveReference, onPaste, onSubmit });
-  callbacksRef.current = { onChange, onRemoveReference, onPaste, onSubmit };
+  const callbacksRef = useRef({ onChange, onRemoveReference, onDrop, onPaste, onSubmit });
+  callbacksRef.current = { onChange, onRemoveReference, onDrop, onPaste, onSubmit };
 
   useEffect(() => {
     const host = hostRef.current;
@@ -96,6 +99,18 @@ export function AgentPromptEditor({
         }])),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.domEventHandlers({
+          drop: (event) => {
+            if (event.dataTransfer) callbacksRef.current.onDrop?.({
+              dataTransfer: event.dataTransfer,
+              preventDefault: () => event.preventDefault(),
+              stopPropagation: () => event.stopPropagation(),
+              defaultPrevented: event.defaultPrevented,
+            });
+            // Returning true is essential: it prevents CodeMirror's native
+            // text/file drop path from serializing an internal Resource URI
+            // into the visible prompt before semantic ingestion runs.
+            return event.defaultPrevented;
+          },
           paste: (event) => {
             if (event.clipboardData) callbacksRef.current.onPaste?.({
               clipboardData: event.clipboardData,

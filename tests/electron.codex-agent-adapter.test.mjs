@@ -89,6 +89,20 @@ describe("Codex app-server normalization", () => {
       text: "Review `/private/staging/report.pdf`",
       text_elements: [],
     }]);
+    expect(buildCodexTurnInput("Review `/workspace/a.md`", [{
+      authorized: true,
+      kind: "workspace-entry",
+      entryType: "file",
+      path: "/workspace/a.md",
+      displayName: "a.md",
+      mime: "text/markdown",
+      inlineMentioned: true,
+      mentionDelivery: "path",
+    }], "/workspace")).toEqual([{
+      type: "text",
+      text: "Review `/workspace/a.md`",
+      text_elements: [],
+    }]);
     expect(() => buildCodexTurnInput("Inspect", [{
       kind: "staged-attachment",
       path: "/private/staging/report.pdf",

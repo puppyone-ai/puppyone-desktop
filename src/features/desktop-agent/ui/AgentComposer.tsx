@@ -13,6 +13,7 @@ import { AgentComposerToolbar } from "./composer/AgentComposerToolbar";
 import { AgentDraftReferenceList } from "./composer/AgentDraftReferenceList";
 import { AgentPromptEditor } from "./composer/AgentPromptEditor";
 import { isAgentMediaReference } from "../domain/agent-prompt-mentions";
+import type { AgentReferenceDropEvent } from "./agentReferenceDropEvent";
 
 type AgentComposerProps = {
   draft: string;
@@ -45,6 +46,7 @@ type AgentComposerProps = {
   onRetryReference?: (id: string) => void;
   onAddExternalFiles?: (files: File[]) => void;
   onPickWorkspaceReferences?: () => void;
+  onDrop?: (event: AgentReferenceDropEvent) => void;
   onPaste?: (event: { clipboardData: DataTransfer; preventDefault: () => void; defaultPrevented: boolean }) => void;
   onSubmit: (prompt: string) => Promise<boolean>;
   onStop: () => void;
@@ -83,6 +85,7 @@ export function AgentComposer({
   onRetryReference,
   onAddExternalFiles,
   onPickWorkspaceReferences,
+  onDrop,
   onPaste,
   onSubmit,
   onStop,
@@ -142,6 +145,7 @@ export function AgentComposer({
                 ariaLabel={t("agent.composer.message", { agent: bidiIsolate(runtimeLabel) })}
                 onChange={updateDraftDocument}
                 onRemoveReference={onRemoveReference}
+                onDrop={onDrop}
                 onPaste={onPaste}
                 onSubmit={() => void submit()}
               />

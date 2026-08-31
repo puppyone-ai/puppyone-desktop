@@ -182,7 +182,10 @@ async function runProductionLayoutSmoke() {
     url.searchParams.set("theme", theme);
     url.hash = "agent-visual-smoke";
     await window.loadURL(url.href);
-    await waitForRenderer(window, "document.querySelectorAll('.desktop-agent-reference-cards > .desktop-agent-reference-card').length", (value) => value === 3);
+    await waitForRenderer(window, `(() => ({
+      cards: document.querySelectorAll('.desktop-agent-reference-cards > .desktop-agent-reference-card').length,
+      mentions: document.querySelectorAll('.desktop-agent-prompt-mention').length,
+    }))()`, (value) => value?.cards === 2 && value?.mentions === 1);
     for (const width of [420, 560, 760]) {
       window.setContentSize(width, 820);
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -200,9 +203,10 @@ async function runProductionLayoutSmoke() {
           viewport: window.innerWidth,
           overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
           draftCards: document.querySelectorAll('.desktop-agent-reference-cards > .desktop-agent-reference-card').length,
-          markdownCards: document.querySelectorAll('.desktop-agent-reference-card.is-file-card').length,
+          fileCards: document.querySelectorAll('.desktop-agent-reference-card.is-file-card').length,
+          inlineMentions: document.querySelectorAll('.desktop-agent-prompt-mention').length,
           imageCards: document.querySelectorAll('.desktop-agent-reference-card.is-image-card img').length,
-          transcriptChips: document.querySelectorAll('.desktop-agent-message-references > span').length,
+          transcriptMediaChips: document.querySelectorAll('.desktop-agent-message-references > span').length,
           addLabel: trigger?.getAttribute('aria-label') || '',
           visibleError: error?.textContent || '',
           pickerPadding: [modelStyle, effortStyle].map((style) => ({
@@ -214,8 +218,9 @@ async function runProductionLayoutSmoke() {
       const pickerPaddingIsBalanced = snapshot.pickerPadding.length === 2
         && snapshot.pickerPadding.every(({ start, end }) => start >= 8 && end >= 8 && start === end);
       if (snapshot.theme !== theme || snapshot.width <= 0 || snapshot.width > snapshot.viewport
-        || snapshot.overflow || snapshot.draftCards !== 3 || snapshot.markdownCards < 1
-        || snapshot.imageCards !== 1 || snapshot.transcriptChips < 2
+        || snapshot.overflow || snapshot.draftCards !== 2 || snapshot.fileCards !== 1
+        || snapshot.inlineMentions !== 1
+        || snapshot.imageCards !== 1 || snapshot.transcriptMediaChips !== 1
         || !snapshot.addLabel || !snapshot.visibleError || !pickerPaddingIsBalanced) {
         throw new Error(`Production Agent reference layout smoke failed: ${JSON.stringify(snapshot)}`);
       }

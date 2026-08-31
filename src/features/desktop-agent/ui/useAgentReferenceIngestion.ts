@@ -13,6 +13,7 @@ import {
   acceptsAgentAttachment,
   hasAgentAttachmentSupport,
 } from "../domain/agent-reference-capabilities";
+import type { AgentReferenceDropEvent } from "./agentReferenceDropEvent";
 
 export type AgentWorkspaceReferenceResolution = Readonly<{
   workspaceRoot: string;
@@ -75,7 +76,7 @@ export function useAgentReferenceIngestion({
     }
   }, [dropActive]);
 
-  const onDrop = useCallback((event: DragEvent<HTMLElement>) => {
+  const ingestDrop = useCallback((event: AgentReferenceDropEvent) => {
     if (!hasReferenceDataTransferSource(event.dataTransfer)) return;
     event.preventDefault();
     event.stopPropagation();
@@ -97,6 +98,14 @@ export function useAgentReferenceIngestion({
       if (typeof result === "number") announceBatchResult(beforeIds, result);
     });
   }, [announceBatchResult, controller, resolveWorkspaceReference, t, workspaceId]);
+
+  const onDrop = useCallback((event: DragEvent<HTMLElement>) => {
+    ingestDrop(event);
+  }, [ingestDrop]);
+
+  const onEditorDrop = useCallback((event: AgentReferenceDropEvent) => {
+    ingestDrop(event);
+  }, [ingestDrop]);
 
   const onPaste = useCallback((event: { clipboardData: DataTransfer; preventDefault: () => void }) => {
     const files = Array.from(event.clipboardData.files).filter((file) => acceptsAgentAttachment(capabilities, {
@@ -134,6 +143,7 @@ export function useAgentReferenceIngestion({
     onDragOver,
     onDragLeave,
     onDrop,
+    onEditorDrop,
     onPaste,
     addExternalFiles,
     pickWorkspaceReferences,

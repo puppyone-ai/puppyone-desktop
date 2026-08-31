@@ -92,6 +92,40 @@ describe("Desktop Agent reference ingestion", () => {
     expect(controller.addWorkspacePaths).not.toHaveBeenCalledWith([resource]);
   });
 
+  it("intercepts a Workspace Resource URI inside CodeMirror before native drop inserts visible URI text", async () => {
+    const controller = controllerFixture();
+    const resource = "puppyone-local://workspace/folder-1/notes.md";
+    const resolveWorkspaceReference: AgentWorkspaceReferenceResolver = vi.fn(() => ({
+      workspaceRoot: "/workspace",
+      referencePath: "notes.md",
+    }));
+    const container = render(<IngestionHarness
+      controller={controller}
+      withComposer
+      resolveWorkspaceReference={resolveWorkspaceReference}
+    />);
+    const promptEditor = container.querySelector<HTMLElement>(".cm-content")!;
+    const transfer = fakeDataTransfer({
+      [EXPLORER_REFERENCE_DRAG_TYPE]: JSON.stringify({
+        version: 1,
+        workspaceId: "workspace-1",
+        entries: [{ path: resource, name: "notes.md", entryType: "file" }],
+      }),
+      "text/plain": resource,
+    });
+    const drop = dragEvent("drop", transfer);
+
+    await act(async () => promptEditor.dispatchEvent(drop));
+
+    await vi.waitFor(() => expect(controller.addWorkspacePaths).toHaveBeenCalledWith(
+      ["notes.md"],
+      expect.any(Map),
+    ));
+    expect(controller.addWorkspacePaths).toHaveBeenCalledTimes(1);
+    expect(drop.defaultPrevented).toBe(true);
+    expect(promptEditor.textContent).not.toContain("puppyone-local://");
+  });
+
   it("loads an authorized visual preview for a workspace image without putting its URL in the path", async () => {
     const controller = controllerFixture();
     const resource = "puppyone-local://workspace/folder-1/capture.png";
@@ -378,6 +412,7 @@ function IngestionHarness({
       referenceCapabilities={capabilities()}
       onAddExternalFiles={ingestion.addExternalFiles}
       onPickWorkspaceReferences={ingestion.pickWorkspaceReferences}
+      onDrop={ingestion.onEditorDrop}
       onPaste={ingestion.onPaste}
       onSubmit={vi.fn(async () => true)}
       onStop={vi.fn()}
