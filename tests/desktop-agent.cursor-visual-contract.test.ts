@@ -110,9 +110,10 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-composer-picker\.is-effort\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*min\(72px, 20vw\)/s);
     expect(css).not.toContain("max-width: min(70%, 300px)");
     expect(css).toMatch(/--agent-composer-input-padding:\s*12px/);
-    expect(css).toMatch(/--agent-composer-text-min-height:\s*44px/);
+    expect(css).not.toContain("--agent-composer-text-min-height");
     expect(css).toMatch(/--agent-composer-text-max-height:\s*120px/);
-    expect(css).toMatch(/--agent-composer-input-min-height:\s*70px/);
+    expect(css).toMatch(/--agent-composer-input-min-height:\s*calc\(var\(--agent-composer-line-height\) \+ var\(--agent-composer-input-padding\) \+ var\(--agent-composer-input-padding\)\)/);
+    expect(css).not.toMatch(/--agent-composer-input-min-height:\s*70px/);
     expect(css).toMatch(/--agent-composer-toolbar-height:\s*38px/);
     expect(css).toMatch(/--agent-composer-picker-padding-inline:\s*8px/);
     expect(css).toMatch(/\.desktop-agent-composer-row\s*\{[^}]*display:\s*flex[^}]*min-height:\s*var\(--agent-composer-input-min-height\)[^}]*flex-direction:\s*column[^}]*gap:\s*0/s);

@@ -12,9 +12,9 @@
   --agent-work-handoff-gap: 8px;
   --agent-composer-line-height: 20px;
   --agent-composer-input-padding: 12px;
-  --agent-composer-text-min-height: 44px;
   --agent-composer-text-max-height: 120px;
-  --agent-composer-input-min-height: 70px;
+  /* One visible text line at rest; CodeMirror grows naturally until max-height. */
+  --agent-composer-input-min-height: calc(var(--agent-composer-line-height) + var(--agent-composer-input-padding) + var(--agent-composer-input-padding));
   --agent-composer-toolbar-height: 38px;
   --agent-composer-picker-padding-inline: 8px;
   --agent-reference-card-height: 52px;
