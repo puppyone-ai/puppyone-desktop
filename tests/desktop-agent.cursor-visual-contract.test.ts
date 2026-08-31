@@ -11,6 +11,7 @@ const css = [
     .map((file) => fs.readFileSync(path.join(styleRoot, file), "utf8")),
 ].join("\n");
 const composer = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentComposer.tsx"), "utf8");
+const composerFocus = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/composer/useAgentComposerFocus.ts"), "utf8");
 const composerToolbar = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/composer/AgentComposerToolbar.tsx"), "utf8");
 const attachmentButton = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/composer/AgentAttachmentButton.tsx"), "utf8");
 const panel = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentChatTabPanel.tsx"), "utf8");
@@ -147,11 +148,14 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-reference-card-actions\s*\{[^}]*inset-block-start:\s*-14px[^}]*inset-inline-end:\s*-14px/s);
     expect(css).toMatch(/\.desktop-agent-reference-card-actions > button\s*\{[^}]*width:\s*20px[^}]*height:\s*20px[^}]*background:\s*var\(--po-menu-bg\)/s);
     expect(css).toMatch(/\.desktop-agent-reference-card\.is-error\s*\{[^}]*border-color:\s*color-mix\(in srgb, var\(--po-danger\) 46%, var\(--agent-border-subtle\)\)/s);
-    expect(composer.indexOf("<AgentDraftReferenceList")).toBeLessThan(composer.indexOf("<AgentPromptEditor"));
+    expect(composer.indexOf("<AgentDraftReferenceList")).toBeLessThan(composer.lastIndexOf("<AgentPromptEditor"));
     expect(composer.indexOf("<AgentDraftReferenceList")).toBeLessThan(composer.indexOf("<AgentComposerToolbar"));
     expect(composerToolbar).toContain('className="desktop-agent-composer-actions"');
     expect(composer).toContain("onMouseDown={handleSurfaceMouseDown}");
-    expect(composer).toContain('querySelector(".cm-content")');
+    expect(composer).toContain("useAgentComposerFocus(inputDisabled)");
+    expect(composerFocus).toContain("promptEditorRef.current?.focusAtEnd()");
+    expect(composerFocus).toContain("target.closest(PROMPT_EDITOR_SELECTOR)");
+    expect(composerFocus).not.toContain('querySelector(".cm-content")');
     expect(composerToolbar.indexOf('className="desktop-agent-composer-trailing"')).toBeLessThan(composerToolbar.indexOf("aria-label={primaryActionLabel}"));
     expect(composer).toContain("const primaryActionBusy = running ? stopping : submitting");
     expect(composer).toContain("const primaryActionDisabled = running ? stopping : !canSubmit");

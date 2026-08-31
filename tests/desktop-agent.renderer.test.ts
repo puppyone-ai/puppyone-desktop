@@ -174,9 +174,10 @@ describe("Desktop Agent renderer surfaces", () => {
   });
 
   it("treats composer whitespace as part of the text input hit target", () => {
+    const onDraftChange = vi.fn();
     const container = render(React.createElement(AgentComposer, {
       draft: "Ready",
-      onDraftChange: vi.fn(),
+      onDraftChange,
       disabled: false,
       running: false,
       stopping: false,
@@ -187,9 +188,28 @@ describe("Desktop Agent renderer surfaces", () => {
     }));
     const composerSurface = container.querySelector(".desktop-agent-composer") as HTMLElement;
     const promptEditor = container.querySelector(".cm-content") as HTMLElement;
+    const promptScroller = container.querySelector(".cm-scroller") as HTMLElement;
     const sendControl = container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement;
 
     act(() => composerSurface.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 })));
+    expect(document.activeElement).toBe(promptEditor);
+
+    act(() => promptEditor.dispatchEvent(new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "Backspace",
+      code: "Backspace",
+    })));
+    expect(onDraftChange).toHaveBeenLastCalledWith("Read");
+
+    act(() => sendControl.focus());
+    act(() => promptScroller.dispatchEvent(new MouseEvent("mousedown", {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: 1,
+      clientY: 1,
+    })));
     expect(document.activeElement).toBe(promptEditor);
 
     act(() => sendControl.focus());

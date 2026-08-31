@@ -1,4 +1,4 @@
-import { useRef, type MouseEvent, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type {
@@ -12,6 +12,7 @@ import { AgentCommandSuggestions, visibleAgentCommands } from "./composer/AgentC
 import { AgentComposerToolbar } from "./composer/AgentComposerToolbar";
 import { AgentDraftReferenceList } from "./composer/AgentDraftReferenceList";
 import { AgentPromptEditor } from "./composer/AgentPromptEditor";
+import { useAgentComposerFocus } from "./composer/useAgentComposerFocus";
 import { isAgentMediaReference } from "../domain/agent-prompt-mentions";
 
 type AgentComposerProps = {
@@ -51,7 +52,6 @@ type AgentComposerProps = {
 };
 
 export const DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID = "agent.composer.placeholder.default";
-const COMPOSER_CONTROL_SELECTOR = "button, a[href], input, select, [role='button'], [role='option'], [contenteditable='true']";
 
 export function AgentComposer({
   draft,
@@ -89,7 +89,7 @@ export function AgentComposer({
   onStop,
 }: AgentComposerProps) {
   const { t } = useLocalization();
-  const editorHostRef = useRef<HTMLDivElement>(null);
+  const { promptEditorRef, handleSurfaceMouseDown } = useAgentComposerFocus(inputDisabled);
   const runtimeLabel = runtimeLabelProp || t("agent.name");
   const resolvedPlaceholder = placeholder.trim() || t(DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID);
   const visibleCommands = visibleAgentCommands(draft, commands);
@@ -106,13 +106,6 @@ export function AgentComposer({
   const submit = async () => {
     if (!canSubmit) return;
     await onSubmit(draft);
-  };
-  const handleSurfaceMouseDown = (event: MouseEvent<HTMLDivElement>) => {
-    if (inputDisabled || event.button !== 0) return;
-    const target = event.target;
-    if (!(target instanceof Element) || target.closest(COMPOSER_CONTROL_SELECTOR)) return;
-    event.preventDefault();
-    (editorHostRef.current?.querySelector(".cm-content") as HTMLElement | null)?.focus();
   };
   const updateDraftDocument = (nextDraft: string, nextMentions: AgentPromptReferenceMention[]) => {
     if (onDraftDocumentChange) onDraftDocumentChange(nextDraft, nextMentions);
@@ -142,18 +135,19 @@ export function AgentComposer({
               onRemove={onRemoveReference}
               onRetry={onRetryReference}
             />
-            <div ref={editorHostRef} className="desktop-agent-prompt-editor-host">
+            <div className="desktop-agent-prompt-editor-host">
               <AgentPromptEditor
-              value={draft}
-              mentions={draftMentions}
-              references={references}
-              disabled={inputDisabled}
-              placeholder={resolvedPlaceholder}
-              ariaLabel={t("agent.composer.message", { agent: bidiIsolate(runtimeLabel) })}
-              onChange={updateDraftDocument}
-              onRemoveReference={onRemoveReference}
-              onPaste={onPaste}
-              onSubmit={() => void submit()}
+                ref={promptEditorRef}
+                value={draft}
+                mentions={draftMentions}
+                references={references}
+                disabled={inputDisabled}
+                placeholder={resolvedPlaceholder}
+                ariaLabel={t("agent.composer.message", { agent: bidiIsolate(runtimeLabel) })}
+                onChange={updateDraftDocument}
+                onRemoveReference={onRemoveReference}
+                onPaste={onPaste}
+                onSubmit={() => void submit()}
               />
             </div>
           </div>
