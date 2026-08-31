@@ -110,6 +110,36 @@ describe("Cursor ACP runtime", () => {
     await adapter.dispose();
   });
 
+  it("bootstraps authentication, inspection and the live session on one ACP connection", async () => {
+    const connections = [];
+    const adapter = new CursorAcpAdapter({
+      readiness: { executablePath: "/tools/agent", environment: {}, version: "2026.08.1", source: "path-installation" },
+      workspaceRoot: "/workspace",
+      connectionFactory: (options) => {
+        const connection = new FakeCursorConnection();
+        connection.options = options;
+        connections.push(connection);
+        return connection;
+      },
+      fileSystemFactory: () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn() }),
+      projectInstructionLoader: vi.fn(async () => ({ source: null, text: "", bytes: 0 })),
+    });
+
+    const result = await adapter.bootstrapSession({ kind: "create", mode: "agent" });
+
+    expect(connections).toHaveLength(1);
+    expect(result).toMatchObject({
+      inspection: { account: { requiresRuntimeSetup: false } },
+      providerSession: { providerSessionId: "cursor-session", mode: "agent" },
+    });
+    expect(connections[0].request.mock.calls.map(([method]) => method)).toEqual([
+      "initialize",
+      "authenticate",
+      "session/new",
+    ]);
+    await adapter.dispose();
+  });
+
   it("discovers and hydrates native ACP sessions only when the runtime advertises the capabilities", async () => {
     const connection = new FakeCursorConnection({ list: true, replayHistory: true });
     const adapter = new CursorAcpAdapter({

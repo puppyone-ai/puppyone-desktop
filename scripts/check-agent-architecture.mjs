@@ -355,6 +355,19 @@ if (/filter\([^\n]*bundled/.test(stripComments(backendRoutingSource))) {
 const genericAcpSource = readFileSync(path.join(mainProtocolRoot, "acp", "acp-runtime-adapter.mjs"), "utf8");
 const cursorAcpSource = readFileSync(path.join(mainRuntimesRoot, "cursor", "cursor-acp-adapter.mjs"), "utf8");
 const cursorDiscoverySource = readFileSync(path.join(mainRuntimesRoot, "cursor", "cursor-discovery.mjs"), "utf8");
+const runtimeResolutionSource = readFileSync(
+  path.join(mainApplicationRoot, "runtime-resolution", "runtime-resolution-coordinator.mjs"),
+  "utf8",
+);
+for (const lifecycleFile of ["agent-service.mjs", "native-conversation-indexer.mjs"]) {
+  const lifecycleSource = readFileSync(path.join(mainApplicationRoot, lifecycleFile), "utf8");
+  if (/runtimeRegistry\.discover\s*\(/.test(stripComments(lifecycleSource))) {
+    errors.push(`${lifecycleFile} bypasses RuntimeResolutionCoordinator with direct Registry discovery`);
+  }
+}
+if (!runtimeResolutionSource.includes("resolveForOperation") || !runtimeResolutionSource.includes("runtimeRegistry.discover")) {
+  errors.push("RuntimeResolutionCoordinator must remain the single application authority over Registry discovery");
+}
 if (/cursor\/|managedOpenCodeAcpConfig|OPENCODE_/.test(stripComments(genericAcpSource))) {
   errors.push("the shared ACP adapter must remain free of Cursor and OpenCode policy");
 }

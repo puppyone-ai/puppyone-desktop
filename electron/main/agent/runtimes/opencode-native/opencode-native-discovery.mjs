@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn as nodeSpawn } from "node:child_process";
 import { redactSecretText } from "../../agent-events.mjs";
+import { createCachedRuntimeDiscovery } from "../../connections/runtime-discovery-cache.mjs";
 import {
   buildAgentEnvironment,
   discoverExecutable,
@@ -14,14 +15,11 @@ import {
 import { OPEN_CODE_HOST_SAFETY_ENVIRONMENT } from "../opencode-protocol/opencode-security-policy.mjs";
 
 export function createUserOpenCodeDiscovery(options = {}) {
-  let cached = null;
-  return {
-    async discover({ refresh = false } = {}) {
-      if (!refresh && cached) return cached;
-      cached = await discoverUserOpenCodeExecutable(options);
-      return cached;
-    },
-  };
+  const { cache: cacheOptions, ...discoveryOptions } = options;
+  return createCachedRuntimeDiscovery(
+    () => discoverUserOpenCodeExecutable(discoveryOptions),
+    cacheOptions,
+  );
 }
 
 export async function discoverUserOpenCodeExecutable({

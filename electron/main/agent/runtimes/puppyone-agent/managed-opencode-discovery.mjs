@@ -4,6 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { spawn as nodeSpawn } from "node:child_process";
 import { redactSecretText } from "../../agent-events.mjs";
+import { createCachedRuntimeDiscovery } from "../../connections/runtime-discovery-cache.mjs";
 import { compareVersions, discoverExecutable, runBounded } from "../../runtime/executable-discovery.mjs";
 import { PUPPYONE_AGENT_RUNTIME_ID } from "./puppyone-agent-identity.mjs";
 import { OPENCODE_RELEASE_ARTIFACTS, OPENCODE_UPSTREAM } from "../opencode-protocol/opencode-manifest.mjs";
@@ -11,13 +12,11 @@ import { OPEN_CODE_LOCKED_ENVIRONMENT } from "../opencode-protocol/opencode-secu
 import { parseOpenCodeVersion } from "../opencode-protocol/opencode-version.mjs";
 
 export function createOpenCodeDiscovery(options = {}) {
-  let cached = null;
-  async function discover({ refresh = false } = {}) {
-    if (!refresh && cached) return cached;
-    cached = await discoverOpenCodeExecutable(options);
-    return cached;
-  }
-  return { discover };
+  const { cache: cacheOptions, ...discoveryOptions } = options;
+  return createCachedRuntimeDiscovery(
+    () => discoverOpenCodeExecutable(discoveryOptions),
+    cacheOptions,
+  );
 }
 
 export async function discoverOpenCodeExecutable({

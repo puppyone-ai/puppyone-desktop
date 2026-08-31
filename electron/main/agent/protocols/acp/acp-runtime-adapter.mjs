@@ -179,56 +179,69 @@ export class AcpRuntimeAdapter {
       // newSession. A short bounded settle window captures them without
       // turning provider discovery into a full runtime boot.
       await delay(METADATA_SETTLE_MS);
-      const models = publicModels(this.sessionConfig, this.runtimeDescriptor.id);
-      const accountReady = models.length > 0 || Boolean(this.authenticationMethodId);
-      return {
-        account: {
-          account: accountReady ? {
-            type: this.accountType,
-            email: null,
-            planType: null,
-          } : null,
-          requiresOpenaiAuth: false,
-          requiresRuntimeSetup: !accountReady,
-          ...(!accountReady ? {
-            setupReason: "runtime-setup-required",
-            error: `${this.runtimeDescriptor.displayName} has no authenticated model available.`,
-          } : {}),
-        },
-        providers: publicProviders(models),
-        models,
-        modes: publicModes(this.sessionConfig),
-        commands: this.commands,
-        capabilities: this.#capabilities(),
-        runtime: {
-          ...this.runtimeDescriptor,
-          version: this.readiness.version ?? this.client.agentInfo?.version ?? null,
-          source: this.readiness.source ?? (this.managed ? "bundled" : "user-installed"),
-          compatibility: "acp-v1",
-        },
-        warnings: [],
-      };
+      return this.#inspection();
     } finally {
       await this.#disconnect(`${this.runtimeDescriptor.displayName} ACP metadata inspection completed.`);
     }
   }
 
   async createSession({ model = null, effort = null, mode = null } = {}) {
+    return (await this.bootstrapSession({ kind: "create", model, effort, mode })).providerSession;
+  }
+
+  /**
+   * Establish protocol/authentication and the requested native session on one
+   * connection. AgentService uses this atomic path instead of inspect-then-
+   * reconnect for ACP runtimes.
+   */
+  async bootstrapSession({
+    kind = "create",
+    threadId = null,
+    model = null,
+    effort = null,
+    mode = null,
+  } = {}) {
     this.#assertIdle();
     await this.#connect("session");
-    const response = await this.client.newSession({ cwd: this.workspaceRoot, mcpServers: [] });
-    this.sessionId = requiredId(response?.sessionId, `${this.runtimeDescriptor.displayName} ACP session id`);
-    this.#syncSession(response);
+    let response;
+    if (kind === "resume") {
+      this.historyCollector = new AcpHistoryCollector();
+      try {
+        response = await this.client.loadSession({
+          cwd: this.workspaceRoot,
+          mcpServers: [],
+          sessionId: requiredId(threadId, `${this.runtimeDescriptor.displayName} ACP session id`),
+        });
+        this.sessionId = requiredId(
+          response?.sessionId ?? threadId,
+          `${this.runtimeDescriptor.displayName} ACP session id`,
+        );
+        this.#syncSession(response);
+        await delay(METADATA_SETTLE_MS);
+      } finally {
+        this.historicalEvents = this.historyCollector?.events(
+          safeId(response?.sessionId) ?? safeId(threadId),
+        ) ?? [];
+        this.historyCollector = null;
+      }
+    } else if (kind === "create") {
+      response = await this.client.newSession({ cwd: this.workspaceRoot, mcpServers: [] });
+      this.sessionId = requiredId(response?.sessionId, `${this.runtimeDescriptor.displayName} ACP session id`);
+      this.#syncSession(response);
+      await delay(METADATA_SETTLE_MS);
+    } else {
+      throw new TypeError("ACP session bootstrap kind is invalid.");
+    }
+    const inspection = this.#inspection();
     await this.#applySelection({ model, effort, mode });
-    const now = new Date().toISOString();
     return {
-      providerSessionId: this.sessionId,
-      title: this.sessionTitles.created,
-      model: this.sessionConfig.models.currentId ?? model,
-      effort: this.sessionConfig.efforts.currentId ?? effort,
-      mode: this.sessionConfig.modes.currentId ?? mode,
-      createdAt: now,
-      updatedAt: now,
+      inspection,
+      providerSession: this.#providerSession({
+        title: kind === "resume" ? this.sessionTitles.resumed : this.sessionTitles.created,
+        model,
+        effort,
+        mode,
+      }),
     };
   }
 
@@ -262,34 +275,13 @@ export class AcpRuntimeAdapter {
   }
 
   async resumeSession({ threadId, model = null, effort = null, mode = null } = {}) {
-    this.#assertIdle();
-    await this.#connect("session");
-    this.historyCollector = new AcpHistoryCollector();
-    let response;
-    try {
-      response = await this.client.loadSession({
-        cwd: this.workspaceRoot,
-        mcpServers: [],
-        sessionId: requiredId(threadId, `${this.runtimeDescriptor.displayName} ACP session id`),
-      });
-      await delay(METADATA_SETTLE_MS);
-    } finally {
-      this.historicalEvents = this.historyCollector?.events(safeId(response?.sessionId) ?? safeId(threadId)) ?? [];
-      this.historyCollector = null;
-    }
-    this.sessionId = requiredId(response?.sessionId ?? threadId, `${this.runtimeDescriptor.displayName} ACP session id`);
-    this.#syncSession(response);
-    await this.#applySelection({ model, effort, mode });
-    const now = new Date().toISOString();
-    return {
-      providerSessionId: this.sessionId,
-      title: this.sessionTitles.resumed,
-      model: this.sessionConfig.models.currentId ?? model,
-      effort: this.sessionConfig.efforts.currentId ?? effort,
-      mode: this.sessionConfig.modes.currentId ?? mode,
-      createdAt: now,
-      updatedAt: now,
-    };
+    return (await this.bootstrapSession({
+      kind: "resume",
+      threadId,
+      model,
+      effort,
+      mode,
+    })).providerSession;
   }
 
   async readHistory() {
@@ -542,6 +534,51 @@ export class AcpRuntimeAdapter {
           ...(this.capabilityOverrides.referenceInputs?.limits ?? {}),
         },
       },
+    };
+  }
+
+  #inspection() {
+    const models = publicModels(this.sessionConfig, this.runtimeDescriptor.id);
+    const accountReady = models.length > 0 || Boolean(this.authenticationMethodId);
+    return {
+      account: {
+        account: accountReady ? {
+          type: this.accountType,
+          email: null,
+          planType: null,
+        } : null,
+        requiresOpenaiAuth: false,
+        requiresRuntimeSetup: !accountReady,
+        ...(!accountReady ? {
+          setupReason: "runtime-setup-required",
+          error: `${this.runtimeDescriptor.displayName} has no authenticated model available.`,
+        } : {}),
+      },
+      providers: publicProviders(models),
+      models,
+      modes: publicModes(this.sessionConfig),
+      commands: this.commands,
+      capabilities: this.#capabilities(),
+      runtime: {
+        ...this.runtimeDescriptor,
+        version: this.readiness.version ?? this.client?.agentInfo?.version ?? null,
+        source: this.readiness.source ?? (this.managed ? "bundled" : "user-installed"),
+        compatibility: "acp-v1",
+      },
+      warnings: [],
+    };
+  }
+
+  #providerSession({ title, model, effort, mode }) {
+    const now = new Date().toISOString();
+    return {
+      providerSessionId: this.sessionId,
+      title,
+      model: this.sessionConfig.models.currentId ?? model,
+      effort: this.sessionConfig.efforts.currentId ?? effort,
+      mode: this.sessionConfig.modes.currentId ?? mode,
+      createdAt: now,
+      updatedAt: now,
     };
   }
 

@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { redactSecretText } from "../agent-events.mjs";
 import {
   assertAuthenticated,
-  assertReady,
   normalizeApprovalDecision,
   normalizeOptionalId,
   normalizeOptionalString,
@@ -16,6 +15,7 @@ import {
 } from "./agent-input-policy.mjs";
 import { abandonAgentTurnReferences, beginAgentTurnReferences, prepareAgentSteerReferenceInput, revokeActiveAgentReferences, scrubPrivateReferencePaths, withAgentSteerReferenceTokens } from "./agent-reference-policy.mjs";
 import { createAgentRuntimeCatalog } from "./agent-runtime-catalog.mjs";
+import { createRuntimeResolutionCoordinator } from "./runtime-resolution/runtime-resolution-coordinator.mjs";
 import { createAgentEventJournal } from "./agent-event-journal.mjs";
 import { createNativeConversationIndexer } from "./native-conversation-indexer.mjs";
 import { AgentSessionStore } from "./agent-session-store.mjs";
@@ -57,9 +57,14 @@ export function createAgentService({
   }
   const sessionStore = new AgentSessionStore({ onOwnerDestroyed: closeSessionsForWindow });
   const sessionCreations = new Set();
-  const runtimeCatalog = createAgentRuntimeCatalog({ runtimeRegistry, processSupervisor });
+  const runtimeResolutionCoordinator = createRuntimeResolutionCoordinator({
+    runtimeRegistry,
+    processSupervisor,
+  });
+  const runtimeCatalog = createAgentRuntimeCatalog({ runtimeResolutionCoordinator });
   const nativeConversationIndexer = createNativeConversationIndexer({
     runtimeRegistry,
+    runtimeResolutionCoordinator,
     sessionRepository: cache,
     processSupervisor,
   });
@@ -78,9 +83,7 @@ export function createAgentService({
     discardRetiredSessions(ownerId, workspaceRoot);
     // Each Chat tab owns an independent controller and may prepare in parallel.
     // Renderer single-flight guards duplicate preparation within one tab.
-    const catalog = await runtimeRegistry.discover({ refresh: false });
-    const selected = selectRequestedRuntime(catalog, request?.runtimeId);
-    assertReady(selected?.readiness, selected?.descriptor?.displayName);
+    const selected = await resolveRuntimeForOperation(request?.runtimeId, workspaceRoot, "create");
     const session = createSessionRecord({
       id: randomUUID(),
       ownerId,
@@ -95,18 +98,18 @@ export function createAgentService({
     sessionStore.add(session);
     try {
       session.adapter = createAdapterForSession(session, selected.readiness);
-      const inspected = await runRuntimeStart(session, "inspect", () => session.adapter.inspect());
-      const inspection = assertAgentRuntimeInspection(session.adapter, inspected, session.runtimeId);
-      assertAuthenticated(inspection.account, selected.descriptor.displayName);
-      applyInspection(session, inspection);
-      requireAvailableModel(session, session.selectedModel);
-      requireAvailableEffort(session, session.selectedModel, session.selectedEffort);
-      const providerSession = await runRuntimeStart(session, "create", () => session.adapter.createSession({
-        model: session.selectedModel,
-        ...(session.selectedEffort ? { effort: session.selectedEffort } : {}),
-        mode: session.selectedMode,
-      }));
+      const { inspection, providerSession } = await bootstrapNativeSession(session, selected, {
+        kind: "create",
+        operation: "create",
+      });
       applyProviderSession(session, providerSession);
+      runtimeResolutionCoordinator.recordOperationSuccess({
+        runtimeId: session.runtimeId,
+        workspaceRoot,
+        readiness: selected.readiness,
+        descriptor: selected.descriptor,
+        inspection,
+      });
       if (!session.lifecycleEventSeen) {
         emit(session, {
           type: "session.started",
@@ -117,6 +120,10 @@ export function createAgentService({
       persistSoon(session);
       return sessionSnapshot(session);
     } catch (error) {
+      runtimeResolutionCoordinator.recordOperationFailure({
+        runtimeId: session.runtimeId,
+        workspaceRoot,
+      });
       await closeSessionRecord(session, { persist: false });
       throw new Error(redactSecretText(error instanceof Error ? error.message : String(error)));
     }
@@ -146,10 +153,7 @@ export function createAgentService({
       const existing = sessionStore.get(persisted.sessionId);
       if (existing) return sessionSnapshot(requireOwnedSession(sender, existing.id));
       const runtimeId = resolvePersistedRuntimeId(persisted, normalizeRuntimeId(request?.runtimeId));
-      const catalog = await runtimeRegistry.discover({ refresh: false });
-      const selected = runtimeRegistry.select(catalog, runtimeId);
-      if (!selected || selected.descriptor.id !== runtimeId) throw new Error(`Agent runtime ${runtimeId} is not registered.`);
-      assertReady(selected.readiness, selected.descriptor.displayName);
+      const selected = await resolveRuntimeForOperation(runtimeId, workspaceRoot, "resume");
       const session = createSessionRecord({
         id: persisted.sessionId,
         ownerId,
@@ -170,18 +174,19 @@ export function createAgentService({
       sessionStore.add(session);
       try {
         session.adapter = createAdapterForSession(session, selected.readiness);
-        const inspected = await runRuntimeStart(session, "inspect", () => session.adapter.inspect());
-        const inspection = assertAgentRuntimeInspection(session.adapter, inspected, session.runtimeId);
-        assertAuthenticated(inspection.account, selected.descriptor.displayName);
-        applyInspection(session, inspection);
-        const resumeRequest = {
+        const { inspection, providerSession } = await bootstrapNativeSession(session, selected, {
+          kind: "resume",
+          operation: "resume",
           threadId: persisted.providerSessionId,
-          model: session.selectedModel,
-        };
-        if (session.selectedEffort) resumeRequest.effort = session.selectedEffort;
-        if (session.selectedMode) resumeRequest.mode = session.selectedMode;
-        const providerSession = await runRuntimeStart(session, "resume", () => session.adapter.resumeSession(resumeRequest));
+        });
         applyProviderSession(session, providerSession);
+        runtimeResolutionCoordinator.recordOperationSuccess({
+          runtimeId: session.runtimeId,
+          workspaceRoot,
+          readiness: selected.readiness,
+          descriptor: selected.descriptor,
+          inspection,
+        });
         if (session.events.length === 0) {
           const historicalEvents = typeof session.adapter.readHistory === "function"
             ? await session.adapter.readHistory()
@@ -198,6 +203,10 @@ export function createAgentService({
         persistSoon(session);
         return sessionSnapshot(session);
       } catch (error) {
+        runtimeResolutionCoordinator.recordOperationFailure({
+          runtimeId: session.runtimeId,
+          workspaceRoot,
+        });
         await closeSessionRecord(session, { persist: false });
         if (isAgentProviderSessionUnavailableError(error)) {
           await cache.remove(persisted.sessionId);
@@ -429,9 +438,7 @@ export function createAgentService({
     const forked = await source.adapter.forkSession({ messageId: normalizeOptionalId(request?.messageId) });
     await persistNow(source);
     await closeSessionRecord(source, { persist: true });
-    const catalog = await runtimeRegistry.discover({ refresh: false });
-    const selected = runtimeRegistry.select(catalog, source.runtimeId);
-    assertReady(selected?.readiness, selected?.descriptor?.displayName);
+    const selected = await resolveRuntimeForOperation(source.runtimeId, source.workspaceRoot, "fork");
     const session = createSessionRecord({
       id: randomUUID(),
       ownerId: source.ownerId,
@@ -447,16 +454,19 @@ export function createAgentService({
     sessionStore.add(session);
     try {
       session.adapter = createAdapterForSession(session, selected.readiness);
-      const inspected = await runRuntimeStart(session, "inspect", () => session.adapter.inspect());
-      const inspection = assertAgentRuntimeInspection(session.adapter, inspected, session.runtimeId);
-      applyInspection(session, inspection);
-      const resumed = await runRuntimeStart(session, "resume-fork", () => session.adapter.resumeSession({
+      const { inspection, providerSession: resumed } = await bootstrapNativeSession(session, selected, {
+        kind: "resume",
+        operation: "resume-fork",
         threadId: forked.providerSessionId,
-        model: session.selectedModel,
-        ...(session.selectedEffort ? { effort: session.selectedEffort } : {}),
-        mode: session.selectedMode,
-      }));
+      });
       applyProviderSession(session, resumed);
+      runtimeResolutionCoordinator.recordOperationSuccess({
+        runtimeId: session.runtimeId,
+        workspaceRoot: session.workspaceRoot,
+        readiness: selected.readiness,
+        descriptor: selected.descriptor,
+        inspection,
+      });
       const historicalEvents = typeof session.adapter.readHistory === "function" ? await session.adapter.readHistory() : [];
       for (const historicalEvent of historicalEvents) emit(session, historicalEvent, { deliver: false });
       emit(session, {
@@ -467,6 +477,10 @@ export function createAgentService({
       await persistNow(session);
       return sessionSnapshot(session);
     } catch (error) {
+      runtimeResolutionCoordinator.recordOperationFailure({
+        runtimeId: session.runtimeId,
+        workspaceRoot: session.workspaceRoot,
+      });
       await closeSessionRecord(session, { persist: false });
       throw error;
     }
@@ -572,14 +586,15 @@ export function createAgentService({
     return runtimeRegistry.hasActiveResources?.() === true;
   }
 
-  function selectRequestedRuntime(catalog, value) {
+  async function resolveRuntimeForOperation(value, workspaceRoot, operation) {
     const requested = normalizeRuntimeId(value);
     if (typeof value === "string" && value.trim() && !requested) throw new Error("Agent runtime id is invalid.");
     if (!requested) throw new Error("Choose an Agent before starting an Agent session.");
-    if (!catalog.some((entry) => entry.descriptor.id === requested)) {
-      throw new Error(`Agent runtime ${requested} is not registered.`);
-    }
-    return runtimeRegistry.select(catalog, requested);
+    return runtimeResolutionCoordinator.resolveForOperation({
+      runtimeId: requested,
+      workspaceRoot,
+      operation,
+    });
   }
 
   function createAdapterForSession(session, internalReadiness) {
@@ -590,6 +605,39 @@ export function createAgentService({
       onEvent: (event) => handleAdapterEvent(session, event),
       onExit: (info) => handleAdapterExit(session, info),
     });
+  }
+
+  async function bootstrapNativeSession(session, selected, { kind, operation, threadId = null }) {
+    const selection = {
+      model: session.selectedModel,
+      ...(session.selectedEffort ? { effort: session.selectedEffort } : {}),
+      ...(session.selectedMode ? { mode: session.selectedMode } : {}),
+    };
+    let inspection;
+    let providerSession;
+    if (typeof session.adapter.bootstrapSession === "function") {
+      const result = await runRuntimeStart(session, `bootstrap-${operation}`, () => (
+        session.adapter.bootstrapSession({ kind, threadId, ...selection })
+      ));
+      inspection = assertAgentRuntimeInspection(session.adapter, result?.inspection, session.runtimeId);
+      providerSession = result?.providerSession;
+    } else {
+      const inspected = await runRuntimeStart(session, "inspect", () => session.adapter.inspect());
+      inspection = assertAgentRuntimeInspection(session.adapter, inspected, session.runtimeId);
+    }
+    assertAuthenticated(inspection.account, selected.descriptor.displayName);
+    applyInspection(session, inspection);
+    requireAvailableModel(session, session.selectedModel);
+    requireAvailableEffort(session, session.selectedModel, session.selectedEffort);
+    if (!providerSession) {
+      providerSession = kind === "resume"
+        ? await runRuntimeStart(session, operation, () => session.adapter.resumeSession({
+          threadId,
+          ...selection,
+        }))
+        : await runRuntimeStart(session, operation, () => session.adapter.createSession(selection));
+    }
+    return { inspection, providerSession };
   }
 
   function createAdapter({ runtimeId, internalReadiness, workspaceRoot, onEvent, onExit }) {

@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn as nodeSpawn } from "node:child_process";
 import { redactSecretText } from "../../agent-events.mjs";
+import { createCachedRuntimeDiscovery } from "../../connections/runtime-discovery-cache.mjs";
 import {
   buildAgentEnvironment,
   discoverExecutable,
@@ -18,14 +19,11 @@ export const CLAUDE_AGENT_SDK_VERSION = "0.3.159";
 export const CLAUDE_CODE_TESTED_BASELINE = null;
 
 export function createClaudeDiscovery(options = {}) {
-  let cached = null;
-  return {
-    async discover({ refresh = false } = {}) {
-      if (!refresh && cached) return cached;
-      cached = await discoverClaudeRuntime(options);
-      return cached;
-    },
-  };
+  const { cache: cacheOptions, ...discoveryOptions } = options;
+  return createCachedRuntimeDiscovery(
+    () => discoverClaudeRuntime(discoveryOptions),
+    cacheOptions,
+  );
 }
 
 export async function discoverClaudeRuntime({

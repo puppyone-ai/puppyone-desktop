@@ -1,5 +1,4 @@
 import { redactSecretText } from "../agent-events.mjs";
-import { assertReady } from "./agent-input-policy.mjs";
 
 /**
  * Explicit, capability-gated native conversation discovery.
@@ -7,20 +6,27 @@ import { assertReady } from "./agent-input-policy.mjs";
  * This indexes provider-owned locators only. It never scans private product
  * databases and it never copies a native transcript into PuppyOne storage.
  */
-export function createNativeConversationIndexer({ runtimeRegistry, sessionRepository, processSupervisor }) {
+export function createNativeConversationIndexer({
+  runtimeRegistry,
+  runtimeResolutionCoordinator,
+  sessionRepository,
+  processSupervisor,
+}) {
+  if (!runtimeResolutionCoordinator || typeof runtimeResolutionCoordinator.resolveForOperation !== "function") {
+    throw new TypeError("NativeConversationIndexer requires the runtime resolution authority.");
+  }
   return {
     async refresh({ workspaceRoot, runtimeId, cursor = null, limit = 50 }) {
       let adapter = null;
       try {
-        const catalog = await runtimeRegistry.discover({ refresh: false });
-        const selected = runtimeRegistry.select(catalog, runtimeId);
-        if (!selected || selected.descriptor.id !== runtimeId) {
-          return failed(runtimeId, `Agent runtime ${runtimeId} is not registered.`);
-        }
+        const selected = await runtimeResolutionCoordinator.resolveForOperation({
+          runtimeId,
+          workspaceRoot,
+          operation: "history",
+        });
         if (selected.descriptor.ownership?.session !== "runtime") {
           return { runtimeId, status: "unsupported", nextCursor: null, indexed: 0, warnings: [] };
         }
-        assertReady(selected.readiness, selected.descriptor.displayName);
         adapter = runtimeRegistry.createAdapter(runtimeId, {
           readiness: selected.readiness,
           workspaceRoot,
@@ -65,6 +71,7 @@ export function createNativeConversationIndexer({ runtimeRegistry, sessionReposi
           warnings: [],
         };
       } catch (error) {
+        runtimeResolutionCoordinator.recordOperationFailure({ runtimeId, workspaceRoot });
         return failed(runtimeId, error instanceof Error ? error.message : String(error));
       } finally {
         await Promise.resolve(adapter?.dispose?.()).catch(() => {});

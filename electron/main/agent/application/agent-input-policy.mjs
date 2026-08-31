@@ -35,12 +35,6 @@ export function readinessWithAccountState(readiness, accountState, runtimeName =
   return readiness;
 }
 
-export function assertReady(readiness, runtimeName = "Agent runtime") {
-  if (readiness?.status !== "ready") {
-    throw new Error(readiness?.message || `${runtimeName} is not ready.`);
-  }
-}
-
 export function assertAuthenticated(accountState, runtimeName = "Agent runtime") {
   if (requiresRuntimeSetup(accountState)) {
     throw new Error(accountState?.error || `${runtimeName} requires authentication or model setup.`);
