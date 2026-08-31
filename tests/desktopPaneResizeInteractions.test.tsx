@@ -313,6 +313,42 @@ describe("desktop side-pane resize interactions", () => {
 
     expect(onOpenChange.mock.calls).toEqual([[true], [false]]);
   });
+
+  it("keeps the auxiliary content at its expanded width while the outer track collapses", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(withTestLocalization(
+      <AuxiliaryPanelHost
+        expandedWidth={560}
+        maxWidth={900}
+        minWidth={320}
+        open
+        width={560}
+      >
+        <div>Text that must never reflow during collapse</div>
+      </AuxiliaryPanelHost>,
+    )));
+
+    const panel = requireHandle(container, ".desktop-right-sidebar");
+    expect(panel.style.getPropertyValue("--desktop-right-sidebar-width")).toBe("560px");
+
+    act(() => root?.render(withTestLocalization(
+      <AuxiliaryPanelHost
+        expandedWidth={560}
+        maxWidth={900}
+        minWidth={320}
+        open={false}
+        width={0}
+      >
+        <div>Text that must never reflow during collapse</div>
+      </AuxiliaryPanelHost>,
+    )));
+
+    expect(panel.style.getPropertyValue("--desktop-right-sidebar-width")).toBe("560px");
+    expect(container.querySelector(".desktop-right-sidebar-viewport .desktop-right-sidebar-inner")).not.toBeNull();
+  });
 });
 
 async function renderWorkspace({
