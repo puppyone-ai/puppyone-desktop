@@ -107,52 +107,10 @@
   --po-font-size-chrome: var(--po-text-size-body);
 }
 
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-interface-text-size="small"],
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="small"]:not([data-interface-text-size]) {
-  --po-text-size-micro: 9px;
-  --po-text-size-caption: 10px;
-  --po-text-size-meta: 11px;
-  --po-text-size-sidebar: 12px;
-  --po-text-size-body: 12px;
-  --po-font-size-chrome: 12px;
-}
-
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-content-text-size="small"],
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="small"]:not([data-content-text-size]) {
-  --po-text-size-body-lg: 13px;
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-content-text-size="small"] {
   --po-text-size-content: 13px;
-  --po-text-size-title: 15px;
-  --po-text-size-page-title: 18px;
-  --po-text-size-display: 22px;
-  --po-code-font-size: 12px;
 }
 
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-terminal-text-size="small"],
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="small"]:not([data-terminal-text-size]) {
-  --po-terminal-font-size: 12px;
-}
-
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-interface-text-size="large"],
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="large"]:not([data-interface-text-size]) {
-  --po-text-size-micro: 11px;
-  --po-text-size-caption: 12px;
-  --po-text-size-meta: 13px;
-  --po-text-size-sidebar: 14px;
-  --po-text-size-body: 14px;
-  --po-font-size-chrome: 14px;
-}
-
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-content-text-size="large"],
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="large"]:not([data-content-text-size]) {
-  --po-text-size-body-lg: 16px;
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-content-text-size="large"] {
   --po-text-size-content: 16px;
-  --po-text-size-title: 18px;
-  --po-text-size-page-title: 22px;
-  --po-text-size-display: 28px;
-  --po-code-font-size: 15px;
-}
-
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-terminal-text-size="large"],
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="large"]:not([data-terminal-text-size]) {
-  --po-terminal-font-size: 15px;
 }

@@ -1,4 +1,5 @@
-export const TYPOGRAPHY_PREFERENCE_VERSION = 1 as const;
+export const TYPOGRAPHY_PREFERENCE_VERSION = 3 as const;
+export const THEME_CONTENT_FONT_ID = "theme" as const;
 
 export type TypographyRole = "ui" | "content" | "code" | "terminal";
 export type FontSourceKind = "bundled" | "system" | "imported";
@@ -17,7 +18,6 @@ export type FontCatalogEntry = Readonly<{
 
 export type TypographyPreferences = Readonly<{
   version: typeof TYPOGRAPHY_PREFERENCE_VERSION;
-  uiFontId: string;
   contentFontId: string;
   codeFontId: string;
   terminalFontId: string;
@@ -26,6 +26,7 @@ export type TypographyPreferences = Readonly<{
 export type ResolvedTypography = Readonly<{
   ui: FontCatalogEntry;
   content: FontCatalogEntry;
+  editorContentOverride: FontCatalogEntry | null;
   code: FontCatalogEntry;
   terminal: FontCatalogEntry;
 }>;
@@ -88,17 +89,24 @@ export const BUILTIN_FONT_CATALOG = [
 
 export const DEFAULT_TYPOGRAPHY_PREFERENCES: TypographyPreferences = Object.freeze({
   version: TYPOGRAPHY_PREFERENCE_VERSION,
-  uiFontId: BUILTIN_FONT_IDS.geistSans,
-  contentFontId: BUILTIN_FONT_IDS.geistSans,
+  contentFontId: THEME_CONTENT_FONT_ID,
   codeFontId: BUILTIN_FONT_IDS.geistMono,
   terminalFontId: BUILTIN_FONT_IDS.terminalSystemMono,
 });
 
-const DEFAULT_FONT_ID_BY_ROLE: Readonly<Record<TypographyRole, string>> = {
-  ui: DEFAULT_TYPOGRAPHY_PREFERENCES.uiFontId,
+type TypographyPreferenceRole = Exclude<TypographyRole, "ui">;
+
+const DEFAULT_FONT_ID_BY_ROLE: Readonly<Record<TypographyPreferenceRole, string>> = {
   content: DEFAULT_TYPOGRAPHY_PREFERENCES.contentFontId,
   code: DEFAULT_TYPOGRAPHY_PREFERENCES.codeFontId,
   terminal: DEFAULT_TYPOGRAPHY_PREFERENCES.terminalFontId,
+};
+
+const PRODUCT_FONT_ID_BY_ROLE: Readonly<Record<TypographyRole, string>> = {
+  ui: BUILTIN_FONT_IDS.geistSans,
+  content: BUILTIN_FONT_IDS.geistSans,
+  code: BUILTIN_FONT_IDS.geistMono,
+  terminal: BUILTIN_FONT_IDS.terminalSystemMono,
 };
 
 const FONT_ID_PATTERN = /^[a-z][a-z0-9-]{0,31}:[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -148,12 +156,19 @@ export function createCatalogFontFamily(entry: FontCatalogEntry) {
 export function parseTypographyPreferences(value: string | null | undefined): TypographyPreferences {
   if (!value) return DEFAULT_TYPOGRAPHY_PREFERENCES;
   try {
-    const parsed = JSON.parse(value) as Partial<TypographyPreferences> | null;
+    const parsed = JSON.parse(value) as (
+      Partial<Omit<TypographyPreferences, "version">> & { version?: unknown }
+    ) | null;
     if (!parsed || typeof parsed !== "object") return DEFAULT_TYPOGRAPHY_PREFERENCES;
+    const contentFontId = normalizeFontId(parsed.contentFontId, "content");
     return Object.freeze({
       version: TYPOGRAPHY_PREFERENCE_VERSION,
-      uiFontId: normalizeFontId(parsed.uiFontId, "ui"),
-      contentFontId: normalizeFontId(parsed.contentFontId, "content"),
+      contentFontId: (
+        (parsed.version === 1 || parsed.version === 2 || parsed.version === undefined)
+        && contentFontId === BUILTIN_FONT_IDS.geistSans
+      )
+        ? THEME_CONTENT_FONT_ID
+        : contentFontId,
       codeFontId: normalizeFontId(parsed.codeFontId, "code"),
       terminalFontId: normalizeFontId(parsed.terminalFontId, "terminal"),
     });
@@ -167,8 +182,11 @@ export function resolveTypography(
   catalog: readonly FontCatalogEntry[] = BUILTIN_FONT_CATALOG,
 ): ResolvedTypography {
   return Object.freeze({
-    ui: resolveFontForRole(preferences.uiFontId, "ui", catalog),
-    content: resolveFontForRole(preferences.contentFontId, "content", catalog),
+    ui: resolveFontForRole(PRODUCT_FONT_ID_BY_ROLE.ui, "ui", catalog),
+    content: resolveFontForRole(PRODUCT_FONT_ID_BY_ROLE.content, "content", catalog),
+    editorContentOverride: preferences.contentFontId === THEME_CONTENT_FONT_ID
+      ? null
+      : resolveFontForRole(preferences.contentFontId, "content", catalog),
     code: resolveFontForRole(preferences.codeFontId, "code", catalog),
     terminal: resolveFontForRole(preferences.terminalFontId, "terminal", catalog),
   });
@@ -176,14 +194,13 @@ export function resolveTypography(
 
 export function withTypographyFont(
   preferences: TypographyPreferences,
-  role: TypographyRole,
+  role: TypographyPreferenceRole,
   fontId: string,
 ): TypographyPreferences {
   const normalizedId = normalizeFontId(fontId, role);
   return Object.freeze({
     ...preferences,
     version: TYPOGRAPHY_PREFERENCE_VERSION,
-    ...(role === "ui" ? { uiFontId: normalizedId } : {}),
     ...(role === "content" ? { contentFontId: normalizedId } : {}),
     ...(role === "code" ? { codeFontId: normalizedId } : {}),
     ...(role === "terminal" ? { terminalFontId: normalizedId } : {}),
@@ -198,7 +215,7 @@ function resolveFontForRole(
   const requested = catalog.find((entry) => entry.id === requestedId && entry.roles.includes(role));
   if (requested) return requested;
 
-  const fallbackId = DEFAULT_FONT_ID_BY_ROLE[role];
+  const fallbackId = PRODUCT_FONT_ID_BY_ROLE[role];
   const fallback = catalog.find((entry) => entry.id === fallbackId && entry.roles.includes(role));
   if (fallback) return fallback;
 
@@ -207,8 +224,9 @@ function resolveFontForRole(
   throw new Error(`Font catalog has no ${role} font.`);
 }
 
-function normalizeFontId(value: unknown, role: TypographyRole) {
+function normalizeFontId(value: unknown, role: TypographyPreferenceRole) {
   if (typeof value !== "string") return DEFAULT_FONT_ID_BY_ROLE[role];
   const normalized = value.trim();
+  if (role === "content" && normalized === THEME_CONTENT_FONT_ID) return normalized;
   return FONT_ID_PATTERN.test(normalized) ? normalized : DEFAULT_FONT_ID_BY_ROLE[role];
 }

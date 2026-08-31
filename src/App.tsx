@@ -1156,10 +1156,7 @@ function AppContent() {
       data-icon-pack={resolvedAppearance.composition.iconPack}
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}
-      data-text-size={textSize}
-      data-interface-text-size={textSize}
       data-content-text-size={textSize}
-      data-terminal-text-size={textSize}
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
       {...typographyRootProps}

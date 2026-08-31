@@ -15,6 +15,47 @@ import {
 } from "../src/features/typography";
 
 describe("typography architecture", () => {
+  it("discards legacy UI font preferences and pins the runtime UI font to the product default", () => {
+    const migrated = parseTypographyPreferences(JSON.stringify({
+      version: 2,
+      uiFontId: BUILTIN_FONT_IDS.systemSans,
+      contentFontId: "theme",
+      codeFontId: BUILTIN_FONT_IDS.geistMono,
+      terminalFontId: BUILTIN_FONT_IDS.terminalSystemMono,
+    }));
+
+    expect(migrated.version).toBe(3);
+    expect(migrated).not.toHaveProperty("uiFontId");
+    expect(resolveTypography(migrated).ui.id).toBe(BUILTIN_FONT_IDS.geistSans);
+  });
+
+  it("defaults content typography to Theme and migrates the legacy default font", () => {
+    expect(DEFAULT_TYPOGRAPHY_PREFERENCES.contentFontId).toBe("theme");
+    expect(parseTypographyPreferences(JSON.stringify({
+      version: 1,
+      uiFontId: BUILTIN_FONT_IDS.geistSans,
+      contentFontId: BUILTIN_FONT_IDS.geistSans,
+      codeFontId: BUILTIN_FONT_IDS.geistMono,
+      terminalFontId: BUILTIN_FONT_IDS.terminalSystemMono,
+    })).contentFontId).toBe("theme");
+    expect(parseTypographyPreferences(JSON.stringify({
+      version: 2,
+      contentFontId: BUILTIN_FONT_IDS.geistSans,
+      codeFontId: BUILTIN_FONT_IDS.geistMono,
+      terminalFontId: BUILTIN_FONT_IDS.terminalSystemMono,
+    })).contentFontId).toBe("theme");
+    expect(parseTypographyPreferences(JSON.stringify({
+      version: 1,
+      contentFontId: BUILTIN_FONT_IDS.systemSerif,
+    })).contentFontId).toBe(BUILTIN_FONT_IDS.systemSerif);
+    expect(parseTypographyPreferences(JSON.stringify({
+      version: 3,
+      contentFontId: BUILTIN_FONT_IDS.geistSans,
+      codeFontId: BUILTIN_FONT_IDS.geistMono,
+      terminalFontId: BUILTIN_FONT_IDS.terminalSystemMono,
+    })).contentFontId).toBe(BUILTIN_FONT_IDS.geistSans);
+  });
+
   it("keeps preferences source-agnostic and resolves unavailable fonts safely", () => {
     const importedId = "imported:9f2b2dc0-regular";
     const preferences = parseTypographyPreferences(JSON.stringify({
@@ -37,12 +78,15 @@ describe("typography architecture", () => {
       roles: ["content"],
     };
     const resolved = resolveTypography(preferences, [...BUILTIN_FONT_CATALOG, importedEntry]);
-    expect(resolved.content).toBe(importedEntry);
+    expect(resolved.content.id).toBe(BUILTIN_FONT_IDS.geistSans);
+    expect(resolved.editorContentOverride).toBe(importedEntry);
     expect(createTypographyRootProps(resolved)).toMatchObject({
-      "data-font-content": importedId,
-      "data-font-content-category": "serif",
+      "data-font-content": BUILTIN_FONT_IDS.geistSans,
+      "data-font-content-category": "sans",
+      "data-font-editor-content": importedId,
       style: {
-        "--po-font-content-primary": importedEntry.family,
+        "--po-font-content-primary": '"Geist Sans"',
+        "--po-font-editor-content-user": expect.stringContaining(importedEntry.family),
       },
     });
   });
@@ -53,6 +97,9 @@ describe("typography architecture", () => {
     expect(defaults.content.family).toBe('"Geist Sans"');
     expect(defaults.content.category).toBe("sans");
     expect(defaults.content.family).toBe(defaults.ui.family);
+    expect(defaults.editorContentOverride).toBeNull();
+    expect(createTypographyRootProps(defaults).style)
+      .not.toHaveProperty("--po-font-editor-content-user");
     expect(defaults.code.family).toContain('"Geist Mono"');
     expect(defaults.code.category).toBe("monospace");
     expect(defaults.terminal.family).toBe(
@@ -72,6 +119,10 @@ describe("typography architecture", () => {
       ...DEFAULT_TYPOGRAPHY_PREFERENCES,
       contentFontId: BUILTIN_FONT_IDS.systemSerif,
     });
+    const explicit = resolveTypography(next);
+    expect(explicit.editorContentOverride?.id).toBe(BUILTIN_FONT_IDS.systemSerif);
+    expect(createTypographyRootProps(explicit).style)
+      .toHaveProperty("--po-font-editor-content-user");
     expect(getFontCatalogEntries("content").map((font) => font.id)).toEqual([
       BUILTIN_FONT_IDS.geistSans,
       BUILTIN_FONT_IDS.systemSans,
@@ -120,10 +171,12 @@ describe("typography architecture", () => {
     const roles = source("src/styles/typography/roles.css");
     const base = source("src/styles/base.css");
     const markdown = source("packages/shared-ui/src/styles/editor/markdown-editor.css");
+    const markdownContent = source("packages/shared-ui/src/styles/editor/markdown-content.css");
     const plainText = source("packages/shared-ui/src/styles/editor/editor-chrome.css");
     const agentTranscript = source("src/features/desktop-agent/ui/styles/transcript.css");
     const terminalAppearance = source("src/features/desktop-terminal/runtime/terminalAppearance.ts");
     const terminalAppearanceSync = source("src/features/desktop-terminal/runtime/useTerminalAppearanceSync.ts");
+    const overlayPortal = source("src/features/app-shell/DesktopOverlayPortal.tsx");
     const markdownEditor = source("packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor.tsx");
     const codeEditor = source("packages/shared-ui/src/editor/viewers/code/CodeMirrorCodeEditor.tsx");
     const plainTextEditor = source("packages/shared-ui/src/editor/viewers/code/PlainTextEditor.tsx");
@@ -159,10 +212,21 @@ describe("typography architecture", () => {
     expect(locales).not.toContain("--po-content-reading-line-height:");
     expect(base).toContain("font-feature-settings: normal;");
     expect(base).not.toContain("'cv02'");
-    expect(markdown).toContain("font-family: var(--po-md-content-font);");
+    expect(markdownContent).toContain("--po-md-content-font-primary: var(--po-font-content-primary");
+    expect(markdownContent).toContain("--po-md-content-font-fallback: var(--po-font-content-fallback");
+    expect(markdownContent).toContain("--po-md-content-font: var(--po-host-md-content-font, var(--po-md-content-font-primary), var(--po-md-content-font-fallback));");
+    expect(markdownContent).toContain("--po-editor-content-font: var(--po-font-editor-content-user, var(--po-md-content-font));");
+    expect(markdownContent).toContain('[data-font-editor-content]:not([data-font-editor-content="theme"])');
+    expect(markdownContent).toContain("font-family: var(--po-font-editor-content-user) !important;");
+    expect(markdownContent).toContain(".cm-line:not(.cm-md-code-block-line)");
+    expect(markdownContent).toContain('[data-po-theme-surface="markdown"] .cm-md-inline-code,');
+    expect(markdownContent).toContain('[data-po-theme-surface="markdown"] .cm-md-code-textarea,');
+    expect(markdownContent).toContain("font-family: var(--po-font-code) !important;");
+    expect(markdown).toContain("font-family: var(--po-editor-content-font);");
     expect(markdown).toContain("font-weight: var(--po-md-content-weight);");
     expect(markdown).toContain("font-feature-settings: normal;");
-    expect(plainText).toContain("font-family: var(--po-font-content, var(--po-font-sans));");
+    expect(plainText).toContain("font-family: var(--po-font-editor-content-user, var(--po-font-content, var(--po-font-sans)));");
+    expect(plainText).toContain("font-size: var(--po-text-size-content, 14px);");
     expect(plainText).toContain("font-weight: var(--po-text-weight-medium);");
     expect(agentTranscript).toContain("font-family: var(--po-font-content, var(--po-font-sans));");
     expect(terminalAppearance).toContain('getPropertyValue("--po-font-terminal")');
@@ -177,11 +241,19 @@ describe("typography architecture", () => {
     expect(plainTextEditor).toContain('data-po-typography-role="content"');
     expect(agentMarkdown).toContain('data-po-typography-role="content"');
     expect(typographyRuntime).toContain('"--po-font-content-primary": resolved.content.family');
+    expect(typographyRuntime).toContain('"--po-font-editor-content-user"');
     expect(typographyRuntime).not.toContain('"--po-font-content": resolved.content.family');
     expect(app).toContain("fontCatalog,\n    locale,");
-    expect(app).toContain("data-interface-text-size={textSize}");
     expect(app).toContain("data-content-text-size={textSize}");
-    expect(app).toContain("data-terminal-text-size={textSize}");
+    expect(app).not.toContain("data-interface-text-size={textSize}");
+    expect(app).not.toContain("data-terminal-text-size={textSize}");
+    expect(app).not.toContain("data-text-size={textSize}");
+    expect(terminalAppearanceSync).not.toContain('"data-terminal-text-size"');
+    expect(terminalAppearanceSync).not.toContain('"data-text-size"');
+    expect(overlayPortal).toContain("root.dataset.contentTextSize = textSize");
+    expect(overlayPortal).not.toContain("root.dataset.interfaceTextSize");
+    expect(overlayPortal).not.toContain("root.dataset.terminalTextSize");
+    expect(overlayPortal).not.toContain("root.dataset.textSize");
   });
 });
 

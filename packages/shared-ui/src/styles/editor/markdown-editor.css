@@ -59,7 +59,7 @@
   height: 100%;
   min-height: 100%;
   color: var(--po-text);
-  font-family: var(--po-md-content-font);
+  font-family: var(--po-editor-content-font);
   font-size: var(--po-md-content-size);
   font-weight: var(--po-md-content-weight);
   /* Keep shaping deterministic across Latin and CJK fallback faces. Feature
@@ -135,7 +135,7 @@
      the centered reading rail. */
   scrollbar-gutter: stable both-edges;
   cursor: text;
-  font-family: var(--po-md-content-font);
+  font-family: var(--po-editor-content-font);
 }
 
 .markdown-codemirror-editor .cm-content {
@@ -235,7 +235,7 @@
   display: block;
   min-height: 22px;
   color: color-mix(in srgb, var(--po-text) 82%, var(--po-text-muted));
-  font-family: var(--po-font-content, var(--po-font-sans));
+  font-family: var(--po-editor-content-font, var(--po-font-content, var(--po-font-sans)));
   font-size: 12px;
   line-height: 1.58;
 }
