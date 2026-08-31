@@ -39,7 +39,7 @@ describe("Desktop Agent architecture boundaries", () => {
     const timeline = source("src/features/desktop-agent/ui/AgentTranscript.tsx");
     const markdown = source("src/features/desktop-agent/ui/SafeMarkdown.tsx");
     const composer = source("src/features/desktop-agent/ui/AgentComposer.tsx");
-    const composerFocus = source("src/features/desktop-agent/ui/composer/useAgentComposerFocus.ts");
+    const promptEditor = source("src/features/desktop-agent/ui/composer/AgentPromptEditor.tsx");
     const composerToolbar = source("src/features/desktop-agent/ui/composer/AgentComposerToolbar.tsx");
     const attachmentButton = source("src/features/desktop-agent/ui/composer/AgentAttachmentButton.tsx");
     const commandSuggestions = source("src/features/desktop-agent/ui/composer/AgentCommandSuggestions.tsx");
@@ -103,12 +103,12 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(composer).not.toMatch(/\.style(?:\.|\[)/);
     expect(composer).not.toContain("ResizeObserver");
     expect(composer).toContain("<AgentPromptEditor");
-    expect(composer).toContain("useAgentComposerFocus(inputDisabled)");
-    expect(composerFocus).toContain("promptEditorRef.current?.focusAtCoordinates");
-    expect(composerFocus).toContain("promptEditorRef.current?.focusAtEnd()");
-    expect(composerFocus).not.toContain('querySelector(".cm-content")');
-    expect(source("src/features/desktop-agent/ui/composer/AgentPromptEditor.tsx")).toContain("EditorView.atomicRanges");
-    expect(css).toMatch(/\.desktop-agent-prompt-editor \.cm-scroller\s*\{[^}]*max-height:\s*var\(--agent-composer-text-max-height\)[^}]*overflow-y:\s*auto/s);
+    expect(composer).not.toContain("onMouseDown=");
+    expect(composer).not.toContain('querySelector(".cm-content")');
+    expect(promptEditor).toContain("EditorView.atomicRanges");
+    expect(promptEditor).not.toContain("focusAtCoordinates");
+    expect(promptEditor).not.toMatch(/mousedown\s*:/);
+    expect(css).toMatch(/\.desktop-agent-prompt-editor \.cm-scroller\s*\{[^}]*max-height:\s*calc\(var\(--agent-composer-text-max-height\) \+ var\(--agent-composer-input-padding\) \+ var\(--agent-composer-input-padding\)\)[^}]*overflow-y:\s*auto/s);
     expect(composer).not.toContain("<select");
     expect(picker).toContain("DesktopOverlayLayer");
     expect(picker).toContain("useAnchoredOverlayPosition");

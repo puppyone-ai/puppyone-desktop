@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { Compartment, EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
 import {
@@ -28,11 +28,6 @@ type AgentPromptEditorProps = {
   onSubmit: () => void;
 };
 
-export type AgentPromptEditorHandle = {
-  focusAtEnd: () => void;
-  focusAtCoordinates: (coordinates: { x: number; y: number }) => void;
-};
-
 const replaceMentionDecorations = StateEffect.define<AgentPromptReferenceMention[]>();
 const mentionDecorations = StateField.define<DecorationSet>({
   create: () => Decoration.none,
@@ -58,7 +53,7 @@ const mentionDecorations = StateField.define<DecorationSet>({
  * CodeMirror owns selection, IME, undo and drag-position behavior; the app owns
  * semantic reference ids and never encodes authorization into DOM text.
  */
-export const AgentPromptEditor = forwardRef<AgentPromptEditorHandle, AgentPromptEditorProps>(function AgentPromptEditor({
+export function AgentPromptEditor({
   value,
   mentions,
   references,
@@ -69,33 +64,13 @@ export const AgentPromptEditor = forwardRef<AgentPromptEditorHandle, AgentPrompt
   onRemoveReference,
   onPaste,
   onSubmit,
-}: AgentPromptEditorProps, forwardedRef) {
+}: AgentPromptEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const editableCompartmentRef = useRef(new Compartment());
   const placeholderCompartmentRef = useRef(new Compartment());
   const callbacksRef = useRef({ onChange, onRemoveReference, onPaste, onSubmit });
   callbacksRef.current = { onChange, onRemoveReference, onPaste, onSubmit };
-
-  useImperativeHandle(forwardedRef, () => ({
-    focusAtEnd() {
-      const view = viewRef.current;
-      if (!view) return;
-      const end = view.state.doc.length;
-      const selection = view.state.selection.main;
-      if (!selection.empty || selection.head !== end) {
-        view.dispatch({ selection: { anchor: end }, scrollIntoView: true });
-      }
-      view.focus();
-    },
-    focusAtCoordinates(coordinates) {
-      const view = viewRef.current;
-      if (!view) return;
-      const position = view.posAtCoords(coordinates) ?? view.state.doc.length;
-      view.dispatch({ selection: { anchor: position }, scrollIntoView: true });
-      view.focus();
-    },
-  }), []);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -221,7 +196,7 @@ export const AgentPromptEditor = forwardRef<AgentPromptEditorHandle, AgentPrompt
   }, [disabled, references]);
 
   return <div ref={hostRef} className="desktop-agent-prompt-editor" dir="auto" />;
-});
+}
 
 function readMentions(state: EditorState) {
   const mentions: AgentPromptReferenceMention[] = [];

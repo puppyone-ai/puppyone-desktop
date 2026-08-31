@@ -12,7 +12,6 @@ import { AgentCommandSuggestions, visibleAgentCommands } from "./composer/AgentC
 import { AgentComposerToolbar } from "./composer/AgentComposerToolbar";
 import { AgentDraftReferenceList } from "./composer/AgentDraftReferenceList";
 import { AgentPromptEditor } from "./composer/AgentPromptEditor";
-import { useAgentComposerFocus } from "./composer/useAgentComposerFocus";
 import { isAgentMediaReference } from "../domain/agent-prompt-mentions";
 
 type AgentComposerProps = {
@@ -89,7 +88,6 @@ export function AgentComposer({
   onStop,
 }: AgentComposerProps) {
   const { t } = useLocalization();
-  const { promptEditorRef, handleSurfaceMouseDown } = useAgentComposerFocus(inputDisabled);
   const runtimeLabel = runtimeLabelProp || t("agent.name");
   const resolvedPlaceholder = placeholder.trim() || t(DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID);
   const visibleCommands = visibleAgentCommands(draft, commands);
@@ -125,7 +123,6 @@ export function AgentComposer({
       <div
         className="desktop-agent-composer"
         data-input-disabled={inputDisabled || undefined}
-        onMouseDown={handleSurfaceMouseDown}
       >
         <div className="desktop-agent-composer-row">
           <div className="desktop-agent-composer-input-row">
@@ -137,7 +134,6 @@ export function AgentComposer({
             />
             <div className="desktop-agent-prompt-editor-host">
               <AgentPromptEditor
-                ref={promptEditorRef}
                 value={draft}
                 mentions={draftMentions}
                 references={references}

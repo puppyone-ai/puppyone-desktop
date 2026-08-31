@@ -5,7 +5,6 @@
 
 @container desktop-agent (max-width: 419px) {
   .desktop-agent-transcript { padding-bottom: 20px; }
-  .desktop-agent-prompt-editor .cm-content { padding-inline: 0; }
   .desktop-agent-composer-trailing { gap: 6px; }
   .desktop-agent-readiness { grid-template-columns: auto minmax(0, 1fr); }
   .desktop-agent-readiness > button { grid-column: 2; justify-self: start; }
