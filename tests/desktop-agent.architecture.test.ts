@@ -69,7 +69,7 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(foundation).toMatch(/\.desktop-agent-boundary\s*\{[^}]*container:\s*desktop-agent \/ inline-size/s);
     expect(foundation).not.toMatch(/\.desktop-agent-panel\s*\{[^}]*container:/s);
     expect(foundation).toMatch(/\.desktop-agent-panel\s*\{[^}]*display:\s*grid[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\) auto/s);
-    expect(foundation).toContain("--agent-radius-composer: 12px");
+    expect(foundation).toContain("--agent-radius-composer: 10px");
     expect(foundation).toContain("--agent-inline-inset: var(--desktop-sidebar-row-left-gap, 12px)");
     expect(foundation).toContain("--agent-composer-input-min-height: calc(var(--agent-composer-line-height) + var(--agent-composer-input-padding) + var(--agent-composer-input-padding));");
     expect(foundation).not.toContain("--agent-composer-input-min-height: 70px");

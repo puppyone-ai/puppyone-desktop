@@ -5,7 +5,7 @@
   --agent-dock-padding-top: 12px;
   --agent-dock-padding-bottom: 12px;
   --agent-control-size: 30px;
-  --agent-radius-composer: 12px;
+  --agent-radius-composer: 10px;
   --agent-radius-message: var(--agent-radius-composer);
   --agent-message-content-inset: 12px;
   --agent-message-turn-gap: 24px;
