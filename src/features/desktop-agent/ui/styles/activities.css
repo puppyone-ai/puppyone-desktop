@@ -106,7 +106,7 @@
   grid-column: 2;
   color: var(--agent-tool-foreground);
   font-size: var(--agent-font-size);
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: normal;
   white-space: nowrap;
 }

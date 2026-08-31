@@ -44,7 +44,7 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-transcript\s*\{[^}]*padding:\s*12px var\(--agent-inline-inset\) 24px/s);
     expect(css).toMatch(/\.desktop-agent-live-tail\s*\{[^}]*gap:\s*var\(--agent-message-turn-gap\)[^}]*padding:\s*0 0 20px/s);
     expect(css).toMatch(/--agent-user-message-surface:\s*color-mix\(in srgb, var\(--agent-composer-surface\) 48%, var\(--agent-canvas\)\)/);
-    expect(css).toMatch(/\.desktop-agent-message\.is-user\s*\{[^}]*box-sizing:\s*border-box[^}]*width:\s*100%[^}]*max-width:\s*none[^}]*margin:\s*0[^}]*padding:\s*8px var\(--agent-message-content-inset\)[^}]*border:\s*0[^}]*background:\s*var\(--agent-user-message-surface\)[^}]*box-shadow:\s*none/s);
+    expect(css).toMatch(/\.desktop-agent-message\.is-user\s*\{[^}]*box-sizing:\s*border-box[^}]*width:\s*100%[^}]*max-width:\s*none[^}]*margin:\s*0[^}]*padding:\s*8px var\(--agent-message-content-inset\)[^}]*border:\s*1px solid var\(--agent-border-subtle\)[^}]*background:\s*var\(--agent-user-message-surface\)[^}]*box-shadow:\s*none/s);
     expect(css).toMatch(/\.desktop-agent-virtual-row\s*\{[^}]*padding-bottom:\s*2px/s);
     expect(css).toMatch(/\.desktop-agent-virtual-row\[data-kind="user"\]\s*\{[^}]*padding-bottom:\s*var\(--agent-message-turn-gap\)/s);
     expect(css).toMatch(/\.desktop-agent-virtual-row\[data-kind="assistant"\]\s*\{[^}]*padding:\s*2px 0 var\(--agent-work-handoff-gap\)/s);
@@ -239,7 +239,8 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-tool-chevron\s*\{[^}]*grid-column:\s*3/s);
     expect(css).toMatch(/\.desktop-agent-tool-call\.has-detail \.desktop-agent-tool-summary\s*\{[^}]*grid-column:\s*4/s);
     expect(css).not.toContain("--agent-current-tool-accent");
-    expect(css).toMatch(/\.desktop-agent-tool-name\s*\{[^}]*font-weight:\s*500/s);
+    expect(css).toMatch(/\.desktop-agent-tool-name\s*\{[^}]*font-weight:\s*400/s);
+    expect(css).not.toMatch(/\.desktop-agent-tool-(?:name|row)[^{]*(?:is-read|is-edit)\s*\{[^}]*(?:color|background):/s);
     expect(css).toMatch(/\.desktop-agent-tool-branch\s*\{[^}]*border:\s*0[^}]*border-inline-start:\s*2px solid var\(--agent-border-subtle\)[^}]*background:\s*transparent/s);
     expect(css).toMatch(/\.desktop-agent-tool-call\s*\{[^}]*margin:\s*0 4px var\(--agent-work-handoff-gap\)/s);
     expect(css).toMatch(/\.desktop-agent-tool-branch:has\(> \.desktop-agent-evidence-tree\)\s*\{[^}]*padding:\s*0[^}]*overflow:\s*clip[^}]*border:\s*0/s);

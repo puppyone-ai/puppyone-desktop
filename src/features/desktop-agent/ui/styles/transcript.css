@@ -138,7 +138,7 @@
   max-width: none;
   margin: 0;
   padding: 8px var(--agent-message-content-inset);
-  border: 0;
+  border: 1px solid var(--agent-border-subtle);
   border-radius: var(--agent-radius-message);
   background: var(--agent-user-message-surface);
   box-shadow: none;
