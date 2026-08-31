@@ -37,7 +37,10 @@ import {
   resolveMarkdownContentLanguage,
   type MarkdownContentLanguageResolution,
 } from "./core/presentation/markdownContentLanguage";
-import { bindMarkdownFormatHotkeys } from "./core/commands/markdownFormatHotkeys";
+import {
+  bindMarkdownFormatHotkeys,
+  syncMarkdownEditorCommandAvailability,
+} from "./core/commands/markdownFormatHotkeys";
 import { CodeMirrorFindAdapter } from "../find/codeMirrorFindAdapter";
 import { useRegisterEditorFindAdapter } from "../find/editorFind";
 import { useEditorAppearanceRevision } from "../../core/appearance/EditorAppearanceContext";
@@ -328,6 +331,7 @@ export function MarkdownCodeMirrorEditor({
     view.dispatch({
       effects: editableCompartmentRef.current.reconfigure(getEditableExtensions(readOnly)),
     });
+    syncMarkdownEditorCommandAvailability(view);
   }, [readOnly]);
 
   useEffect(() => {

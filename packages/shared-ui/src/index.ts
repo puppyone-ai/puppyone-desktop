@@ -290,9 +290,11 @@ export type {
 export {
   MARKDOWN_FORMAT_ACTIVE_EVENT,
   MARKDOWN_FORMAT_SHORTCUT_EVENT,
+  MARKDOWN_EDITOR_COMMAND_EVENT,
+  isMarkdownEditorCommand,
   isMarkdownFormatCommand,
 } from "./editor/markdown";
-export type { MarkdownFormatCommand } from "./editor/markdown";
+export type { MarkdownEditorCommand, MarkdownFormatCommand } from "./editor/markdown";
 export {
   classifyEditorViewerCapability,
   createPresetViewerRegistry,

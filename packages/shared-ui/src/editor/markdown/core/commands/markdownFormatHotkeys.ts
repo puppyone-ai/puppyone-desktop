@@ -4,6 +4,10 @@ import {
   isMarkdownFormatCommand,
   type MarkdownFormatCommand,
 } from "./markdownInlineCommands";
+import {
+  applyMarkdownEditorCommand,
+  isMarkdownEditorCommand,
+} from "./markdownEditorCommands";
 
 export {
   applyMarkdownFormatCommand,
@@ -13,6 +17,7 @@ export {
 
 export const MARKDOWN_FORMAT_ACTIVE_EVENT = "puppyone:markdown-format-active";
 export const MARKDOWN_FORMAT_SHORTCUT_EVENT = "puppyone:markdown-format-shortcut";
+export const MARKDOWN_EDITOR_COMMAND_EVENT = "puppyone:markdown-editor-command";
 
 let boundEditorCount = 0;
 let activeMarkdownEditor: EditorView | null = null;
@@ -21,10 +26,13 @@ export function bindMarkdownFormatHotkeys(view: EditorView): () => void {
   if (boundEditorCount === 0) {
     window.addEventListener("keydown", onMarkdownFormatKeyDown, true);
     window.addEventListener(MARKDOWN_FORMAT_SHORTCUT_EVENT, onMarkdownFormatShortcut);
+    window.addEventListener(MARKDOWN_EDITOR_COMMAND_EVENT, onMarkdownEditorCommand);
   }
   boundEditorCount += 1;
 
-  const onFocusIn = () => setActiveMarkdownEditor(view);
+  const onFocusIn = (event: FocusEvent) => (
+    syncMarkdownEditorCommandAvailability(view, event.target === view.contentDOM)
+  );
   const onFocusOut = (event: FocusEvent) => {
     const next = event.relatedTarget;
     if (next instanceof Node && view.dom.contains(next)) return;
@@ -33,8 +41,8 @@ export function bindMarkdownFormatHotkeys(view: EditorView): () => void {
 
   view.dom.addEventListener("focusin", onFocusIn);
   view.dom.addEventListener("focusout", onFocusOut);
-  if (view.hasFocus || view.dom.contains(view.dom.ownerDocument.activeElement)) {
-    setActiveMarkdownEditor(view);
+  if (view.hasFocus || view.dom.ownerDocument.activeElement === view.contentDOM) {
+    syncMarkdownEditorCommandAvailability(view);
   }
 
   return () => {
@@ -45,8 +53,24 @@ export function bindMarkdownFormatHotkeys(view: EditorView): () => void {
     if (boundEditorCount === 0) {
       window.removeEventListener("keydown", onMarkdownFormatKeyDown, true);
       window.removeEventListener(MARKDOWN_FORMAT_SHORTCUT_EVENT, onMarkdownFormatShortcut);
+      window.removeEventListener(MARKDOWN_EDITOR_COMMAND_EVENT, onMarkdownEditorCommand);
     }
   };
+}
+
+export function syncMarkdownEditorCommandAvailability(
+  view: EditorView,
+  ownsFocus = view.hasFocus || view.dom.ownerDocument.activeElement === view.contentDOM,
+): void {
+  if (!ownsFocus) {
+    if (activeMarkdownEditor === view) setActiveMarkdownEditor(null);
+    return;
+  }
+  if (view.state.readOnly) {
+    setActiveMarkdownEditor(null);
+    return;
+  }
+  setActiveMarkdownEditor(view);
 }
 
 export function matchMarkdownFormatHotkey(event: KeyboardEvent): MarkdownFormatCommand | null {
@@ -83,4 +107,11 @@ function onMarkdownFormatShortcut(event: Event): void {
   const type = event.detail?.type;
   if (!isMarkdownFormatCommand(type)) return;
   applyMarkdownFormatCommand(activeMarkdownEditor, type);
+}
+
+function onMarkdownEditorCommand(event: Event): void {
+  if (!activeMarkdownEditor || !(event instanceof CustomEvent)) return;
+  const type = event.detail?.type;
+  if (!isMarkdownEditorCommand(type)) return;
+  applyMarkdownEditorCommand(activeMarkdownEditor, type);
 }

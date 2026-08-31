@@ -23,6 +23,7 @@ const MARKDOWN_FORMAT_SPECS: Record<MarkdownFormatCommand, MarkdownFormatSpec> =
 };
 
 const INLINE_CODE_SPEC: MarkdownFormatSpec = { kind: "inlineCode", open: "`", close: "`" };
+const INLINE_MATH_SPEC: MarkdownFormatSpec = { kind: "mathInline", open: "$", close: "$" };
 
 export function isMarkdownFormatCommand(value: unknown): value is MarkdownFormatCommand {
   return value === "emphasis" || value === "strike" || value === "strong" || value === "underline";
@@ -33,14 +34,16 @@ export function applyMarkdownFormatCommand(view: EditorView, type: MarkdownForma
   return spec ? toggleMarkdownFormat(view, spec) : false;
 }
 
-export function toggleMarkdownInline(delimiter: "**" | "*" | "`" | "~~") {
+export function toggleMarkdownInline(delimiter: "**" | "*" | "`" | "~~" | "$") {
   const spec = delimiter === "**"
     ? MARKDOWN_FORMAT_SPECS.strong
     : delimiter === "*"
       ? MARKDOWN_FORMAT_SPECS.emphasis
       : delimiter === "~~"
         ? MARKDOWN_FORMAT_SPECS.strike
-        : INLINE_CODE_SPEC;
+        : delimiter === "$"
+          ? INLINE_MATH_SPEC
+          : INLINE_CODE_SPEC;
   return (view: EditorView): boolean => toggleMarkdownFormat(view, spec);
 }
 

@@ -1,12 +1,42 @@
 export const MARKDOWN_FORMAT_ACTIVE_CHANNEL = "editor:markdown-format-active";
 export const MARKDOWN_FORMAT_SHORTCUT_CHANNEL = "editor:markdown-format-shortcut";
+export const MARKDOWN_EDITOR_COMMAND_CHANNEL = "editor:markdown-command";
 
 export const MARKDOWN_FORMAT_COMMANDS = Object.freeze(["strong", "emphasis", "underline", "strike"]);
+export const MARKDOWN_EDITOR_COMMANDS = Object.freeze([
+  "paragraph",
+  "heading-1",
+  "heading-2",
+  "heading-3",
+  "heading-4",
+  "heading-5",
+  "heading-6",
+  "bullet-list",
+  "ordered-list",
+  "task-list",
+  "quote",
+  "code-block",
+  "math-block",
+  "indent",
+  "outdent",
+  "strong",
+  "emphasis",
+  "underline",
+  "strike",
+  "inline-code",
+  "inline-math",
+  "link",
+  "clear-format",
+]);
 
 const controllers = new Map();
 
 export function isMarkdownFormatCommand(value) {
   return MARKDOWN_FORMAT_COMMANDS.includes(value);
+}
+
+export function isMarkdownEditorCommand(value) {
+  return MARKDOWN_EDITOR_COMMANDS.includes(value);
 }
 
 /**
@@ -62,24 +92,46 @@ export function attachMarkdownFormatShortcuts(
     setActive(nextActive) {
       active = nextActive === true;
     },
+    isActive() {
+      return active;
+    },
     dispose,
   };
   controllers.set(webContents.id, controller);
   return controller;
 }
 
-export function setMarkdownFormatShortcutsActive(webContentsId, active) {
-  controllers.get(webContentsId)?.setActive(active === true);
+export function isMarkdownEditorActive(webContentsId) {
+  return controllers.get(webContentsId)?.isActive() === true;
 }
 
-export function registerMarkdownFormatIpcHandlers({ ipcMain }) {
+export function dispatchMarkdownEditorCommand(webContents, type) {
+  if (!webContents || webContents.isDestroyed?.()) return false;
+  if (!isMarkdownEditorCommand(type) || !isMarkdownEditorActive(webContents.id)) return false;
+  webContents.send(MARKDOWN_EDITOR_COMMAND_CHANNEL, { type });
+  return true;
+}
+
+export function setMarkdownFormatShortcutsActive(webContentsId, active) {
+  const controller = controllers.get(webContentsId);
+  if (!controller) return false;
+  const previous = controller.isActive();
+  controller.setActive(active === true);
+  return previous !== controller.isActive();
+}
+
+export function registerMarkdownFormatIpcHandlers({ ipcMain, onActiveChange = () => undefined }) {
   if (!ipcMain || typeof ipcMain.on !== "function") {
     throw new TypeError("Trusted ipcMain is required for Markdown format shortcuts.");
   }
+  if (typeof onActiveChange !== "function") throw new TypeError("onActiveChange must be a function.");
 
   ipcMain.on(MARKDOWN_FORMAT_ACTIVE_CHANNEL, (event, request) => {
     const webContentsId = event?.sender?.id;
     if (!Number.isSafeInteger(webContentsId) || webContentsId <= 0) return;
-    setMarkdownFormatShortcutsActive(webContentsId, request?.active === true);
+    const active = request?.active === true;
+    if (setMarkdownFormatShortcutsActive(webContentsId, active)) {
+      onActiveChange({ active, webContentsId });
+    }
   });
 }

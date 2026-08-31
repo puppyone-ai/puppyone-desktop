@@ -212,7 +212,7 @@ function isSelectableInlineFormat(element: MarkdownElement): boolean {
   return !(element.kind === "inlineHtml" && element.inlineHtml?.status !== "complete");
 }
 
-export type MarkdownInlineFormatKind = "emphasis" | "inlineCode" | "strike" | "strong" | "underline";
+export type MarkdownInlineFormatKind = "emphasis" | "inlineCode" | "mathInline" | "strike" | "strong" | "underline";
 
 export type MarkdownInlineFormatCoverage = {
   formats: MarkdownElement[];

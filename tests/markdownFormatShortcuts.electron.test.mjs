@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   attachMarkdownFormatShortcuts,
+  dispatchMarkdownEditorCommand,
+  isMarkdownEditorActive,
   matchMarkdownFormatInput,
   MARKDOWN_FORMAT_SHORTCUT_CHANNEL,
   registerMarkdownFormatIpcHandlers,
@@ -157,12 +159,14 @@ describe("Markdown format window shortcuts", () => {
     const controller = attachMarkdownFormatShortcuts(webContents, { platform: "darwin" });
 
     const ipcListeners = new Map();
+    const onActiveChange = vi.fn();
     registerMarkdownFormatIpcHandlers({
       ipcMain: {
         on(channel, listener) {
           ipcListeners.set(channel, listener);
         },
       },
+      onActiveChange,
     });
 
     ipcListeners.get("editor:markdown-format-active")({ sender: { id: 21 } }, { active: true });
@@ -173,6 +177,34 @@ describe("Markdown format window shortcuts", () => {
       channel: MARKDOWN_FORMAT_SHORTCUT_CHANNEL,
       payload: { type: "strong" },
     });
+    expect(onActiveChange).toHaveBeenCalledWith({ active: true, webContentsId: 21 });
+    controller.dispose();
+  });
+
+  it("forwards native menu commands only to an active Markdown editor", () => {
+    const sent = [];
+    const webContents = {
+      id: 22,
+      isDestroyed: () => false,
+      send(channel, payload) {
+        sent.push({ channel, payload });
+      },
+      on() {},
+      once() {},
+      removeListener() {},
+    };
+    const controller = attachMarkdownFormatShortcuts(webContents);
+
+    expect(isMarkdownEditorActive(webContents.id)).toBe(false);
+    expect(dispatchMarkdownEditorCommand(webContents, "math-block")).toBe(false);
+    controller.setActive(true);
+    expect(isMarkdownEditorActive(webContents.id)).toBe(true);
+    expect(dispatchMarkdownEditorCommand(webContents, "math-block")).toBe(true);
+    expect(dispatchMarkdownEditorCommand(webContents, "not-a-command")).toBe(false);
+    expect(sent).toEqual([{
+      channel: "editor:markdown-command",
+      payload: { type: "math-block" },
+    }]);
     controller.dispose();
   });
 });

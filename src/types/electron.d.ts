@@ -934,6 +934,9 @@ declare global {
       onMarkdownFormatShortcut: (
         callback: (payload: { type: "strong" | "emphasis" | "underline" | "strike" }) => void,
       ) => () => void;
+      onMarkdownEditorCommand: (
+        callback: (payload: { type: import("@puppyone/shared-ui").MarkdownEditorCommand }) => void,
+      ) => () => void;
       onDocumentSessionFlushRequested: (
         callback: (request: {
           requestId: string;
