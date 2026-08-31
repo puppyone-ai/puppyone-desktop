@@ -3,6 +3,7 @@ import type { InterfaceStyle } from "../appearance/interfaceStyles";
 import { GENERATED_BUILTIN_SUB_THEMES } from "./builtinSubThemes.generated";
 import {
   getSubThemeVariant,
+  type AppearanceSurfaceTarget,
   type SubThemeColorMode,
   type SubThemeCatalogSnapshot,
   type SubThemeDefinition,
@@ -64,7 +65,7 @@ export function listSelectableSubThemes(
   snapshot: SubThemeCatalogSnapshot,
   rootThemeId: InterfaceStyle,
   mode: SubThemeColorMode,
-  allowedTargets: readonly string[],
+  allowedTargets: readonly AppearanceSurfaceTarget[],
 ): readonly SubThemeDefinition[] {
   return getCompatibleSubThemes(snapshot, rootThemeId, mode).filter((subTheme) => (
     subTheme.id !== LEGACY_CUSTOM_CSS_THEME_ID
