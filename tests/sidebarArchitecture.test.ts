@@ -106,7 +106,7 @@ describe("Sidebar architecture", () => {
     );
   });
 
-  it("keeps each pane on one canonical width from host edge through content", () => {
+  it("keeps direct resize canonical while visibility transitions preserve content width", () => {
     expect(dataShellCss).toMatch(
       /\.data-content\[data-resizable-explorer="true"\]\s*\{[^}]*grid-template-columns:[^}]*var\(--data-explorer-width[^}]*minmax/s,
     );
@@ -134,9 +134,10 @@ describe("Sidebar architecture", () => {
     expect(layoutCss).not.toContain("--desktop-right-sidebar-visible-width");
     expect(auxiliaryHostSource).not.toContain("desktop-right-sidebar-visible-width");
     expect(auxiliaryHostSource).toContain('className="desktop-right-sidebar-viewport"');
-    expect(auxiliaryHostSource).toContain("expandedWidthRef");
+    expect(auxiliaryHostSource).toContain("lastExpandedWidth");
     expect(sharedDataWorkspaceCss).not.toContain("--data-explorer-min-width");
-    expect(collapsiblePaneResizeSource).toContain("A pane has one rendered width");
+    expect(collapsiblePaneResizeSource).toContain("canonical live resize width");
+    expect(collapsiblePaneResizeSource).toContain("last-expanded content plane");
     expect(auxiliaryHostSource).toContain("aria-hidden={open ? undefined : true}");
     expect(auxiliaryHostSource).toContain('{...(!open ? { inert: "" } : {})}');
   });

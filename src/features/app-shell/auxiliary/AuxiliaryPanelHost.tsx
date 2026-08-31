@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import {
   SidebarResizeHandle,
   useCollapsiblePaneResize,
@@ -40,7 +47,7 @@ export function AuxiliaryPanelHost({
 }: AuxiliaryPanelHostProps) {
   const { t } = useLocalization();
   const resolvedWidth = width ?? 560;
-  const expandedWidthRef = useRef(clamp(
+  const [lastExpandedWidth, setLastExpandedWidth] = useState(() => clamp(
     resolvedWidth > 0 ? resolvedWidth : expandedWidth ?? 560,
     minWidth,
     maxWidth,
@@ -81,14 +88,26 @@ export function AuxiliaryPanelHost({
     onDragActiveChange: onResizeActiveChange,
     onWidthChange: onWidthChange ?? noop,
   });
-  if (open) {
-    expandedWidthRef.current = clamp(resize.width, minWidth, maxWidth);
-  } else if (!wasOpenRef.current && expandedWidth !== undefined) {
-    expandedWidthRef.current = clamp(expandedWidth, minWidth, maxWidth);
-  }
-  wasOpenRef.current = open;
+  const liveExpandedWidth = clamp(resize.width, minWidth, maxWidth);
+  const renderedExpandedWidth = open ? liveExpandedWidth : lastExpandedWidth;
+
+  useLayoutEffect(() => {
+    const wasOpen = wasOpenRef.current;
+    wasOpenRef.current = open;
+    if (open) {
+      setLastExpandedWidth((current) => current === liveExpandedWidth
+        ? current
+        : liveExpandedWidth);
+      return;
+    }
+    if (!wasOpen && expandedWidth !== undefined) {
+      const preferred = clamp(expandedWidth, minWidth, maxWidth);
+      setLastExpandedWidth((current) => current === preferred ? current : preferred);
+    }
+  }, [expandedWidth, liveExpandedWidth, maxWidth, minWidth, open]);
+
   const panelStyle = {
-    "--desktop-right-sidebar-width": `${expandedWidthRef.current}px`,
+    "--desktop-right-sidebar-width": `${renderedExpandedWidth}px`,
   } as CSSProperties;
   const collapsedEdgeVisible = !open && collapsedEdgeSettled;
 
