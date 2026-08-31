@@ -399,16 +399,16 @@ describe("editor split-pane architecture", () => {
     const resizerRule = readCssBlock(dataShellStyles, ".data-explorer-resizer");
     const resizerDividerRule = readCssBlock(dataShellStyles, ".data-explorer-resizer::after");
 
-    expect(explorerRule).toContain("border-inline-end: 1px solid transparent;");
+    expect(explorerRule).toContain(
+      "border-inline-end: 1px solid var(--po-sidebar-divider, var(--po-divider));",
+    );
     expect(resizerRule).toContain("background: transparent;");
     expect(resizerRule).toContain(
       "inset-inline-start: var(--data-explorer-width, clamp(282px, 26vw, 360px));",
     );
     expect(resizerDividerRule).toContain("inset-inline-start: 0;");
     expect(resizerDividerRule).toContain("inset-inline-end: auto;");
-    expect(resizerDividerRule).toContain(
-      "background: var(--po-shell-divider, var(--po-divider));",
-    );
+    expect(resizerDividerRule).toContain("background: transparent;");
     expect(dataShellStyles).not.toContain("grid-column: 3;");
     expect(dataShellStyles).not.toMatch(
       /grid-template-columns:[^}]*var\(--po-pane-resizer-hit-size/s,

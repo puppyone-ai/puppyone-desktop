@@ -72,13 +72,13 @@ describe("sidebar spacing architecture", () => {
     expect(workspaceSurfaceOutletSource).toContain(
       'className={`desktop-view-surface desktop-view-surface-${region}`}',
     );
-    expect(explorerColumn).toContain("border-inline-end: 1px solid transparent;");
+    expect(explorerColumn).toContain(
+      "border-inline-end: 1px solid var(--po-sidebar-divider, var(--po-divider));",
+    );
     expect(explorerResizer).toContain("background: transparent;");
     expect(explorerDivider).toContain("inset-inline-start: 0;");
     expect(explorerDivider).toContain("inset-inline-end: auto;");
-    expect(explorerDivider).toContain(
-      "background: var(--po-shell-divider, var(--po-divider));",
-    );
+    expect(explorerDivider).toContain("background: transparent;");
     expect(injectedSurface).not.toContain("border-inline-end:");
     expect(cloudSidebarCss).not.toContain("border-inline-end:");
   });
@@ -134,7 +134,7 @@ describe("sidebar spacing architecture", () => {
     `));
   });
 
-  it("uses one stronger frame divider and one quieter sidebar divider", () => {
+  it("uses one shared quiet divider for both sidebars", () => {
     const semanticThemeScope = readCssBlock(
       tokensCss,
       ":root,\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface, .dark)",
@@ -168,7 +168,7 @@ describe("sidebar spacing architecture", () => {
     expect(tokensCss).not.toMatch(/--po-header-divider:\s*rgba/);
     expect(titlebar).toContain("--desktop-titlebar-divider: var(--po-header-divider);");
     expect(rightSidebar).toContain(
-      "border-inline-start-color: var(--po-shell-divider, var(--po-divider));",
+      "border-inline-start-color: var(--po-sidebar-divider, var(--po-divider));",
     );
     expect(sharedGroupDivider).toContain(
       "background: var(--po-sidebar-divider, var(--po-divider));",

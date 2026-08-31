@@ -38,7 +38,7 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--po-sidebar);
-  border-inline-end: 1px solid transparent;
+  border-inline-end: 1px solid var(--po-sidebar-divider, var(--po-divider));
   transition: background-color 260ms ease, border-color 260ms ease;
 }
 
@@ -142,7 +142,7 @@
 .data-explorer-resizer::after {
   inset-inline-start: 0;
   inset-inline-end: auto;
-  background: var(--po-shell-divider, var(--po-divider));
+  background: transparent;
   transition: background 120ms ease, box-shadow 120ms ease;
 }
 

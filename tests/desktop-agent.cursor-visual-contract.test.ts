@@ -204,13 +204,13 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(brandMark).not.toMatch(/https?:\/\//);
   });
 
-  it("uses a flat shared shell divider for the right sidebar edge", () => {
+  it("uses the same quiet divider as the left sidebar edge", () => {
     expect(layoutCss).toMatch(/\.desktop-right-sidebar\s*\{[^}]*--desktop-right-sidebar-background:\s*var\(--po-header\)[^}]*--po-terminal-bg:\s*var\(--desktop-right-sidebar-background\)[^}]*overflow:\s*hidden[^}]*background:\s*var\(--desktop-right-sidebar-background\)/s);
     expect(layoutCss).toMatch(/\.desktop-right-sidebar:not\(\.is-open\)\s*\{[^}]*overflow:\s*visible/s);
     expect(layoutCss).toMatch(/\.desktop-right-sidebar-stack\s*\{[^}]*background:\s*var\(--desktop-right-sidebar-background\)/s);
     expect(layoutCss).toMatch(/\.desktop-right-sidebar-surface\s*\{[^}]*background:\s*var\(--desktop-right-sidebar-background\)/s);
     expect(css).toMatch(/\.desktop-right-sidebar \.desktop-agent-boundary\s*\{[^}]*--agent-canvas:\s*var\(--po-terminal-bg\)/s);
-    expect(layoutCss).toMatch(/\.desktop-right-sidebar\.is-open\s*\{[^}]*border-inline-start-color:\s*var\(--po-shell-divider, var\(--po-divider\)\)/s);
+    expect(layoutCss).toMatch(/\.desktop-right-sidebar\.is-open\s*\{[^}]*border-inline-start-color:\s*var\(--po-sidebar-divider, var\(--po-divider\)\)/s);
     expect(layoutCss).not.toContain(".desktop-right-sidebar::before");
   });
 

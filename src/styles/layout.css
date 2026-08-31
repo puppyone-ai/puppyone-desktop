@@ -321,7 +321,7 @@
   flex-basis: var(--desktop-right-sidebar-width);
   width: var(--desktop-right-sidebar-width);
   border-inline-start-width: 1px;
-  border-inline-start-color: var(--po-shell-divider, var(--po-divider));
+  border-inline-start-color: var(--po-sidebar-divider, var(--po-divider));
 }
 
 .desktop-right-sidebar:not(.is-open) {
