@@ -30,9 +30,17 @@ export function registerThemeIpcHandlers({ ipcMain, themeService, onSyncNativeMe
   });
 }
 
+const LEGACY_DEFAULT_SUB_THEME_ID = "default";
+const FALLBACK_SUB_THEME_ID = "default.neutral";
+const SUB_THEME_ID_PATTERN = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$/;
+const BUILTIN_SUB_THEME_ID_PATTERN = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/;
+
 function parseThemeMenuState(value) {
   const targets = ["application", "markdown", "csv"];
-  const pack = parseThemeId(value?.pack) ?? "default";
+  const requiredTargets = Array.isArray(value?.requiredTargets)
+    ? [...new Set(value.requiredTargets.filter((target) => targets.includes(target)))]
+    : [...targets];
+  const pack = parseThemeId(value?.pack) ?? FALLBACK_SUB_THEME_ID;
   const themes = [];
   const knownIds = new Set();
   for (const theme of Array.isArray(value?.themes) ? value.themes.slice(0, 500) : []) {
@@ -47,14 +55,14 @@ function parseThemeMenuState(value) {
   }
   return Object.freeze({
     pack,
+    requiredTargets: Object.freeze(requiredTargets),
     themes: Object.freeze(themes),
   });
 }
 
 function parseThemeId(value) {
-  if (value === "default") return value;
-  return typeof value === "string"
-    && /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$/.test(value)
-    ? value
-    : null;
+  if (value === LEGACY_DEFAULT_SUB_THEME_ID) return FALLBACK_SUB_THEME_ID;
+  if (typeof value !== "string") return null;
+  if (SUB_THEME_ID_PATTERN.test(value) || BUILTIN_SUB_THEME_ID_PATTERN.test(value)) return value;
+  return null;
 }

@@ -1,3 +1,5 @@
+const FALLBACK_SUB_THEME_ID = "default.neutral";
+
 function runMenuAction(actionId, action, logger) {
   void Promise.resolve()
     .then(action)
@@ -30,8 +32,9 @@ export function createDesktopNativeMenuService({
   if (typeof onOpenThemesDirectory !== "function") throw new TypeError("onOpenThemesDirectory must be a function.");
 
   let themeState = {
-    pack: "default",
-    themes: [{ id: "default", name: "Default", targets: ["application", "markdown", "csv"] }],
+    pack: FALLBACK_SUB_THEME_ID,
+    requiredTargets: ["application", "markdown", "csv"],
+    themes: [{ id: FALLBACK_SUB_THEME_ID, name: "Neutral", targets: ["application", "markdown", "csv"] }],
   };
 
   const action = (actionId, handler) => () => runMenuAction(actionId, handler, logger);
@@ -75,11 +78,8 @@ export function createDesktopNativeMenuService({
     label: t("native.menu.theme.pack"),
     submenu: themeState.themes
       .filter((theme) => (
-        theme.id === "default"
-        || (
-          theme.id !== "local.puppyone.custom-css"
-          && ["application", "markdown", "csv"].every((target) => theme.targets.includes(target))
-        )
+        theme.id !== "local.puppyone.custom-css"
+        && themeState.requiredTargets.every((target) => theme.targets.includes(target))
       ))
       .map((theme) => ({
         id: `theme.pack.${theme.id}`,
@@ -152,18 +152,25 @@ export function createDesktopNativeMenuService({
 
 function normalizeThemeState(value) {
   const validTargets = new Set(["application", "markdown", "csv"]);
-  const pack = typeof value?.pack === "string" ? value.pack : "default";
+  const requiredTargets = Array.isArray(value?.requiredTargets)
+    ? value.requiredTargets.filter((target) => validTargets.has(target))
+    : [...validTargets];
+  const pack = normalizePackId(value?.pack);
   const themes = Array.isArray(value?.themes)
     ? value.themes.flatMap((theme) => {
       if (typeof theme?.id !== "string" || typeof theme?.name !== "string") return [];
       const targets = Array.isArray(theme.targets)
         ? theme.targets.filter((target) => validTargets.has(target))
         : [];
-      return targets.length > 0 ? [{ id: theme.id, name: theme.name, targets }] : [];
+      return targets.length > 0
+        ? [{ id: theme.id, name: theme.name, targets }]
+        : [];
     })
     : [];
-  if (!themes.some((theme) => theme.id === "default")) {
-    themes.unshift({ id: "default", name: "Default", targets: [...validTargets] });
-  }
-  return { pack, themes };
+  return { pack, requiredTargets, themes };
+}
+
+function normalizePackId(value) {
+  if (value === "default") return FALLBACK_SUB_THEME_ID;
+  return typeof value === "string" ? value : FALLBACK_SUB_THEME_ID;
 }

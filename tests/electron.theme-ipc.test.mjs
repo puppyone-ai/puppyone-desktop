@@ -44,7 +44,26 @@ describe("CSS theme IPC", () => {
     })).toEqual({ synced: true });
     expect(onSyncNativeMenu).toHaveBeenCalledWith({
       pack: "builtin.pack.forest",
+      requiredTargets: Object.freeze(["application", "markdown", "csv"]),
       themes: [{ id: "builtin.markdown.focus", name: "Focus", targets: ["markdown"] }],
+    });
+
+    expect(handlers.get(THEME_SYNC_NATIVE_MENU_CHANNEL)({}, {
+      pack: "default",
+      themes: [
+        { id: "default.neutral", name: "Neutral", targets: ["application", "markdown", "csv"] },
+        { id: "default.warm", name: "Warm", targets: ["application", "markdown", "csv"] },
+        { id: "builtin.pack.forest", name: "Forest", targets: ["application", "markdown", "csv"] },
+      ],
+    })).toEqual({ synced: true });
+    expect(onSyncNativeMenu).toHaveBeenLastCalledWith({
+      pack: "default.neutral",
+      requiredTargets: Object.freeze(["application", "markdown", "csv"]),
+      themes: [
+        { id: "default.neutral", name: "Neutral", targets: Object.freeze(["application", "markdown", "csv"]) },
+        { id: "default.warm", name: "Warm", targets: Object.freeze(["application", "markdown", "csv"]) },
+        { id: "builtin.pack.forest", name: "Forest", targets: Object.freeze(["application", "markdown", "csv"]) },
+      ],
     });
   });
 

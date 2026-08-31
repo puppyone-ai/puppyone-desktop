@@ -863,6 +863,7 @@ export type DesktopThemeSnapshot = Readonly<{
 }>;
 export type DesktopThemeMenuState = Readonly<{
   pack: string;
+  requiredTargets?: readonly DesktopThemeTarget[];
   themes: readonly Readonly<{
     id: string;
     name: string;

@@ -60,6 +60,18 @@ export function getCompatibleSubThemes(
   ));
 }
 
+export function listSelectableSubThemes(
+  snapshot: SubThemeCatalogSnapshot,
+  rootThemeId: InterfaceStyle,
+  mode: SubThemeColorMode,
+  allowedTargets: readonly string[],
+): readonly SubThemeDefinition[] {
+  return getCompatibleSubThemes(snapshot, rootThemeId, mode).filter((subTheme) => (
+    subTheme.id !== LEGACY_CUSTOM_CSS_THEME_ID
+    && allowedTargets.every((target) => subTheme.targets.includes(target))
+  ));
+}
+
 export function isCompleteSubTheme(subTheme: SubThemeDefinition): boolean {
   return COMPLETE_TARGETS.every((target) => subTheme.targets.includes(target));
 }

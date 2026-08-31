@@ -91,8 +91,10 @@ describe("DesktopNativeMenuService", () => {
     const { actions, service } = createHarness();
     service.setThemeState({
       pack: "builtin.pack.forest",
+      requiredTargets: ["application", "markdown", "csv"],
       themes: [
-        { id: "default", name: "Default", targets: ["application", "markdown", "csv"] },
+        { id: "default.neutral", name: "Neutral", targets: ["application", "markdown", "csv"] },
+        { id: "default.warm", name: "Warm", targets: ["application", "markdown", "csv"] },
         { id: "builtin.pack.forest", name: "Forest", targets: ["application", "markdown", "csv"] },
         { id: "local.puppyone.custom-css", name: "My Custom CSS", targets: ["application", "markdown", "csv"] },
         { id: "builtin.markdown.newspaper", name: "Newspaper", targets: ["markdown"] },
@@ -107,6 +109,11 @@ describe("DesktopNativeMenuService", () => {
       "Visual Variant",
       "Open Themes Folder",
     ]);
+    expect(themeMenu.submenu[0].submenu.map((item) => item.label)).toEqual([
+      "Neutral",
+      "Warm",
+      "Forest",
+    ]);
     expect(themeMenu.submenu[0].submenu.find((item) => item.label === "Forest"))
       .toMatchObject({ type: "radio", checked: true });
     expect(themeMenu.submenu[0].submenu.find((item) => item.label === "My Custom CSS"))
@@ -116,12 +123,12 @@ describe("DesktopNativeMenuService", () => {
     expect(themeMenu.submenu[0].submenu.find((item) => item.label === "Ledger"))
       .toBeUndefined();
 
-    themeMenu.submenu[0].submenu.find((item) => item.label === "Default").click();
+    themeMenu.submenu[0].submenu.find((item) => item.label === "Neutral").click();
     themeMenu.submenu.at(-1).click();
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(actions.selectTheme).toHaveBeenCalledWith({ kind: "pack", themeId: "default" });
+    expect(actions.selectTheme).toHaveBeenCalledWith({ kind: "pack", themeId: "default.neutral" });
     expect(actions.selectTheme).toHaveBeenCalledTimes(1);
     expect(actions.openThemesDirectory).toHaveBeenCalledOnce();
   });
