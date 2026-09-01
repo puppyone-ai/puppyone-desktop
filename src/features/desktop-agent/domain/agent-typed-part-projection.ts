@@ -29,28 +29,37 @@ export function projectTypedPart(projection: AgentProjection, event: AgentEvent)
   if (!part) return;
   const indexes = projectionIndexes(projection);
   const existingIndex = indexes.parts.get(part.id);
-  if (existingIndex !== undefined) projection.parts[existingIndex] = part;
+  const existingPart = existingIndex === undefined ? null : projection.parts[existingIndex];
+  const projectedPart: AgentPart = {
+    ...part,
+    sequence: existingPart?.sequence ?? part.sequence,
+    updatedSequence: event.sequence,
+  };
+  if (existingIndex !== undefined) projection.parts[existingIndex] = projectedPart;
   else {
-    indexes.parts.set(part.id, projection.parts.length);
-    projection.parts.push(part);
+    indexes.parts.set(projectedPart.id, projection.parts.length);
+    projection.parts.push(projectedPart);
   }
-  if (turn && !turn.partIds.includes(part.id)) {
+  if (turn && !turn.partIds.includes(projectedPart.id)) {
     const turnIndex = indexes.turns.get(turn.id);
-    const nextTurn = { ...turn, partIds: [...turn.partIds, part.id] };
+    const nextTurn = { ...turn, partIds: [...turn.partIds, projectedPart.id] };
     if (turnIndex !== undefined) projection.turns[turnIndex] = nextTurn;
   }
   // Usage is session metadata, not visible transcript content. Keep the typed
   // part for consumers that need it, but never allocate virtual-list geometry.
-  if (part.kind === "usage") return;
+  if (projectedPart.kind === "usage") return;
+  const rowId = `row:${projectedPart.id}`;
+  const rowIndex = indexes.rows.get(rowId);
+  const existingRow = rowIndex === undefined ? null : projection.rows[rowIndex];
   const row: TimelineRow = {
-    id: `row:${part.id}`,
-    partId: part.id,
-    turnId: part.turnId,
-    kind: part.kind,
-    sequence: part.sequence,
-    estimatedHeight: estimatePartHeight(part),
+    id: rowId,
+    partId: projectedPart.id,
+    turnId: projectedPart.turnId,
+    kind: projectedPart.kind,
+    sequence: existingRow?.sequence ?? projectedPart.sequence,
+    updatedSequence: event.sequence,
+    estimatedHeight: estimatePartHeight(projectedPart),
   };
-  const rowIndex = indexes.rows.get(row.id);
   if (rowIndex !== undefined) projection.rows[rowIndex] = row;
   else {
     indexes.rows.set(row.id, projection.rows.length);
@@ -99,9 +108,13 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
     return message ? messagePart(message) : null;
   }
   if (event.type === "assistant.delta" || event.type === "assistant.completed") {
-    const id = `assistant:${event.itemId ?? event.turnId ?? event.sequence}`;
-    const messageIndex = projectionIndexes(projection).messages.get(id);
-    const message = messageIndex === undefined ? null : projection.messages[messageIndex];
+    const baseId = `assistant:${event.itemId ?? event.turnId ?? event.sequence}`;
+    const message = [...projection.messages].reverse().find((entry) => (
+      entry.role === "assistant"
+      && entry.turnId === event.turnId
+      && (event.itemId ? entry.itemId === event.itemId : entry.id === baseId)
+      && (entry.updatedSequence ?? entry.sequence) === event.sequence
+    )) ?? null;
     return message ? messagePart(message) : null;
   }
   if (event.type === "reasoning.summary.delta" || event.type === "plan.updated"
@@ -131,6 +144,7 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
       kind: "usage",
       usage: pickUsage(event.payload),
       sequence: event.sequence,
+      updatedSequence: event.sequence,
     };
   }
   if (event.type === "approval.requested" || event.type === "approval.resolved") {
@@ -144,6 +158,7 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
       requestId,
       state: event.type.endsWith("resolved") ? "resolved" : "pending",
       sequence: event.sequence,
+      updatedSequence: event.sequence,
     };
   }
   if (event.type === "question.requested" || event.type === "question.resolved") {
@@ -157,6 +172,7 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
       requestId,
       state: event.type.endsWith("resolved") ? "resolved" : "pending",
       sequence: event.sequence,
+      updatedSequence: event.sequence,
     };
   }
   if (event.type.startsWith("session.") || event.type.startsWith("turn.")) return null;
@@ -169,6 +185,7 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
     label: "",
     labelCode: "unsupported-event",
     sequence: event.sequence,
+    updatedSequence: event.sequence,
   };
 }
 

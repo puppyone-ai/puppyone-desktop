@@ -2,8 +2,8 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { useScrollEdgeState } from "@puppyone/shared-ui";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
-import { ArrowDown, CircleAlert, LoaderCircle } from "lucide-react";
-import { PageLoading } from "../../../components/loading";
+import { ArrowDown, CircleAlert } from "lucide-react";
+import { InlineLoading, PageLoading } from "../../../components/loading";
 import type { AgentSubmissionStage } from "../application/agent-controller-state";
 import type { AgentDraftReference, AgentPromptReferenceMention, AgentReferenceDisplay } from "../domain/agent-contract";
 import type { AgentPart, AgentProjection } from "../domain/agent-projection-types";
@@ -97,12 +97,20 @@ function AgentTranscriptView({
     [layout.offsets, scrollTop, timeline.rows.length, viewportHeight],
   );
   const visibleRows = timeline.rows.slice(range.start, range.end);
-  const latestSequence = timeline.rows.at(-1)?.sequence ?? 0;
+  // Ledger freshness and visual order are separate axes. A completion event
+  // revises an existing row without moving it, but still counts as new work.
+  const latestSequence = projection.lastSequence;
   const submissionStatus = agentSubmissionStatusLabel(submissionStage, runtimeLabel, t);
-  const showThinking = !projection.connectionStatus && !submissionStatus && shouldShowAgentThinking(projection, working);
+  const runStatus = !projection.connectionStatus && !submissionStatus
+    ? agentRunStatusCode(projection, working)
+    : null;
+  const showThinking = runStatus === "thinking";
   const workingStatus = projection.connectionStatus
     ? null
-    : submissionStatus || (showThinking ? t("agent.activity.thinking") : null);
+    : submissionStatus
+      || (runStatus === "thinking"
+        ? t("agent.activity.thinking")
+        : runStatus === "working" ? t("agent.activity.workingThroughRequest") : null);
   const hasLiveTail = Boolean(pendingPrompt)
     || pendingReferences.length > 0
     || Boolean(projection.connectionStatus)
@@ -345,16 +353,15 @@ function AgentTranscriptView({
             }} runtimeLabel={runtimeLabel} />}
             {projection.connectionStatus && <AgentConnectionStatus status={projection.connectionStatus} />}
             {workingStatus && (
-              <div
+              <InlineLoading
                 className="desktop-agent-working-indicator"
-                role="status"
-                aria-label={showThinking
+                size="xs"
+                tone="neutral"
+                label={workingStatus}
+                ariaLabel={showThinking
                   ? t("agent.transcript.thinkingAria", { agent: bidiIsolate(runtimeLabel) })
                   : workingStatus}
-              >
-                <LoaderCircle size={13} className="desktop-agent-spin" aria-hidden="true" />
-                <span>{workingStatus}</span>
-              </div>
+              />
             )}
           </div>
         )}
@@ -436,9 +443,22 @@ export function shouldShowAgentThinking(
   projection: AgentProjection,
   working: boolean,
 ) {
-  if (!working || projection.approvals.length > 0 || projection.questions.length > 0) return false;
+  return agentRunStatusCode(projection, working) === "thinking";
+}
+
+/**
+ * Provider-neutral, presentation-only pulse for an accepted native turn.
+ * It never becomes transcript content and therefore never enters a Harness
+ * continuation. Event semantics decide the label; silence never fabricates a
+ * model message or a fake tool result.
+ */
+export function agentRunStatusCode(
+  projection: AgentProjection,
+  working: boolean,
+): "thinking" | "working" | null {
+  if (!working || projection.approvals.length > 0 || projection.questions.length > 0) return null;
   const turnId = projection.runningTurnId;
-  if (!turnId) return false;
+  if (!turnId) return null;
   const typedParts = projection.parts.length > 0
     ? projection.parts
     : [
@@ -447,17 +467,19 @@ export function shouldShowAgentThinking(
     ];
   const visible = typedParts
     .filter((part) => part.turnId === turnId && !["user", "usage", "permission", "question"].includes(part.kind))
-    .sort((left, right) => left.sequence - right.sequence);
+    .sort((left, right) => (
+      (left.updatedSequence ?? left.sequence) - (right.updatedSequence ?? right.sequence)
+    ));
   const latest = visible.at(-1);
-  if (!latest) return true;
-  if (latest.kind === "assistant") return false;
-  if (latest.kind === "error" || latest.kind === "warning") return false;
+  if (!latest) return "thinking";
+  if (latest.kind === "assistant") return latest.streaming ? null : "working";
+  if (latest.kind === "error" || latest.kind === "warning") return null;
   if ("status" in latest && ["running", "pending", "in-progress", "waiting-for-user", "blocked"].includes(latest.status)) {
-    return false;
+    return latest.kind === "reasoning" ? "thinking" : "working";
   }
   // A completed tool/reasoning item while the turn is still active means the
   // native harness has resumed work and needs a fresh, non-persistent pulse.
-  return true;
+  return "working";
 }
 
 export function agentSubmissionStatusLabel(

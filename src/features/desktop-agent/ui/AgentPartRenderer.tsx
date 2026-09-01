@@ -26,7 +26,7 @@ function MessagePart({ part, runtimeLabel }: AgentPartRendererProps<"user" | "as
 
 function ReasoningPart({ part }: AgentPartRendererProps<"reasoning">) {
   return (
-    <AgentActivityRenderBoundary activityId={part.id} resetKey={`${part.id}:${part.sequence}`}>
+    <AgentActivityRenderBoundary activityId={part.id} resetKey={`${part.id}:${part.updatedSequence ?? part.sequence}`}>
       <AgentReasoningActivity activity={part} />
     </AgentActivityRenderBoundary>
   );
@@ -34,7 +34,7 @@ function ReasoningPart({ part }: AgentPartRendererProps<"reasoning">) {
 
 function PlanPart({ part }: AgentPartRendererProps<"plan">) {
   return (
-    <AgentActivityRenderBoundary activityId={part.id} resetKey={`${part.id}:${part.sequence}`}>
+    <AgentActivityRenderBoundary activityId={part.id} resetKey={`${part.id}:${part.updatedSequence ?? part.sequence}`}>
       <AgentPlanActivity activity={part} />
     </AgentActivityRenderBoundary>
   );
@@ -42,7 +42,7 @@ function PlanPart({ part }: AgentPartRendererProps<"plan">) {
 
 function NoticePart({ part }: AgentPartRendererProps<"warning" | "error">) {
   return (
-    <AgentActivityRenderBoundary activityId={part.id} resetKey={`${part.id}:${part.sequence}`}>
+    <AgentActivityRenderBoundary activityId={part.id} resetKey={`${part.id}:${part.updatedSequence ?? part.sequence}`}>
       <AgentNoticeActivity activity={part} />
     </AgentActivityRenderBoundary>
   );
@@ -50,7 +50,7 @@ function NoticePart({ part }: AgentPartRendererProps<"warning" | "error">) {
 
 function ToolPart({ part, onOpenFile }: AgentPartRendererProps<"tool" | "command" | "file-change">) {
   return (
-    <AgentActivityRenderBoundary activityId={part.id} resetKey={`${part.id}:${part.sequence}`}>
+    <AgentActivityRenderBoundary activityId={part.id} resetKey={`${part.id}:${part.updatedSequence ?? part.sequence}`}>
       <AgentToolRenderer part={part} onOpenFile={onOpenFile} />
     </AgentActivityRenderBoundary>
   );

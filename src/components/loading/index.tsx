@@ -136,20 +136,21 @@ export function Dots({
   className,
   style,
   ariaLabel = "Loading",
+  ariaHidden = false,
 }: {
   size?: LoaderSize;
   tone?: LoaderTone;
   className?: string;
   style?: CSSProperties;
   ariaLabel?: string;
+  ariaHidden?: boolean;
 }) {
   const { dot, gap } = DOTS_SIZE[size];
   const { active } = TONE_MAP[tone];
 
   return (
     <span
-      role="status"
-      aria-label={ariaLabel}
+      {...(ariaHidden ? { "aria-hidden": true } : { role: "status", "aria-label": ariaLabel })}
       data-puppy-loader="dots"
       className={className}
       style={{ display: "inline-flex", alignItems: "center", gap, verticalAlign: "middle", ...style }}
@@ -225,16 +226,23 @@ export function InlineLoading({
   tone = "neutral",
   className,
   style,
+  ariaLabel,
 }: {
   label?: ReactNode | null;
   size?: LoaderSize;
   tone?: LoaderTone;
   className?: string;
   style?: CSSProperties;
+  ariaLabel?: string;
 }) {
   return (
-    <span className={className} style={{ display: "inline-flex", alignItems: "center", gap: 7, ...style }}>
-      <Dots size={size} tone={tone} />
+    <span
+      className={className}
+      role="status"
+      aria-label={ariaLabel || (typeof label === "string" ? label : "Loading")}
+      style={{ display: "inline-flex", alignItems: "center", gap: 7, ...style }}
+    >
+      <Dots size={size} tone={tone} ariaHidden />
       {label != null && <span>{label}</span>}
     </span>
   );

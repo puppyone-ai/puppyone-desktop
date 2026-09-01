@@ -31,6 +31,7 @@ export function buildAgentTimeline(projection: AgentProjection): AgentTimeline {
       turnId: part.turnId,
       kind: part.kind,
       sequence: part.sequence,
+      updatedSequence: part.updatedSequence ?? part.sequence,
       estimatedHeight: estimateLegacyPartHeight(part),
     }));
   }
@@ -63,6 +64,7 @@ function appendTurnSummaries(
       durationMs: turn.durationMs,
       status: turn.status,
       sequence,
+      updatedSequence: turn.completedAtSequence,
     };
     partMap.set(id, part);
     nextRows.push({
@@ -71,6 +73,7 @@ function appendTurnSummaries(
       turnId: turn.id,
       kind: "turn-summary",
       sequence,
+      updatedSequence: turn.completedAtSequence,
       estimatedHeight: 30,
     });
   }
