@@ -119,7 +119,7 @@
 :where([data-font-editor-content]:not([data-font-editor-content="theme"]))
   [data-po-theme-surface="markdown"]
   .cm-md-html-rendered-surface
-  * {
+  *:not(:is(.katex, .katex *)) {
   font-family: var(--po-font-editor-content-user) !important;
 }
 
@@ -128,13 +128,13 @@
   .cm-md-table-cell-content,
 :where([data-font-editor-content]:not([data-font-editor-content="theme"]))
   [data-po-theme-surface="markdown"]
-  .cm-md-table-cell-content *,
+  .cm-md-table-cell-content *:not(:is(.katex, .katex *)),
 :where([data-font-editor-content]:not([data-font-editor-content="theme"]))
   [data-po-theme-surface="markdown"]
   .cm-md-mdx-tab-panel,
 :where([data-font-editor-content]:not([data-font-editor-content="theme"]))
   [data-po-theme-surface="markdown"]
-  .cm-md-mdx-tab-panel * {
+  .cm-md-mdx-tab-panel *:not(:is(.katex, .katex *)) {
   font-family: var(--po-font-editor-content-user) !important;
 }
 
@@ -170,14 +170,6 @@
 [data-po-theme-surface="markdown"] .cm-md-html-rendered-surface samp,
 [data-po-theme-surface="markdown"] .cm-md-html-rendered-surface samp * {
   font-family: var(--po-font-code) !important;
-}
-
-/* KaTeX ships its own font stack. Reassert it after prose overrides. */
-:where([data-font-editor-content]:not([data-font-editor-content="theme"]))
-  [data-po-theme-surface="markdown"]
-  :is(.cm-md-math-inline-widget, .cm-md-math-block-widget)
-  :is(.katex, .katex *) {
-  font-family: revert !important;
 }
 
 .markdown-codemirror-editor .cm-scroller {
