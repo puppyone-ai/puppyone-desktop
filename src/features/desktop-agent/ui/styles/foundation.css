@@ -34,7 +34,7 @@
     color-mix(in srgb, var(--po-selected) 62%, transparent) 100%
   );
   --agent-composer-surface: var(--po-active);
-  --agent-user-message-surface: color-mix(in srgb, var(--agent-composer-surface) 48%, var(--agent-canvas));
+  --agent-user-message-surface: var(--agent-composer-surface);
   --agent-control-surface: color-mix(in srgb, var(--po-header) 82%, var(--po-panel-raised));
   --agent-border: var(--po-border-strong);
   --agent-border-subtle: var(--po-divider);
