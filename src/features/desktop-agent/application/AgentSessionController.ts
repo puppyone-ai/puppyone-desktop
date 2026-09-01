@@ -360,45 +360,70 @@ export class AgentSessionController {
   }
 
   selectProvider(providerId: string | null) {
-    if (this.state.projection.runningTurnId || this.state.sessionPreparation === "preparing" || this.state.pendingPrompt) return this.state.selectedModel;
+    if (this.state.projection.runningTurnId || this.state.pendingPrompt) return this.state.selectedModel;
     const selectedProviderId = providerId && listAgentInferenceProviders(this.state.inspection).some((provider) => provider.id === providerId)
       ? providerId
       : null;
     const selectedModel = chooseAgentModel(this.state.inspection, null, selectedProviderId);
     const selectedModelEntry = this.state.inspection?.models.find((model) => model.model === selectedModel);
+    const preparationInvalidated = selectedProviderId !== this.state.selectedProviderId
+      || selectedModel !== this.state.selectedModel
+      ? this.sessionPreparer.invalidateSelection()
+      : false;
     this.patch({
       selectedProviderId,
       selectedModel,
       selectedEffort: chooseAgentEffort(selectedModelEntry, null),
       error: null,
+      ...(preparationInvalidated ? { sessionPreparation: "idle" as const } : {}),
     });
     return selectedModel;
   }
 
   selectModel(model: string | null) {
-    if (this.state.projection.runningTurnId || this.state.sessionPreparation === "preparing" || this.state.pendingPrompt) return;
+    if (this.state.projection.runningTurnId || this.state.pendingPrompt) return;
     const selectedModelEntry = model
       ? this.state.inspection?.models.find((candidate) => candidate.model === model) ?? null
       : null;
     const selectedModel = selectedModelEntry?.model ?? null;
     const preserveEffort = selectedModel === this.state.selectedModel ? this.state.selectedEffort : null;
+    const selectedEffort = chooseAgentEffort(selectedModelEntry, preserveEffort);
+    const preparationInvalidated = selectedModel !== this.state.selectedModel || selectedEffort !== this.state.selectedEffort
+      ? this.sessionPreparer.invalidateSelection()
+      : false;
     this.patch({
       selectedProviderId: selectedModelEntry ? agentProviderIdForModel(selectedModelEntry) : this.state.selectedProviderId,
       selectedModel,
-      selectedEffort: chooseAgentEffort(selectedModelEntry, preserveEffort),
+      selectedEffort,
       error: null,
+      ...(preparationInvalidated ? { sessionPreparation: "idle" as const } : {}),
     });
   }
 
   selectEffort(effort: string | null) {
-    if (this.state.projection.runningTurnId || this.state.sessionPreparation === "preparing" || this.state.pendingPrompt) return;
+    if (this.state.projection.runningTurnId || this.state.pendingPrompt) return;
     const selectedModel = this.state.inspection?.models.find((model) => model.model === this.state.selectedModel);
-    this.patch({ selectedEffort: chooseAgentEffort(selectedModel, effort), error: null });
+    const selectedEffort = chooseAgentEffort(selectedModel, effort);
+    const preparationInvalidated = selectedEffort !== this.state.selectedEffort
+      ? this.sessionPreparer.invalidateSelection()
+      : false;
+    this.patch({
+      selectedEffort,
+      error: null,
+      ...(preparationInvalidated ? { sessionPreparation: "idle" as const } : {}),
+    });
   }
 
   selectMode(mode: string | null) {
-    if (this.state.sessionPreparation === "preparing" || this.state.pendingPrompt) return;
-    this.patch({ selectedMode: mode || null });
+    if (this.state.projection.runningTurnId || this.state.pendingPrompt) return;
+    const selectedMode = chooseAgentMode(this.state.inspection, mode);
+    const preparationInvalidated = selectedMode !== this.state.selectedMode
+      ? this.sessionPreparer.invalidateSelection()
+      : false;
+    this.patch({
+      selectedMode,
+      ...(preparationInvalidated ? { sessionPreparation: "idle" as const } : {}),
+    });
   }
 
   setDraft(draft: string) {

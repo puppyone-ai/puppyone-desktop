@@ -1,7 +1,7 @@
 import { ArrowUp, LoaderCircle, Square } from "lucide-react";
-import type { AgentModel, AgentReferenceInputCapabilities } from "../../domain/agent-contract";
-import { AgentEffortPicker } from "../AgentEffortPicker";
-import { AgentModelPicker } from "../AgentModelPicker";
+import type { AgentReferenceInputCapabilities } from "../../domain/agent-contract";
+import type { AgentSessionControl, AgentSessionControlId } from "../../domain/agent-session-controls";
+import { AgentSessionControlPicker } from "../AgentSessionControlPicker";
 import { AgentAttachmentButton } from "./AgentAttachmentButton";
 
 type AgentComposerToolbarProps = {
@@ -9,12 +9,8 @@ type AgentComposerToolbarProps = {
   inputDisabled: boolean;
   configurationDisabled: boolean;
   running: boolean;
-  models: AgentModel[];
-  selectedModel: string | null;
-  onSelectModel?: (model: string) => void;
-  efforts: string[];
-  selectedEffort: string | null;
-  onSelectEffort?: (effort: string) => void;
+  sessionControls: AgentSessionControl[];
+  onSelectSessionControl?: (id: AgentSessionControlId, value: string) => void;
   referenceCapabilities?: AgentReferenceInputCapabilities;
   onAddExternalFiles?: (files: File[]) => void;
   onPickWorkspaceReferences?: () => void;
@@ -31,12 +27,8 @@ export function AgentComposerToolbar({
   inputDisabled,
   configurationDisabled,
   running,
-  models,
-  selectedModel,
-  onSelectModel,
-  efforts,
-  selectedEffort,
-  onSelectEffort,
+  sessionControls,
+  onSelectSessionControl,
   referenceCapabilities,
   onAddExternalFiles,
   onPickWorkspaceReferences,
@@ -56,26 +48,15 @@ export function AgentComposerToolbar({
         />
       </div>
       <div className="desktop-agent-composer-actions">
-        {!hideConfiguration && models.length > 0 && (
-          <div className="desktop-agent-composer-picker is-model">
-            <AgentModelPicker
-              models={models}
-              selectedModel={selectedModel}
+        {!hideConfiguration && sessionControls.map((control) => (
+          <div className={`desktop-agent-composer-picker is-${control.id}`} key={control.id}>
+            <AgentSessionControlPicker
+              control={control}
               disabled={running || configurationDisabled}
-              onSelectModel={onSelectModel ?? ignoreSelection}
+              onSelect={onSelectSessionControl ?? ignoreSelection}
             />
           </div>
-        )}
-        {!hideConfiguration && efforts.length > 0 && onSelectEffort && (
-          <div className="desktop-agent-composer-picker is-effort">
-            <AgentEffortPicker
-              efforts={efforts}
-              selectedEffort={selectedEffort}
-              disabled={running || configurationDisabled}
-              onSelectEffort={onSelectEffort}
-            />
-          </div>
-        )}
+        ))}
         <button
           type="button"
           className={`desktop-agent-composer-action${running ? " is-stop" : ""}`}

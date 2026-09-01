@@ -3,6 +3,7 @@ import { useLocalization } from "@puppyone/localization/react";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { AgentReferenceDisplayList } from "./AgentReferenceDisplayList";
 import { AgentPromptInlineContent } from "./AgentPromptInlineContent";
+import { useAgentStreamPresentation } from "./useAgentStreamPresentation";
 
 type AgentMessagePartProps = {
   part: Extract<AgentPart, { kind: "user" | "assistant" }>;
@@ -16,6 +17,7 @@ type AgentMessagePartProps = {
 export function AgentMessagePart({ part, runtimeLabel }: AgentMessagePartProps) {
   const { t } = useLocalization();
   const isAssistant = part.kind === "assistant";
+  const presentedText = useAgentStreamPresentation(part.text, isAssistant && part.streaming);
   return (
     <article
       className={`desktop-agent-message is-${part.kind}`}
@@ -24,7 +26,7 @@ export function AgentMessagePart({ part, runtimeLabel }: AgentMessagePartProps) 
       data-message-surface={isAssistant ? "document" : "row"}
     >
       {isAssistant
-        ? <SafeMarkdown text={part.text || (part.streaming ? "…" : "")} streaming={part.streaming} />
+        ? <SafeMarkdown text={presentedText || (part.streaming ? "…" : "")} streaming={part.streaming} />
         : <>
             <AgentReferenceDisplayList references={(part.references ?? []).filter((reference) => reference.mime?.startsWith("image/") === true)} />
             {part.text && <AgentPromptInlineContent

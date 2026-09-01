@@ -51,11 +51,23 @@ export class AgentSessionPreparer {
         return false;
       }
     }).finally(() => {
-      if (this.preparationPromise === preparation) this.preparationPromise = null;
+      if (this.preparationPromise !== preparation) return;
+      this.preparationPromise = null;
+      const latest = this.options.readState();
+      if (!this.disposed && latest.sessionPreparation === "idle" && canPrepareSession(latest)) {
+        void this.prepare();
+      }
     });
     this.preparationPromise = preparation;
     this.options.patch({ sessionPreparation: "preparing", error: null });
     return preparation;
+  }
+
+  /** Invalidates only an in-flight prewarm; the stale native session is closed on arrival. */
+  invalidateSelection() {
+    if (this.disposed || !this.preparationPromise || this.options.readState().session) return false;
+    this.epoch += 1;
+    return true;
   }
 
   dispose() {

@@ -258,19 +258,21 @@ describe("Desktop Agent reference ingestion", () => {
       running={false}
       stopping={false}
       submitting={false}
-      models={[{
-        id: "gpt-5.6",
-        model: "gpt-5.6",
-        displayName: "GPT-5.6",
-        description: "OpenAI · GPT-5.6",
-        variants: ["low", "high"],
-        defaultVariant: "high",
-      }]}
-      selectedModel="gpt-5.6"
-      onSelectModel={vi.fn()}
-      efforts={["low", "high"]}
-      selectedEffort="high"
-      onSelectEffort={onSelectEffort}
+      sessionControls={[
+        {
+          id: "model",
+          value: "gpt-5.6",
+          options: [{ value: "gpt-5.6", label: "GPT-5.6", description: "OpenAI · GPT-5.6" }],
+        },
+        {
+          id: "effort",
+          value: "high",
+          options: [{ value: "low", label: "low" }, { value: "high", label: "high" }],
+        },
+      ]}
+      onSelectSessionControl={(id, value) => {
+        if (id === "effort") onSelectEffort(value);
+      }}
       referenceCapabilities={capabilities()}
       references={[
         {

@@ -1,6 +1,7 @@
 import { Check, Copy } from "lucide-react";
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
+import { splitStreamingMarkdown } from "../domain/agent-stream-presentation";
 
 type SafeMarkdownProps = { text: string; streaming?: boolean };
 
@@ -15,11 +16,12 @@ const MAX_INITIAL_MARKDOWN_BLOCKS = 240;
 export function SafeMarkdown({ text, streaming = false }: SafeMarkdownProps) {
   const { locale, t } = useLocalization();
   const [expanded, setExpanded] = useState(false);
-  // The event synchronizer already coalesces provider deltas to the browser's
-  // paint cadence. Rendering that latest snapshot directly avoids the uneven
-  // catch-up bursts that a second deferred queue introduces during streaming.
   const candidate = expanded ? text : initialMarkdownWindow(text);
-  const parsedBlocks = useMemo(() => parseBlocks(candidate), [candidate]);
+  const presentation = useMemo(
+    () => streaming ? splitStreamingMarkdown(candidate) : { stable: candidate, tail: "" },
+    [candidate, streaming],
+  );
+  const parsedBlocks = useMemo(() => parseBlocks(presentation.stable), [presentation.stable]);
   const initiallyTruncated = text.length > MAX_INITIAL_MARKDOWN_TEXT
     || parsedBlocks.length > MAX_INITIAL_MARKDOWN_BLOCKS;
   const blocks = expanded ? parsedBlocks : parsedBlocks.slice(0, MAX_INITIAL_MARKDOWN_BLOCKS);
@@ -30,7 +32,13 @@ export function SafeMarkdown({ text, streaming = false }: SafeMarkdownProps) {
       lang={locale}
     >
       {blocks.map((block, index) => renderBlock(block, index))}
-      {streaming && <span className="desktop-agent-stream-caret" aria-hidden="true" />}
+      {presentation.tail && (
+        <p className="desktop-agent-markdown-stream-tail">
+          {presentation.tail}
+          {streaming && <span className="desktop-agent-stream-caret" aria-hidden="true" />}
+        </p>
+      )}
+      {streaming && !presentation.tail && <span className="desktop-agent-stream-caret" aria-hidden="true" />}
       {(expanded || initiallyTruncated) && (
         <button
           type="button"

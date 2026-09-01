@@ -4,10 +4,10 @@ import { useLocalization } from "@puppyone/localization/react";
 import type {
   AgentCommand,
   AgentDraftReference,
-  AgentModel,
   AgentPromptReferenceMention,
   AgentReferenceInputCapabilities,
 } from "../domain/agent-contract";
+import type { AgentSessionControl, AgentSessionControlId } from "../domain/agent-session-controls";
 import { AgentCommandSuggestions, visibleAgentCommands } from "./composer/AgentCommandSuggestions";
 import { AgentComposerToolbar } from "./composer/AgentComposerToolbar";
 import { AgentDraftReferenceList } from "./composer/AgentDraftReferenceList";
@@ -30,12 +30,8 @@ type AgentComposerProps = {
   floatingAccessory?: ReactNode;
   runtimeLabel?: string;
   configurationDisabled?: boolean;
-  models?: AgentModel[];
-  selectedModel?: string | null;
-  onSelectModel?: (model: string) => void;
-  efforts?: string[];
-  selectedEffort?: string | null;
-  onSelectEffort?: (effort: string) => void;
+  sessionControls?: AgentSessionControl[];
+  onSelectSessionControl?: (id: AgentSessionControlId, value: string) => void;
   commands?: AgentCommand[];
   references?: AgentDraftReference[];
   getReferencePreviewUrl?: (id: string) => string | null;
@@ -69,12 +65,8 @@ export function AgentComposer({
   floatingAccessory = null,
   runtimeLabel: runtimeLabelProp,
   configurationDisabled = false,
-  models = [],
-  selectedModel = null,
-  onSelectModel,
-  efforts = [],
-  selectedEffort = null,
-  onSelectEffort,
+  sessionControls = [],
+  onSelectSessionControl,
   commands = [],
   references = [],
   getReferencePreviewUrl,
@@ -156,12 +148,8 @@ export function AgentComposer({
             inputDisabled={inputDisabled}
             configurationDisabled={configurationDisabled}
             running={running}
-            models={models}
-            selectedModel={selectedModel}
-            onSelectModel={onSelectModel}
-            efforts={efforts}
-            selectedEffort={selectedEffort}
-            onSelectEffort={onSelectEffort}
+            sessionControls={sessionControls}
+            onSelectSessionControl={onSelectSessionControl}
             referenceCapabilities={referenceCapabilities}
             onAddExternalFiles={onAddExternalFiles}
             onPickWorkspaceReferences={onPickWorkspaceReferences}

@@ -68,6 +68,18 @@ function runtimeEntry(id: string, displayName: string) {
   };
 }
 
+function modelSessionControl(models: Array<{ model: string; displayName: string; description?: string }>, value: string | null) {
+  return [{
+    id: "model" as const,
+    value,
+    options: models.map((model) => ({
+      value: model.model,
+      label: model.displayName,
+      description: model.description,
+    })),
+  }];
+}
+
 describe("Desktop Agent renderer surfaces", () => {
   it.each([
     [
@@ -180,8 +192,7 @@ describe("Desktop Agent renderer surfaces", () => {
         stopping: false,
         submitting: false,
         placeholder: "Ask anything",
-        models: [{ id: "gpt-5", model: "gpt-5", displayName: "GPT-5", description: "", isDefault: true }],
-        selectedModel: "gpt-5",
+        sessionControls: modelSessionControl([{ model: "gpt-5", displayName: "GPT-5" }], "gpt-5"),
         onSubmit: vi.fn(async () => true),
         onStop: vi.fn(),
       }),
@@ -574,8 +585,7 @@ describe("Desktop Agent renderer surfaces", () => {
       stopping: false,
       submitting: false,
       placeholder: "Ask anything",
-      models: [{ id: "gpt-5", model: "gpt-5", displayName: "GPT-5", description: "", isDefault: true }],
-      selectedModel: "gpt-5",
+      sessionControls: modelSessionControl([{ model: "gpt-5", displayName: "GPT-5" }], "gpt-5"),
       onSubmit: vi.fn(async () => true),
       onStop: vi.fn(),
     }));
@@ -610,8 +620,7 @@ describe("Desktop Agent renderer surfaces", () => {
         stopping: false,
         submitting: false,
         placeholder: "Ask anything",
-        models: [{ id: "gpt-5", model: "gpt-5", displayName: "GPT-5", description: "", isDefault: true }],
-        selectedModel: "gpt-5",
+        sessionControls: modelSessionControl([{ model: "gpt-5", displayName: "GPT-5" }], "gpt-5"),
         onSubmit: vi.fn(async () => true),
         onStop: vi.fn(),
       }),
@@ -716,8 +725,7 @@ describe("Desktop Agent renderer surfaces", () => {
         stopping: false,
         submitting: false,
         placeholder: "Choose a provider to start",
-        models: [],
-        selectedModel: null,
+        sessionControls: [],
         onSubmit: vi.fn(async () => false),
         onStop: vi.fn(),
       }),
@@ -773,9 +781,10 @@ describe("Desktop Agent renderer surfaces", () => {
           stopping: false,
           submitting: false,
           placeholder: "Ask anything",
-          models,
-          selectedModel: model,
-          onSelectModel: setModel,
+          sessionControls: modelSessionControl(models, model),
+          onSelectSessionControl: (id, value) => {
+            if (id === "model") setModel(value);
+          },
           onSubmit: vi.fn(async () => true),
           onStop: vi.fn(),
         }),

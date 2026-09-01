@@ -7,6 +7,7 @@ import type { AgentPromptReferenceMention } from "../domain/agent-contract";
 import { listAgentRuntimes, listEnabledAgentRuntimes } from "../domain/agent-backend-routing";
 import type { AgentChatTabPresentation } from "../domain/agent-chat-tabs";
 import type { AgentRoutePreference } from "../domain/agent-route-preference";
+import { deriveAgentSessionControls } from "../domain/agent-session-controls";
 import { AgentApprovalDock } from "./AgentApprovalDock";
 import { AgentChangesPill } from "./AgentChangesPill";
 import { AgentComposer, DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID } from "./AgentComposer";
@@ -105,8 +106,11 @@ export function AgentChatTabPanel({
     active: commandTarget, controller, state, runtimeModels, preferredRuntimeId, preferredRoute, preferredModel,
     onPreferredRuntimeChange, onPreferredRouteChange, onPreferredModelChange,
   });
-  const selectedModelProfile = runtimeModels.find((model) => model.model === state.selectedModel);
-  const runtimeEfforts = selectedModelProfile?.variants ?? [];
+  const sessionControls = useMemo(() => deriveAgentSessionControls(inspection, {
+    selectedEffort: state.selectedEffort,
+    selectedMode: state.selectedMode,
+    selectedModel: state.selectedModel,
+  }), [inspection, state.selectedEffort, state.selectedMode, state.selectedModel]);
   const modelSelectionAvailable = Boolean(capabilities?.modelSelection);
   const routingReady = Boolean(agentRuntimeSelected && (!modelSelectionAvailable || (
     state.selectedModel && runtimeModels.some((model) => model.model === state.selectedModel)
@@ -233,11 +237,9 @@ export function AgentChatTabPanel({
         disabled={loading || unavailable || failed || !routingReady || state.projection.approvals.length > 0 || state.projection.questions.length > 0}
         running={Boolean(state.projection.runningTurnId)} stopping={state.stopping} submitting={submissionPending}
         placeholder={composerPlaceholder} runtimeLabel={runtimeLabel}
-        configurationDisabled={loading || preparingSession || submissionPending}
-        models={capabilities?.modelSelection ? runtimeModels : []} selectedModel={state.selectedModel}
-        onSelectModel={routingPreferences.selectModel}
-        efforts={runtimeEfforts} selectedEffort={state.selectedEffort}
-        onSelectEffort={routingPreferences.selectEffort}
+        configurationDisabled={loading || submissionPending}
+        sessionControls={sessionControls}
+        onSelectSessionControl={routingPreferences.selectSessionControl}
         commands={capabilities?.slashCommands ? inspection?.commands ?? [] : []}
         references={state.references} getReferencePreviewUrl={controller.getReferencePreviewUrl}
         referenceCapabilities={capabilities?.referenceInputs}

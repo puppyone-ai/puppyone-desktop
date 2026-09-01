@@ -579,6 +579,74 @@ describe("AgentSessionController", () => {
     });
   });
 
+  it("lets capability controls supersede an in-flight prewarm and closes the stale native session", async () => {
+    const bridge = bridgeFixture(() => {});
+    const models = [
+      { id: "openai/gpt-5", model: "openai/gpt-5", providerId: "openai", displayName: "GPT-5", description: "", isDefault: true },
+      { id: "openai/gpt-5-mini", model: "openai/gpt-5-mini", providerId: "openai", displayName: "GPT-5 Mini", description: "", isDefault: false },
+    ];
+    bridge.discoverAgentRuntimes.mockResolvedValueOnce({
+      runtimes: [{ descriptor: { id: "opencode", displayName: "OpenCode" }, readiness: readiness() }],
+      selectedRuntimeId: "opencode",
+      runtime: { id: "opencode", displayName: "OpenCode" },
+      readiness: readiness(),
+      account: null,
+      providers: [{ id: "openai", displayName: "OpenAI", defaultModel: "openai/gpt-5", modelCount: 2 }],
+      models,
+      modes: [
+        { id: "build", displayName: "Build", description: "", isDefault: true },
+        { id: "plan", displayName: "Plan", description: "", isDefault: false },
+      ],
+      commands: [],
+      capabilities: capabilities(),
+      warnings: [],
+    });
+    bridge.resumeAgentSession.mockResolvedValueOnce(null);
+    const resolvers: Array<(value: AgentSessionSnapshot) => void> = [];
+    bridge.createAgentSession.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)));
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+
+    const firstPreparation = controller.prepareSession();
+    await vi.waitFor(() => expect(controller.getSnapshot().sessionPreparation).toBe("preparing"));
+    controller.selectModel("openai/gpt-5-mini");
+    controller.selectMode("plan");
+    expect(controller.getSnapshot()).toMatchObject({
+      selectedModel: "openai/gpt-5-mini",
+      selectedMode: "plan",
+      sessionPreparation: "idle",
+    });
+
+    resolvers[0](snapshot("session-stale", []));
+    await expect(firstPreparation).resolves.toBe(false);
+    await vi.waitFor(() => expect(bridge.createAgentSession).toHaveBeenCalledTimes(2));
+    expect(bridge.closeAgentSession).toHaveBeenCalledWith({
+      rootPath: "/workspace",
+      sessionId: "session-stale",
+      removePersistence: true,
+    });
+    const latest = snapshot("session-latest", []);
+    latest.models = models;
+    latest.modes = [
+      { id: "build", displayName: "Build", description: "", isDefault: true },
+      { id: "plan", displayName: "Plan", description: "", isDefault: false },
+    ];
+    latest.session.selectedModel = "openai/gpt-5-mini";
+    latest.session.selectedMode = "plan";
+    resolvers[1](latest);
+
+    await vi.waitFor(() => expect(controller.getSnapshot()).toMatchObject({
+      session: { id: "session-latest" },
+      selectedModel: "openai/gpt-5-mini",
+      selectedMode: "plan",
+      sessionPreparation: "ready",
+    }));
+    expect(bridge.createAgentSession.mock.calls[1][0]).toMatchObject({
+      model: "openai/gpt-5-mini",
+      mode: "plan",
+    });
+  });
+
   it("does not publish late asynchronous state after renderer disposal", async () => {
     const bridge = bridgeFixture(() => {});
     const inspection = await bridge.discoverAgentRuntimes();

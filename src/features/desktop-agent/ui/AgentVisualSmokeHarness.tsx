@@ -17,6 +17,7 @@ import type {
   AgentReferenceInputCapabilities,
   AgentRuntimeCatalogEntry,
 } from "../domain/agent-contract";
+import type { AgentSessionControl } from "../domain/agent-session-controls";
 import "./desktop-agent.css";
 
 const agentRuntimes: AgentRuntimeCatalogEntry[] = [
@@ -95,6 +96,23 @@ export function AgentVisualSmokeHarness() {
   const startupLoading = new URLSearchParams(window.location.search).get("state") === "loading";
   const selectedRuntime = agentRuntimes.find((entry) => entry.descriptor.id === runtimeId) ?? agentRuntimes[0];
   const models = modelsByRuntime[runtimeId];
+  const sessionControls: AgentSessionControl[] = [
+    {
+      id: "model",
+      value: selectedModel,
+      options: models.map((entry) => ({
+        value: entry.model,
+        label: entry.displayName,
+        description: entry.description || undefined,
+      })),
+    },
+    {
+      id: "effort",
+      value: selectedEffort,
+      options: (models.find((entry) => entry.model === selectedModel)?.variants ?? [])
+        .map((effort) => ({ value: effort, label: effort })),
+    },
+  ].filter((control) => control.options.length > 0) as AgentSessionControl[];
   const startupProjection = useMemo(() => createAgentProjection(), []);
   const projection = useMemo(() => {
     const value = createAgentProjection();
@@ -296,12 +314,11 @@ export function AgentVisualSmokeHarness() {
               configurationDisabled={startupLoading}
               placeholder={t("agent.composer.placeholder.followUp")}
               runtimeLabel={selectedRuntime.descriptor.displayName}
-              models={models}
-              selectedModel={selectedModel}
-              onSelectModel={setSelectedModel}
-              efforts={models.find((entry) => entry.model === selectedModel)?.variants ?? []}
-              selectedEffort={selectedEffort}
-              onSelectEffort={setSelectedEffort}
+              sessionControls={sessionControls}
+              onSelectSessionControl={(id, value) => {
+                if (id === "model") setSelectedModel(value);
+                if (id === "effort") setSelectedEffort(value);
+              }}
               commands={[]}
               references={references}
               getReferencePreviewUrl={(id) => id === "attachment-capture"
