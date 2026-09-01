@@ -60,11 +60,21 @@ describe("Unified Terminal Workbench architecture", () => {
     const status = source(
       "src/features/desktop-terminal/workbench/TerminalWorkbenchStatus.tsx",
     );
+    const workbenchIcon = source(
+      "src/features/desktop-terminal/ui/WorkbenchLauncherIcon.tsx",
+    );
+    const launcherIcon = source(
+      "src/features/desktop-terminal/ui/TerminalLauncherIcon.tsx",
+    );
     expect(contract).toContain("iconKey: string | null");
     expect(status).toContain(
       "<WorkbenchLauncherIcon compact iconKey={item.snapshot.iconKey}",
     );
     expect(status).not.toContain("MessageSquare");
+    expect(workbenchIcon).toContain('fallback="chat"');
+    expect(workbenchIcon).not.toContain("chatIconLauncherIds");
+    expect(launcherIcon).toContain("resolveAgentBrand({ id: launcherId, iconKey })");
+    expect(launcherIcon).toContain("<AgentBrandImage brandId={brand.id}");
   });
 
   it("keeps Tab Bar chrome outside the content split-drop coordinate space", () => {

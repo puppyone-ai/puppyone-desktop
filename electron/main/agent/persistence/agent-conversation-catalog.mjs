@@ -58,8 +58,16 @@ export function createAgentConversationCatalog({ filePath, logger = console } = 
   }
 
   return {
-    save(record) {
-      return saveRecord({ ...record, origin: record?.origin ?? "puppyone" });
+    async save(record) {
+      await load();
+      const existing = records.find((entry) => entry.sessionId === safeId(record?.sessionId));
+      return saveRecord({
+        ...record,
+        origin: record?.origin ?? existing?.origin ?? "puppyone",
+        availability: record?.availability ?? existing?.availability ?? "unverified",
+        lastSeenAt: record?.lastSeenAt ?? existing?.lastSeenAt,
+        unavailableAt: record?.unavailableAt ?? existing?.unavailableAt,
+      });
     },
 
     async upsertNative(record) {
@@ -75,8 +83,52 @@ export function createAgentConversationCatalog({ filePath, logger = console } = 
       return saveRecord({
         ...record,
         sessionId: existing?.sessionId ?? randomUUID(),
-        origin: "native-discovery",
+        origin: existing?.origin ?? "native-discovery",
+        availability: "available",
+        lastSeenAt: new Date().toISOString(),
+        unavailableAt: null,
       });
+    },
+
+    /** Reconcile only after one authoritative, fully-paginated native scan. */
+    async reconcileNative({ workspaceRoot, runtimeId, providerSessionIds, reconciledAt = new Date().toISOString() }) {
+      await load();
+      const root = absolutePath(workspaceRoot);
+      const runtime = safeId(runtimeId);
+      const seen = new Set((Array.isArray(providerSessionIds) ? providerSessionIds : []).map(safeId).filter(Boolean));
+      const timestamp = isoDate(reconciledAt) ?? new Date().toISOString();
+      const unavailableSessionIds = [];
+      let changed = false;
+      records = records.map((entry) => {
+        if (entry.workspaceRoot !== root || entry.runtimeId !== runtime || entry.archivedAt) return entry;
+        if (seen.has(entry.providerSessionId)) {
+          if (entry.availability === "available" && !entry.unavailableAt) return entry;
+          changed = true;
+          return { ...entry, availability: "available", lastSeenAt: timestamp, unavailableAt: undefined };
+        }
+        if (entry.availability === "unavailable") {
+          unavailableSessionIds.push(entry.sessionId);
+          return entry;
+        }
+        changed = true;
+        unavailableSessionIds.push(entry.sessionId);
+        return { ...entry, availability: "unavailable", unavailableAt: timestamp };
+      });
+      if (changed) await schedulePersist();
+      return { unavailableSessionIds };
+    },
+
+    async markUnavailable(sessionId, unavailableAt = new Date().toISOString()) {
+      await load();
+      const index = records.findIndex((entry) => entry.sessionId === safeId(sessionId));
+      if (index < 0) return false;
+      records[index] = {
+        ...records[index],
+        availability: "unavailable",
+        unavailableAt: isoDate(unavailableAt) ?? new Date().toISOString(),
+      };
+      await schedulePersist();
+      return true;
     },
 
     async findById(sessionId, workspaceRoot = null) {
@@ -92,12 +144,18 @@ export function createAgentConversationCatalog({ filePath, logger = console } = 
       const runtime = runtimeId == null ? null : safeId(runtimeId);
       return clone(records.find((entry) => (
         !entry.archivedAt
+        && entry.availability === "available"
         && entry.workspaceRoot === root
         && (!runtime || entry.runtimeId === runtime)
       )) ?? null);
     },
 
-    async list(workspaceRoot = null, { runtimeId = null, includeArchived = false } = {}) {
+    async list(workspaceRoot = null, {
+      runtimeId = null,
+      includeArchived = false,
+      includeUnavailable = false,
+      includeUnverified = false,
+    } = {}) {
       await load();
       const root = workspaceRoot == null ? null : absolutePath(workspaceRoot);
       const runtime = runtimeId == null ? null : safeId(runtimeId);
@@ -105,6 +163,8 @@ export function createAgentConversationCatalog({ filePath, logger = console } = 
         (!root || entry.workspaceRoot === root)
         && (!runtime || entry.runtimeId === runtime)
         && (includeArchived || !entry.archivedAt)
+        && (includeUnavailable || entry.availability !== "unavailable")
+        && (includeUnverified || entry.availability !== "unverified")
       )).map(clone);
     },
 
@@ -157,6 +217,11 @@ function normalizeRecord(value) {
     selectedMode: bounded(value.selectedMode ?? value.mode, 160),
     capabilityRevision: bounded(value.capabilityRevision, 160),
     origin: value.origin === "native-discovery" ? "native-discovery" : "puppyone",
+    availability: ["available", "unverified", "unavailable"].includes(value.availability)
+      ? value.availability
+      : value.origin === "native-discovery" ? "available" : "unverified",
+    lastSeenAt: isoDate(value.lastSeenAt),
+    unavailableAt: isoDate(value.unavailableAt),
   });
 }
 

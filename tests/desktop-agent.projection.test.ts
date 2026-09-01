@@ -41,6 +41,19 @@ describe("Desktop Agent transcript projection", () => {
     expect(projection.turns[0]?.durationMs).toBe(2_450);
   });
 
+  it("keeps usage metadata out of visible transcript rows", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Measure" }, "turn-usage"),
+      event(2, "usage.updated", { inputTokens: 20, outputTokens: 5 }, "turn-usage"),
+    ]);
+
+    expect(projection.usage).toEqual({ inputTokens: 20, outputTokens: 5 });
+    expect(projection.parts.find((part) => part.kind === "usage")).toMatchObject({
+      usage: { inputTokens: 20, outputTokens: 5 },
+    });
+    expect(projection.rows.some((row) => row.kind === "usage")).toBe(false);
+  });
+
   it("ignores duplicates, marks gaps, and keeps partial assistant text after interruption", () => {
     let projection = applyAgentEvent(createAgentProjection(), event(1, "turn.started", { prompt: "Go" }, "turn-1"));
     projection = applyAgentEvent(projection, event(3, "assistant.delta", { delta: "Partial" }, "turn-1", "message-1"));

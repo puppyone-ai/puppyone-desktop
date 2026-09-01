@@ -24,6 +24,8 @@ import type {
   AgentSessionCreateRequest,
   AgentSessionExitEvent,
   AgentSessionMutationRequest,
+  AgentSessionOpenRequest,
+  AgentSessionOpenResult,
   AgentSessionResumeRequest,
   AgentSessionSnapshot,
   AgentSessionsListRequest,
@@ -1355,6 +1357,7 @@ declare global {
       readAgentAccount: (request?: AgentAccountReadRequest) => Promise<AgentAccountState | null>;
       createAgentSession: (request: AgentSessionCreateRequest) => Promise<AgentSessionSnapshot>;
       resumeAgentSession: (request: AgentSessionResumeRequest) => Promise<AgentSessionSnapshot | null>;
+      openAgentSession: (request: AgentSessionOpenRequest) => Promise<AgentSessionOpenResult>;
       replayAgentSession: (request: AgentReplayRequest) => Promise<AgentSessionSnapshot>;
       listAgentSessions: (request: AgentSessionsListRequest) => Promise<AgentSessionsListResponse>;
       forkAgentSession: (request: AgentSessionMutationRequest) => Promise<AgentSessionSnapshot>;

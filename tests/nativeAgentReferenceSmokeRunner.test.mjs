@@ -33,15 +33,16 @@ afterEach(async () => {
 
 describe("native Agent reference visibility smoke", () => {
   it.each([
-    ["puppyone-agent", true, true, ["workspace-text", "staged-image", "staged-utf8-text"]],
-    ["codex", true, false, ["workspace-text", "staged-image"]],
-    ["claude", true, false, ["workspace-text", "staged-image"]],
-    ["cursor", true, false, ["workspace-text", "staged-image"]],
-    ["opencode-native", true, true, ["workspace-text", "staged-image", "staged-utf8-text"]],
+    ["codex", true, false, false, ["workspace-text", "staged-image"]],
+    ["claude", true, false, false, ["workspace-text", "staged-image"]],
+    ["cursor", true, false, false, ["workspace-text", "staged-image"]],
+    ["opencode-native", true, true, false, ["workspace-text", "staged-image", "staged-utf8-text"]],
+    ["pi", true, true, true, ["workspace-text", "staged-image", "staged-utf8-text"]],
   ])("proves only the negotiated %s input set is model-visible", async (
     runtimeId,
     imageAccepted,
     textAccepted,
+    binaryAccepted,
     expectedInputs,
   ) => {
     const roots = await smokeRoots();
@@ -49,7 +50,7 @@ describe("native Agent reference visibility smoke", () => {
     const service = fakeService({
       sender,
       runtimeId,
-      capabilities: referenceCapabilities({ imageAccepted, textAccepted }),
+      capabilities: referenceCapabilities({ imageAccepted, textAccepted, binaryAccepted }),
       answer: expectedAnswer({ imageAccepted, textAccepted }),
     });
 
@@ -64,7 +65,7 @@ describe("native Agent reference visibility smoke", () => {
       runtimeId,
       model: "fixture/model",
       status: "passed",
-      checks: ["capability", "unsupported-binary", "model-visibility", "close"],
+      checks: ["capability", "unsupported-input", "model-visibility", "close"],
       testedInputs: expectedInputs,
     });
 
@@ -72,7 +73,10 @@ describe("native Agent reference visibility smoke", () => {
     const rejected = service.startTurn.mock.calls[0][1];
     const submitted = service.startTurn.mock.calls[1][1];
     expect(rejected.references).toEqual([
-      expect.objectContaining({ mime: "application/pdf", authorized: true }),
+      expect.objectContaining({
+        mime: binaryAccepted ? "video/mp4" : "application/pdf",
+        authorized: true,
+      }),
     ]);
     expect(submitted.prompt).not.toMatch(/(?:WKS|IMG|EXT)_A1B2C3D4/u);
     expect(submitted.references.map((reference) => reference.displayName)).toEqual([
@@ -138,25 +142,31 @@ describe("native Agent reference visibility smoke", () => {
     expect(service.closeSession).toHaveBeenCalled();
   });
 
-  it("fails before sending when a runtime unexpectedly advertises generic binary input", async () => {
+  it("uses another unsupported semantic kind when a runtime accepts binary path mentions", async () => {
     const roots = await smokeRoots();
     const sender = smokeSender();
-    const capabilities = referenceCapabilities({ imageAccepted: true, textAccepted: false });
-    capabilities.referenceInputs.attachments.binary.accepted = true;
-    const service = fakeService({ sender, runtimeId: "codex", capabilities, answer: "" });
+    const capabilities = referenceCapabilities({ imageAccepted: true, textAccepted: false, binaryAccepted: true });
+    const service = fakeService({
+      sender,
+      runtimeId: "pi",
+      capabilities,
+      answer: expectedAnswer({ imageAccepted: true, textAccepted: false }),
+    });
 
     await expect(runNativeAgentReferenceSmoke({
       service,
       sender,
       ...roots,
-      runtimeId: "codex",
+      runtimeId: "pi",
       timeoutMs: 1_000,
       tokenFactory: () => TOKEN_SET,
-    })).rejects.toMatchObject({
-      stage: "capability",
-      code: "unexpected-generic-binary-support",
+    })).resolves.toMatchObject({
+      runtimeId: "pi",
+      checks: ["capability", "unsupported-input", "model-visibility", "close"],
     });
-    expect(service.startTurn).not.toHaveBeenCalled();
+    expect(service.startTurn.mock.calls[0][1].references).toEqual([
+      expect.objectContaining({ mime: "video/mp4" }),
+    ]);
   });
 
   it("requires an explicit selected model before claiming service visibility", async () => {
@@ -229,6 +239,7 @@ describe("native Agent reference visibility smoke", () => {
     expect(fixtures.workspace.path.startsWith(roots.workspaceRoot)).toBe(true);
     expect(fixtures.image.path.startsWith(roots.attachmentRoot)).toBe(true);
     expect(fixtures.unsupported).toMatchObject({ mime: "application/pdf", authorized: true });
+    expect(fixtures.unsupportedVideo).toMatchObject({ mime: "video/mp4", authorized: true });
     expect(() => renderTokenPng("not-safe")).toThrow(/token is invalid/i);
   });
 });
@@ -236,11 +247,11 @@ describe("native Agent reference visibility smoke", () => {
 describe("native Agent smoke runtime selection", () => {
   it("keeps every shipped Harness in one shared smoke inventory", () => {
     expect(NATIVE_AGENT_RUNTIME_IDS).toEqual([
-      "puppyone-agent",
       "codex",
       "claude",
       "cursor",
       "opencode-native",
+      "pi",
     ]);
     expect(requestedNativeAgentRuntimeIds(["--runtimes=all"])).toEqual({
       valid: true,
@@ -280,8 +291,8 @@ function fakeService({ sender, runtimeId, capabilities, answer }) {
       capabilities,
     })),
     startTurn: vi.fn(async (_owner, request) => {
-      if (request.references?.some((reference) => reference.mime === "application/pdf")) {
-        throw new Error("The selected Agent does not accept binary file attachments.");
+      if (request.references?.some((reference) => ["application/pdf", "video/mp4"].includes(reference.mime))) {
+        throw new Error("The selected Agent does not accept this reference attachment.");
       }
       queueMicrotask(() => {
         sender.send("agent:event", event(request.sessionId, "assistant.completed", { text: answer }));
@@ -294,7 +305,7 @@ function fakeService({ sender, runtimeId, capabilities, answer }) {
   };
 }
 
-function referenceCapabilities({ imageAccepted, textAccepted }) {
+function referenceCapabilities({ imageAccepted, textAccepted, binaryAccepted = false }) {
   return {
     referenceInputs: {
       schemaVersion: 1,
@@ -304,7 +315,7 @@ function referenceCapabilities({ imageAccepted, textAccepted }) {
         text: { accepted: textAccepted, mimeTypes: ["text/plain"] },
         audio: { accepted: false },
         video: { accepted: false },
-        binary: { accepted: false },
+        binary: { accepted: binaryAccepted },
       },
       limits: { maxCount: 32, maxBytesPerReference: 25 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024 },
       steer: false,

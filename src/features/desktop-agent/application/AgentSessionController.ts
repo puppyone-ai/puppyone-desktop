@@ -8,10 +8,9 @@ import {
 import type {
   AgentApprovalDecision,
   AgentQuestionResolution,
-  AgentSessionsListRequest,
-  AgentSessionsListResponse,
   AgentSessionSnapshot,
 } from "../domain/agent-contract";
+import { AgentSessionOpenError } from "../domain/agent-session-open-error";
 import { AgentEventSynchronizer, type AgentStreamFlushScheduler } from "./AgentEventSynchronizer";
 import { agentControllerTransitions, type AgentControllerState } from "./agent-controller-state";
 import { AgentKnownError, createAgentError, formatAgentError } from "./agent-error";
@@ -141,10 +140,6 @@ export class AgentSessionController {
     return () => this.listeners.delete(listener);
   };
 
-  hasSubscribers() {
-    return this.listeners.size > 0;
-  }
-
   /** Releases renderer subscriptions only; it never sends a runtime stop. */
   dispose() {
     if (this.disposed) return;
@@ -165,6 +160,11 @@ export class AgentSessionController {
 
   async initialize(refresh = false) {
     return this.initializeRuntime(refresh, true);
+  }
+
+  /** Discover the runtime catalog without implicitly restoring any conversation. */
+  async inspectRuntimes(refresh = false) {
+    return this.initializeRuntime(refresh, false);
   }
 
   /** Selects a creation recipe before first discovery without restoring history. */
@@ -240,7 +240,8 @@ export class AgentSessionController {
       this.patch({ error: createAgentError("active-turn") });
       return false;
     }
-    const bridge = this.requireBridge("discoverAgentRuntimes", "resumeAgentSession");
+    this.eventSynchronizer.connect();
+    const bridge = this.requireBridge("discoverAgentRuntimes", "openAgentSession");
     await this.referenceDrafts.reset([
       ...this.state.references,
       ...this.submission.ownedReferences(),
@@ -282,41 +283,29 @@ export class AgentSessionController {
         initialized: true,
         phase: "restoring",
       });
-      const restored = await bridge.resumeAgentSession({
+      const result = await bridge.openAgentSession({
         rootPath: this.workspaceRoot,
         sessionId,
         runtimeId,
       });
-      if (!restored) {
-        this.patch({ phase: "ready", sessionPreparation: "idle" });
-        return false;
-      }
-      this.applySnapshot(restored);
+      if (result.status === "failed") throw new AgentSessionOpenError(result.error);
+      this.applySnapshot(result.snapshot);
       this.patch({
-        phase: restored.session.activeTurnId ? "running" : "ready",
+        phase: result.snapshot.session.activeTurnId ? "running" : "ready",
         sessionPreparation: "ready",
       });
       return true;
     } catch (error) {
       this.patch({ phase: "failed", error: formatAgentError(error), sessionPreparation: "failed" });
-      return false;
+      throw error;
     }
-  }
-
-  async listSavedSessions(
-    request: Omit<AgentSessionsListRequest, "rootPath"> = {},
-  ): Promise<AgentSessionsListResponse> {
-    return this.requireBridge("listAgentSessions").listAgentSessions({
-      rootPath: this.workspaceRoot,
-      includeArchived: false,
-      discoverNative: false,
-      ...request,
-    });
   }
 
   private async runInitialize(refresh: boolean, restoreLatest: boolean) {
     this.eventSynchronizer.connect();
-    const bridge = this.requireBridge("discoverAgentRuntimes", "resumeAgentSession");
+    const bridge = restoreLatest
+      ? this.requireBridge("discoverAgentRuntimes", "resumeAgentSession")
+      : this.requireBridge("discoverAgentRuntimes");
     this.patch({ phase: "discovering", error: null });
     try {
       const inspection = await bridge.discoverAgentRuntimes({
@@ -501,6 +490,15 @@ export class AgentSessionController {
     ]);
     this.submission.clearQueue();
     return true;
+  }
+
+  /** Closes prepared native ownership before releasing renderer resources. */
+  async rollbackPreparation() {
+    try {
+      await this.sessionLifecycle.rollbackPreparation();
+    } finally {
+      this.dispose();
+    }
   }
 
   prepareSession() {

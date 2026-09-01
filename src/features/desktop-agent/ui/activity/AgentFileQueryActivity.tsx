@@ -1,9 +1,7 @@
 import { FileSearch, FolderSearch, ListTree, Search } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
 import {
-  agentActivitySummary,
   agentActivityToolId,
-  formatAgentActivityLabel,
   formatAgentToolName,
   outputForActivity,
 } from "../../domain/agent-activity-presentation";
@@ -22,7 +20,6 @@ export function AgentFileQueryActivity({ activity, onOpenFile }: { activity: Age
   return (
     <AgentActivityShell
       title={formatAgentToolName(tool, t)}
-      summary={agentActivitySummary(activity) || formatAgentActivityLabel(activity, t)}
       status={activity.status}
       icon={iconFor(tool)}
       className={`desktop-agent-file-query is-${tool}`}

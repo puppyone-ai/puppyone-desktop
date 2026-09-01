@@ -5,6 +5,8 @@
   --agent-dock-padding-top: 12px;
   --agent-dock-padding-bottom: 12px;
   --agent-control-size: 30px;
+  --agent-primary-action-visual-size: 28px;
+  --agent-primary-action-separation: 4px;
   --agent-radius-composer: 8px;
   --agent-radius-message: var(--agent-radius-composer);
   --agent-message-content-inset: 12px;
@@ -18,6 +20,13 @@
   --agent-composer-toolbar-height: 38px;
   --agent-composer-picker-padding-inline: 8px;
   --agent-reference-card-height: 52px;
+  --agent-empty-state-dock-reserve: calc(
+    var(--agent-dock-padding-top)
+    + var(--agent-composer-input-min-height)
+    + var(--agent-composer-toolbar-height)
+    + var(--agent-dock-padding-bottom)
+    + 2px
+  );
   --agent-font-size: var(--desktop-sidebar-font-size, var(--po-text-size-sidebar, 13px));
   --agent-font-size-meta: var(--desktop-sidebar-font-size-meta, var(--po-text-size-meta, 12px));
   --agent-font-size-caption: var(--po-text-size-caption, 11px);
@@ -47,6 +56,23 @@
   background: var(--agent-canvas);
 }
 
+/* Product chrome never participates in document selection. Only authored or
+ * generated conversation content and editable fields opt back into selection. */
+.desktop-agent-workspace,
+.desktop-agent-boundary,
+.desktop-agent-overlay {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.desktop-agent-boundary .desktop-agent-virtual-row,
+.desktop-agent-boundary .desktop-agent-live-tail > .desktop-agent-message,
+.desktop-agent-boundary :is(input, textarea, [contenteditable="true"]),
+.desktop-agent-overlay :is(input, textarea, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .dark .desktop-agent-boundary,
 .dark .desktop-agent-overlay {
   --agent-row-hover-surface: color-mix(in srgb, rgba(211, 208, 197, 0.075) 86%, transparent);
@@ -65,9 +91,21 @@
   height: 100%;
   min-width: 0;
   min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   overflow: hidden;
   background: var(--agent-canvas);
+}
+
+/* Every structural region shares the panel's only explicit column. The empty
+ * overlay intentionally overlaps conversation + dock rows and must never make
+ * Grid auto-placement synthesize a second column for the dock. */
+.desktop-agent-header-region,
+.desktop-agent-status-region,
+.desktop-agent-conversation-region,
+.desktop-agent-conversation-overlay,
+.desktop-agent-dock-region {
+  grid-column: 1;
 }
 
 .desktop-agent-boundary *,
@@ -103,25 +141,25 @@
   display: block;
   width: 100%;
   height: 100%;
-  transform: scale(var(--desktop-agent-brand-mark-scale, 1));
   transform-origin: center;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-.desktop-agent-brand-mark img { object-fit: cover; }
+.desktop-agent-brand-mark img {
+  object-fit: cover;
+  transform: scale(var(--po-agent-brand-image-scale, 1));
+}
+.desktop-agent-brand-mark svg { transform: scale(var(--desktop-agent-brand-mark-scale, 1)); }
 .desktop-agent-brand-mark.is-codex { background: transparent; }
 .desktop-agent-brand-mark.is-claude { --desktop-agent-brand-mark-scale: 0.84; background: transparent; }
 .desktop-agent-brand-mark.is-cursor { background: transparent; }
 .desktop-agent-brand-mark.is-cursor img { object-fit: contain; }
-.desktop-agent-brand-mark.is-opencode { --desktop-agent-brand-mark-scale: 1.3; background: #131010; }
+.desktop-agent-brand-mark.is-opencode { background: #131010; }
+.desktop-agent-brand-mark.is-pi { background: transparent; }
+.desktop-agent-brand-mark.is-pi img { object-fit: contain; }
 .desktop-agent-brand-mark.is-fallback { border: 1px solid var(--agent-border-subtle); background: var(--agent-control-surface); color: var(--agent-text-muted); }
-
-.dark .desktop-agent-brand-mark.is-codex img {
-  content: url("/assets/icons/agents/codex-dark.png");
-}
-
-.dark .desktop-agent-brand-mark.is-cursor img {
-  content: url("/assets/icons/agents/cursor-dark.svg");
-}
 
 .desktop-agent-header-region {
   --desktop-sidebar-control-size: 26px;
@@ -158,6 +196,23 @@
   min-height: 0;
   grid-row: 3;
   overflow: hidden;
+}
+
+/* Empty-chat identity spans both flexible conversation space and the auto-size
+ * dock. Their combined track height is stable while width-driven composer
+ * reflow changes the split between them. */
+.desktop-agent-conversation-overlay {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-row: 3 / 5;
+  overflow: hidden;
+  pointer-events: none;
+}
+.desktop-agent-conversation-overlay.has-dock {
+  padding-bottom: var(--agent-empty-state-dock-reserve);
 }
 
 .desktop-agent-dock-region {

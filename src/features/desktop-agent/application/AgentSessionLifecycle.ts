@@ -81,6 +81,15 @@ export class AgentSessionLifecycle {
     }
   }
 
+  /**
+   * Releases a native session created while Workbench topology was only
+   * reserved. No committed tab owns this resource, so active-turn close
+   * policy does not apply to rollback.
+   */
+  async rollbackPreparation() {
+    await this.closeActiveSession(false);
+  }
+
   private async closeActiveSession(removePersistence: boolean) {
     const sessionId = this.options.readState().session?.id;
     const bridge = this.options.bridgeProvider();

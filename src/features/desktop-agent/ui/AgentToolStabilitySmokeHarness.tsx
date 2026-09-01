@@ -20,6 +20,9 @@ type SmokeResult = {
   previewCount: number;
   searchContainerCount: number;
   sentinelVisible: boolean;
+  maxRailAlignmentErrorPx: number;
+  maxElbowCenterErrorPx: number;
+  commandResultGapPx: number;
   uncaughtErrors: string[];
   longTasks: number[];
   error?: string;
@@ -60,6 +63,9 @@ export function AgentToolStabilitySmokeHarness() {
         previewCount: 0,
         searchContainerCount: 0,
         sentinelVisible: false,
+        maxRailAlignmentErrorPx: Number.POSITIVE_INFINITY,
+        maxElbowCenterErrorPx: Number.POSITIVE_INFINITY,
+        commandResultGapPx: Number.POSITIVE_INFINITY,
         uncaughtErrors,
         longTasks,
         error: error instanceof Error ? error.stack || error.message : String(error),
@@ -101,13 +107,18 @@ async function runSmoke(): Promise<Omit<SmokeResult, "uncaughtErrors" | "longTas
   const sentinelVisible = document.querySelector('.desktop-agent-virtual-row[data-kind="assistant"]') !== null;
   const maxPreviewChars = Math.max(0, ...previewLengths);
   const maxSearchRows = Math.max(0, ...searchRows);
+  const evidenceGeometry = measureEvidenceGeometry();
   const passed = fallbackCount === 1
     && sentinelVisible
     && mountedRows <= agentTimelineLimits.maxMountedRows
     && previewLengths.length >= 3
     && maxPreviewChars <= agentToolEvidenceLimits.maxChars + 256
     && searchRows.length === 1
-    && maxSearchRows <= 80;
+    && maxSearchRows <= 80
+    && evidenceGeometry.maxRailAlignmentErrorPx <= 1
+    && evidenceGeometry.maxElbowCenterErrorPx <= 1
+    && evidenceGeometry.commandResultGapPx >= 0
+    && evidenceGeometry.commandResultGapPx <= 10;
   return {
     passed,
     durationMs,
@@ -118,6 +129,7 @@ async function runSmoke(): Promise<Omit<SmokeResult, "uncaughtErrors" | "longTas
     previewCount: previewLengths.length,
     searchContainerCount: searchRows.length,
     sentinelVisible,
+    ...evidenceGeometry,
     ...(passed ? {} : { error: "Agent tool stability DOM contract failed." }),
   };
 }
@@ -137,6 +149,21 @@ function createSmokeProjection() {
       request: Object.fromEntries(Array.from({ length: 200 }, (_, index) => [`field-${index}`, "x".repeat(4_096)])),
     }),
     activity("crash", "tool", smokeToolId, "ignored", {}),
+    {
+      id: "activity:file-change",
+      turnId: "turn-smoke",
+      itemId: "file-change",
+      kind: "file-change",
+      label: "updated fixture",
+      status: "completed" as const,
+      detail: {
+        tool: "edit",
+        path: "src/fixture.ts",
+        changes: [{ path: "src/fixture.ts", additions: 2, deletions: 1 }],
+      },
+      output: "",
+      sequence: 6,
+    },
   ];
   projection.messages = [{
     id: "assistant-sentinel",
@@ -149,6 +176,49 @@ function createSmokeProjection() {
     sequence: 100,
   }];
   return projection;
+}
+
+function measureEvidenceGeometry() {
+  const commandTool = document.querySelector<HTMLElement>(".desktop-agent-command");
+  const fileTool = document.querySelector<HTMLElement>(".desktop-agent-file-change");
+  const commandNode = commandTool?.querySelector<HTMLElement>(".desktop-agent-evidence-node.is-command");
+  const resultNode = commandTool?.querySelector<HTMLElement>(".desktop-agent-evidence-node.is-result");
+  const fileNode = fileTool?.querySelector<HTMLElement>(".desktop-agent-evidence-node.is-result");
+  const commandLine = commandNode?.querySelector<HTMLElement>(".desktop-agent-command-line");
+  const commandOutput = resultNode?.querySelector<HTMLElement>(".desktop-agent-command-output");
+  const commandMarker = commandNode?.querySelector<HTMLElement>(".desktop-agent-evidence-marker");
+  const fileRow = fileNode?.querySelector<HTMLElement>(".desktop-agent-file-list li");
+  const railErrors = [
+    railAlignmentError(commandTool, commandNode),
+    railAlignmentError(fileTool, fileNode),
+  ];
+  const elbowErrors = [
+    elbowCenterError(commandNode, commandMarker),
+    elbowCenterError(fileNode, fileRow),
+  ];
+  return {
+    maxRailAlignmentErrorPx: Math.max(...railErrors),
+    maxElbowCenterErrorPx: Math.max(...elbowErrors),
+    commandResultGapPx: commandLine && commandOutput
+      ? commandOutput.getBoundingClientRect().top - commandLine.getBoundingClientRect().bottom
+      : Number.POSITIVE_INFINITY,
+  };
+}
+
+function railAlignmentError(tool: HTMLElement | null | undefined, node: HTMLElement | null | undefined) {
+  const icon = tool?.querySelector<HTMLElement>(".desktop-agent-tool-icon");
+  if (!icon || !node) return Number.POSITIVE_INFINITY;
+  const iconRect = icon.getBoundingClientRect();
+  return Math.abs(iconRect.left + iconRect.width / 2 - node.getBoundingClientRect().left);
+}
+
+function elbowCenterError(node: HTMLElement | null | undefined, row: HTMLElement | null | undefined) {
+  if (!node || !row) return Number.POSITIVE_INFINITY;
+  const nodeRect = node.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+  const elbow = getComputedStyle(node, "::before");
+  const elbowCenterY = nodeRect.top + Number.parseFloat(elbow.top) + Number.parseFloat(elbow.height);
+  return Math.abs(elbowCenterY - (rowRect.top + rowRect.height / 2));
 }
 
 function activity(

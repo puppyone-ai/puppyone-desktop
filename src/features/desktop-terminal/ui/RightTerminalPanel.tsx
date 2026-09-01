@@ -16,7 +16,9 @@ import { useLocalization } from "@puppyone/localization/react";
 import type {
   AuxiliaryWorkbenchContribution,
   AuxiliaryWorkbenchCreationRecipe,
+  AuxiliaryWorkbenchHistoryTarget,
 } from "../../app-shell/auxiliary-workbench/types";
+import { filterAgentChatCreationRecipesByLocalAgentIds } from "../../app-shell/auxiliary-workbench/agentChatCreationRecipes";
 import { useAuxiliaryWorkbenchContributions } from "../../app-shell/auxiliary-workbench/useAuxiliaryWorkbenchContributions";
 import { useTerminalAgentLocator } from "../controller/useTerminalAgentLocator";
 import { useTerminalTabMoveDrag } from "../interactions/useTerminalTabMoveDrag";
@@ -49,6 +51,8 @@ type RightTerminalPanelProps = Readonly<{
   hiddenAgentIds: readonly string[];
   contributions?: readonly AuxiliaryWorkbenchContribution[];
 }>;
+
+const EMPTY_CHAT_RECIPES: readonly AuxiliaryWorkbenchCreationRecipe[] = Object.freeze([]);
 
 export function RightTerminalPanel({
   workspace,
@@ -99,11 +103,15 @@ export function RightTerminalPanel({
     item: AuxiliaryWorkbenchItem,
     targetGroupId: string | null,
     recipe: AuxiliaryWorkbenchCreationRecipe | null,
+    historyTarget: AuxiliaryWorkbenchHistoryTarget | null,
   ) => {
     const itemId = workbench.commitContributionItem(item, targetGroupId);
     setInitialSnapshot(itemId, Object.freeze({
       ...contribution.initialSnapshot,
-      iconKey: recipe?.iconKey ?? contribution.initialSnapshot.iconKey,
+      title: historyTarget?.title ?? contribution.initialSnapshot.title,
+      accessibleLabel: historyTarget?.title ?? contribution.initialSnapshot.accessibleLabel,
+      iconKey: historyTarget?.iconKey ?? recipe?.iconKey ?? contribution.initialSnapshot.iconKey,
+      resourceId: historyTarget?.id ?? contribution.initialSnapshot.resourceId,
     }));
     return itemId;
   }, [setInitialSnapshot, workbench]);
@@ -121,12 +129,13 @@ export function RightTerminalPanel({
   });
   const hosts = usePersistentTerminalSessionHosts(itemIds);
   const agentChatContribution = contributionByKind.get(AGENT_CHAT_WORKBENCH_ITEM_KIND) ?? null;
+  const agentChatHistory = agentChatContribution?.history ?? null;
   const agentLauncherMode = agentChatContribution ? "chat" : "terminal";
-  const chatRecipes = agentChatContribution?.creationRecipes ?? [];
-  const canCreateChat = Boolean(agentChatContribution && chatRecipes.some((recipe) => (
-    canCreateContribution(agentChatContribution, recipe)
-  )));
+  const registeredChatRecipes = agentChatContribution?.creationRecipes ?? EMPTY_CHAT_RECIPES;
   const chatPreparing = preparingKinds.has(AGENT_CHAT_WORKBENCH_ITEM_KIND);
+  const openAgentSessionIds = useMemo(() => Array.from(snapshotById.values()).flatMap(
+    (snapshot) => snapshot.resourceId ? [snapshot.resourceId] : [],
+  ), [snapshotById]);
 
   const presentedTerminalSessions = useMemo(() => workbench.presentedItemIds.flatMap(
     (itemId) => {
@@ -149,6 +158,13 @@ export function RightTerminalPanel({
     const hidden = new Set(hiddenAgentIds);
     return availableAgentIds.filter((agentId) => !hidden.has(agentId));
   }, [availableAgentIds, hiddenAgentIds]);
+  const chatRecipes = useMemo(
+    () => filterAgentChatCreationRecipesByLocalAgentIds(registeredChatRecipes, visibleAgentIds),
+    [registeredChatRecipes, visibleAgentIds],
+  );
+  const canCreateChat = Boolean(agentChatContribution && chatRecipes.some((recipe) => (
+    canCreateContribution(agentChatContribution, recipe)
+  )));
   const canLaunch = useCallback((launcherId: DesktopTerminalLauncherId) => (
     terminalEnabled && (
       launcherId === "shell"
@@ -191,6 +207,22 @@ export function RightTerminalPanel({
       recipe,
     );
     if (createdItemId) workbench.requestCloseTerminal(launcherItemId);
+  }, [agentChatContribution, createContributionItem, workbench]);
+  const restoreChat = useCallback(async (
+    target: AuxiliaryWorkbenchHistoryTarget,
+    targetGroupId: string | null,
+    launcherItemId: string | null = null,
+  ) => {
+    if (!agentChatContribution) return false;
+    const createdItemId = await createContributionItem(
+      agentChatContribution,
+      targetGroupId,
+      null,
+      target,
+    );
+    if (!createdItemId) return false;
+    if (launcherItemId) workbench.requestCloseTerminal(launcherItemId);
+    return true;
   }, [agentChatContribution, createContributionItem, workbench]);
 
   useEffect(() => {
@@ -290,10 +322,15 @@ export function RightTerminalPanel({
             chatCreationAvailable={canCreateChat}
             chatPreparing={chatPreparing}
             chatRecipes={chatRecipes}
+            history={agentChatHistory}
+            historyRootId={workspace.id}
+            historyRootPath={workspace.path}
+            excludedHistoryResourceIds={openAgentSessionIds}
             onCreateChat={agentChatContribution
               ? (recipe) => { if (!chatPreparing) void createChat(recipe, null); }
               : undefined}
             onLaunch={createDetectedTerminal}
+            onRestoreHistoryTarget={(target) => restoreChat(target, null)}
             onRefresh={() => void refreshAvailableAgents()}
             terminalEnabled={terminalEnabled}
           />
@@ -324,6 +361,9 @@ export function RightTerminalPanel({
                 chatCreationAvailable={canCreateChat}
                 chatPreparing={chatPreparing}
                 chatRecipes={chatRecipes}
+                history={agentChatHistory}
+                historyRootId={workspace.id}
+                excludedHistoryResourceIds={openAgentSessionIds}
                 focused={active && workbench.activeItemId === item.id}
                 onFocus={() => {
                   setFocusedItemId(item.id);
@@ -333,6 +373,12 @@ export function RightTerminalPanel({
                 onCreateChat={agentChatContribution
                   ? (recipe) => { void createChatFromLauncher(item.id, recipe); }
                   : undefined}
+                onRestoreHistoryTarget={(target) => {
+                  const targetGroupId = workbench.groups.find(
+                    (group) => group.itemIds.includes(item.id),
+                  )?.id ?? null;
+                  return restoreChat(target, targetGroupId, item.id);
+                }}
                 onRefresh={() => void refreshAvailableAgents()}
                 presented={active && presentedItemIdSet.has(item.id)}
                 runtime={workbench.runtimeRegistry.get(item.id)}

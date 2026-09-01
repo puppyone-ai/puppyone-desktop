@@ -285,6 +285,11 @@ describe("Codex app-server normalization", () => {
     });
 
     expect(normalizeCodexNotification({
+      method: "deprecationNotice",
+      params: { message: "Full-history hydration is deprecated for paginated threads." },
+    })).toEqual([]);
+
+    expect(normalizeCodexNotification({
       method: "error",
       params: {
         error: {
@@ -361,6 +366,72 @@ describe("Codex app-server normalization", () => {
 
     await expect(adapter.resumeSession({ threadId: "thread-stale", model: "gpt-5" }))
       .rejects.toBeInstanceOf(AgentProviderSessionUnavailableError);
+    adapter.dispose();
+  });
+
+  it("resumes metadata-only and restores paginated turns and items in transcript order", async () => {
+    const connection = new FakeConnection();
+    connection.results.set("thread/resume", {
+      thread: { id: "thread-history", preview: "Saved session", createdAt: 1, updatedAt: 4 },
+    });
+    connection.results.set("thread/turns/list", (params) => params.cursor === null
+      ? {
+          data: [{
+            id: "turn-new",
+            items: [],
+            itemsView: "summary",
+            status: "completed",
+          }],
+          nextCursor: "older-turns",
+        }
+      : {
+          data: [{
+            id: "turn-old",
+            itemsView: "full",
+            status: "completed",
+            items: [
+              { id: "old-user", type: "userMessage", content: [{ type: "text", text: "old prompt" }] },
+              { id: "old-answer", type: "agentMessage", text: "old answer" },
+            ],
+          }],
+          nextCursor: null,
+        });
+    connection.results.set("thread/items/list", (params) => params.cursor === null
+      ? {
+          data: [{ turnId: "turn-new", item: { id: "new-answer", type: "agentMessage", text: "new answer" } }],
+          nextCursor: "older-items",
+        }
+      : {
+          data: [{
+            turnId: "turn-new",
+            item: { id: "new-user", type: "userMessage", content: [{ type: "text", text: "new prompt" }] },
+          }],
+          nextCursor: null,
+        });
+    const adapter = new CodexAppServerAdapter({
+      executablePath: "/usr/local/bin/codex",
+      environment: {},
+      workspaceRoot: "/workspace",
+      appVersion: "test",
+      connectionFactory: () => connection,
+    });
+
+    await adapter.resumeSession({ threadId: "thread-history", model: "gpt-5" });
+    const events = await adapter.readHistory();
+
+    expect(connection.requests).toContainEqual({
+      method: "thread/resume",
+      params: expect.objectContaining({ threadId: "thread-history", excludeTurns: true }),
+    });
+    expect(connection.requests.filter((request) => request.method === "thread/turns/list"))
+      .toHaveLength(2);
+    expect(connection.requests.filter((request) => request.method === "thread/items/list"))
+      .toHaveLength(2);
+    expect(connection.requests.some((request) => request.method === "thread/read")).toBe(false);
+    expect(events.filter((event) => event.type === "turn.started").map((event) => event.payload.prompt))
+      .toEqual(["old prompt", "new prompt"]);
+    expect(events.filter((event) => event.type === "assistant.completed").map((event) => event.payload.text))
+      .toEqual(["old answer", "new answer"]);
     adapter.dispose();
   });
 
@@ -504,7 +575,7 @@ describe("Codex app-server normalization", () => {
     await adapter.compactSession();
     expect(connection.requests).toEqual(expect.arrayContaining([
       expect.objectContaining({ method: "turn/steer", params: expect.objectContaining({ threadId: "thread-1", turnId: "turn-1" }) }),
-      expect.objectContaining({ method: "thread/fork", params: { threadId: "thread-1", messageId: "message-1" } }),
+      expect.objectContaining({ method: "thread/fork", params: { threadId: "thread-1", messageId: "message-1", excludeTurns: true } }),
       expect.objectContaining({ method: "thread/compact/start", params: { threadId: "thread-1" } }),
     ]));
     expect(CODEX_CAPABILITIES).toMatchObject({
@@ -588,7 +659,12 @@ class FakeConnection extends EventEmitter {
   request(method, params) {
     this.requests.push({ method, params });
     if (this.failures.has(method)) return Promise.reject(this.failures.get(method));
-    return Promise.resolve(this.results.get(method) ?? {});
+    try {
+      const result = this.results.get(method);
+      return Promise.resolve(typeof result === "function" ? result(params) : result ?? {});
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 
   notify() {}

@@ -245,6 +245,11 @@ describe("sidebar spacing architecture", () => {
     const treeRow = compact(readCssBlock(dataTreeCss, ".tree-row"));
     const treeRowAction = compact(readCssBlock(dataTreeCss, ".tree-row-action-button"));
     const treeRowActionIcon = compact(readCssBlock(dataTreeCss, ".tree-row-action-button > svg"));
+    const workspaceGroupHeader = compact(readCssBlock(
+      dataTreeCss,
+      ".tree-row.workspace-folder-root.workspace-group-header",
+    ));
+    const workspaceGroupDivider = compact(readCssBlock(dataTreeCss, ".tree-workspace-group-divider"));
 
     expect(adapter).toContain("--po-tree-row-left-gap: var(--desktop-sidebar-row-left-gap);");
     expect(adapter).toContain("--po-tree-row-right-gap: var(--desktop-sidebar-row-right-gap);");
@@ -255,6 +260,14 @@ describe("sidebar spacing architecture", () => {
     expect(adapter).toContain("--po-tree-row-font-size: var(--desktop-sidebar-font-size);");
     expect(adapter).toContain("--po-tree-row-font-weight: var(--desktop-sidebar-font-weight);");
     expect(adapter).toContain("--po-tree-row-line-height: var(--desktop-sidebar-line-height);");
+    expect(adapter).toContain("--po-tree-workspace-group-color: var(--desktop-sidebar-section-title-color);");
+    expect(adapter).toContain("--po-tree-workspace-group-font-size: var(--desktop-sidebar-section-title-font-size);");
+    expect(adapter).toContain("--po-tree-workspace-group-font-weight: var(--desktop-sidebar-section-title-font-weight);");
+    expect(workspaceGroupHeader).toContain("color: var(--tree-workspace-group-color);");
+    expect(workspaceGroupHeader).toContain("font-size: var(--tree-workspace-group-font-size);");
+    expect(workspaceGroupHeader).toContain("font-weight: var(--tree-workspace-group-font-weight);");
+    expect(workspaceGroupDivider).toContain("background: var(--tree-workspace-group-divider);");
+    expect(workspaceGroupDivider).toContain("min-width: 18px;");
     expect(treeRow).toContain("font-size: var(--tree-row-font-size);");
     expect(treeRow).toContain("font-weight: var(--tree-row-font-weight);");
     expect(treeRow).toContain("line-height: var(--tree-row-line-height);");

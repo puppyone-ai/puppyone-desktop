@@ -9,10 +9,11 @@
 .desktop-agent-composer-floating {
   position: absolute;
   bottom: calc(100% + 8px);
-  inset-inline-start: 0;
+  inset-inline-end: 8px;
+  inset-inline-start: auto;
   z-index: 2;
   width: max-content;
-  max-width: 100%;
+  max-width: calc(100% - 16px);
   pointer-events: none;
 }
 
@@ -29,7 +30,7 @@
   padding: 0;
   border: 1px solid var(--agent-border-subtle);
   border-radius: var(--agent-radius-composer);
-  background: var(--agent-prompt-surface);
+  background: var(--agent-composer-surface);
   box-shadow: none;
   transition: border-color 180ms ease, box-shadow 180ms ease;
 }
@@ -40,12 +41,12 @@
 
 .desktop-agent-composer:hover:not([data-input-disabled="true"]) {
   border-color: var(--agent-border);
-  background: var(--agent-prompt-surface);
+  background: var(--agent-composer-surface);
 }
 
 .desktop-agent-composer:focus-within {
   border-color: var(--agent-border);
-  background: var(--agent-prompt-surface);
+  background: var(--agent-composer-surface);
   box-shadow: none;
 }
 
@@ -74,6 +75,17 @@
 .desktop-agent-prompt-editor .cm-editor {
   width: 100%;
   min-width: 0;
+}
+.desktop-agent-composer:not([data-input-disabled="true"]) :is(
+  .desktop-agent-prompt-editor-host,
+  .desktop-agent-prompt-editor,
+  .cm-editor,
+  .cm-scroller,
+  .cm-content,
+  .cm-line,
+  .cm-placeholder
+) {
+  cursor: text;
 }
 .desktop-agent-prompt-editor .cm-editor {
   min-height: var(--agent-composer-input-min-height);
@@ -130,7 +142,7 @@
   width: 100%;
   min-width: 0;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 .desktop-agent-composer-trailing {
   display: grid;
@@ -173,7 +185,11 @@
   background: var(--agent-row-hover-surface);
   color: var(--agent-text-muted);
 }
+.desktop-agent-attachment-control + .desktop-agent-composer-action {
+  margin-inline-start: var(--agent-primary-action-separation);
+}
 .desktop-agent-composer-action {
+  position: relative;
   display: grid;
   width: var(--agent-control-size);
   height: var(--agent-control-size);
@@ -182,15 +198,28 @@
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--agent-text);
+  background: transparent;
   box-shadow: none;
   color: var(--agent-canvas);
   cursor: var(--po-clickable-cursor, pointer);
   transition: opacity 120ms ease;
 }
+.desktop-agent-composer-action::before {
+  position: absolute;
+  inset: calc((var(--agent-control-size) - var(--agent-primary-action-visual-size)) / 2);
+  border-radius: 50%;
+  background: var(--agent-text);
+  content: "";
+}
+.desktop-agent-composer-action > svg {
+  position: relative;
+  z-index: 1;
+}
 .desktop-agent-composer-action:hover:not(:disabled) { opacity: 0.84; }
-.desktop-agent-composer-action:disabled { cursor: default; background: color-mix(in srgb, var(--agent-text) 14%, transparent); box-shadow: none; color: color-mix(in srgb, var(--agent-text) 48%, transparent); opacity: 1; }
-.desktop-agent-composer-action.is-stop:disabled { background: var(--agent-text); color: var(--agent-canvas); opacity: 0.52; }
+.desktop-agent-composer-action:disabled { cursor: default; box-shadow: none; color: color-mix(in srgb, var(--agent-text) 48%, transparent); opacity: 1; }
+.desktop-agent-composer-action:disabled::before { background: color-mix(in srgb, var(--agent-text) 14%, transparent); }
+.desktop-agent-composer-action.is-stop:disabled { color: var(--agent-canvas); opacity: 0.52; }
+.desktop-agent-composer-action.is-stop:disabled::before { background: var(--agent-text); }
 
 .desktop-agent-reference-cards {
   display: flex;
@@ -294,10 +323,10 @@
   border: 0;
   border-radius: var(--desktop-control-radius);
   background: transparent;
-  color: var(--agent-text-muted);
+  color: var(--agent-text-subtle);
   cursor: var(--po-clickable-cursor, pointer);
 }
-.desktop-agent-reference-trigger:hover:not(:disabled) { background: var(--agent-row-hover-surface); color: var(--agent-text); }
+.desktop-agent-reference-trigger:hover:not(:disabled) { background: var(--agent-row-hover-surface); color: var(--agent-text-muted); }
 .desktop-agent-reference-trigger:disabled { cursor: default; color: var(--agent-text-subtle); opacity: 0.48; }
 .desktop-agent-command-menu {
   position: absolute;

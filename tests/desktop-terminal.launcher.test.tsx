@@ -8,12 +8,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AGENT_CHAT_CREATION_RECIPES,
   PUPPYONE_AGENT_CREATION_RECIPE,
+  localAgentIdForAgentChatRuntime,
 } from "../src/features/app-shell/auxiliary-workbench/agentChatCreationRecipes";
 import {
   DESKTOP_TERMINAL_LAUNCHERS,
   getDesktopTerminalLauncher,
 } from "../src/features/desktop-terminal/model/terminalLaunchers";
 import { TerminalLauncher } from "../src/features/desktop-terminal/ui/TerminalLauncher";
+import { WorkbenchLauncherIcon } from "../src/features/desktop-terminal/ui/WorkbenchLauncherIcon";
 import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -28,7 +30,20 @@ afterEach(() => {
 });
 
 describe("Unified Workbench launcher", () => {
-  it("uses detected Terminal Agent commands above Shell before Chat opt-in", () => {
+  it("resolves Pi Workbench chrome through the same brand registry as Local Agents settings", () => {
+    const container = renderLauncher(<WorkbenchLauncherIcon iconKey="pi" />);
+    const icon = container.querySelector(".desktop-terminal-launcher-icon.is-pi");
+
+    expect(icon).not.toBeNull();
+    expect(icon?.classList).not.toContain("is-chat-fallback");
+    expect(Array.from(icon?.querySelectorAll("img") ?? [], (image) => image.getAttribute("src")))
+      .toEqual([
+        "/assets/icons/agents/pi.svg",
+        "/assets/icons/agents/pi-dark.svg",
+      ]);
+  });
+
+  it("uses detected Terminal Agent commands and keeps Terminal in the same launch group", () => {
     const onLaunch = vi.fn();
     const container = renderLauncher(
       <TerminalLauncher
@@ -41,12 +56,10 @@ describe("Unified Workbench launcher", () => {
     );
 
     const groups = container.querySelectorAll(".desktop-terminal-launcher-group");
-    expect(groups).toHaveLength(2);
+    expect(groups).toHaveLength(1);
     expect(groups[0].classList).toContain("is-agents");
-    expect(groups[1].classList).toContain("is-shell");
     expect(groups[0].getAttribute("data-agent-mode")).toBe("terminal");
     expect(groups[0].querySelector("h2")?.textContent).toBe("start with an agent");
-    expect(groups[1].querySelector("h2")?.textContent).toBe("or open a shell");
 
     const agentButtons = groups[0].querySelectorAll<HTMLButtonElement>(
       ".desktop-terminal-launcher-tool",
@@ -68,9 +81,12 @@ describe("Unified Workbench launcher", () => {
       false,
     ]);
 
-    const shellButtons = groups[1].querySelectorAll<HTMLButtonElement>("button");
+    const shellButtons = groups[0].querySelectorAll<HTMLButtonElement>(
+      ".desktop-terminal-launcher-shell",
+    );
     expect(shellButtons).toHaveLength(1);
-    expect(shellButtons[0].textContent).toBe("Open a shell");
+    expect(shellButtons[0].textContent).toBe("Terminal");
+    expect(groups[0].querySelector(".desktop-terminal-launcher-divider")).not.toBeNull();
     expect(container.querySelector(".desktop-terminal-launcher-rail")).toBeNull();
     expect(container.querySelector(".desktop-terminal-launcher-group.is-terminal")).toBeNull();
 
@@ -107,6 +123,7 @@ describe("Unified Workbench launcher", () => {
       "Claude Code",
       "Cursor",
       "OpenCode",
+      "Pi",
     ]);
     expect(container.textContent).not.toContain("PuppyOne");
     act(() => agentButtons[0]?.click());
@@ -195,20 +212,54 @@ describe("Unified Workbench launcher", () => {
       .toBe("start with an agent");
   });
 
-  it("keeps the managed PuppyOne recipe registered but hidden from the launcher", () => {
+  it("keeps the managed PuppyOne recipe reserved but unregistered from the launcher", () => {
     expect(AGENT_CHAT_CREATION_RECIPES.map(({ id }) => id)).toEqual([
       "codex",
       "claude",
       "cursor",
       "opencode-native",
+      "pi",
     ]);
     expect(PUPPYONE_AGENT_CREATION_RECIPE).toMatchObject({
       id: "puppyone-agent",
       status: "coming-soon",
     });
     expect(AGENT_CHAT_CREATION_RECIPES).not.toContain(PUPPYONE_AGENT_CREATION_RECIPE);
+    expect(localAgentIdForAgentChatRuntime("opencode-native")).toBe("opencode");
     expect(getDesktopTerminalLauncher("codex").id).toBe("codex");
     expect(getDesktopTerminalLauncher("hermes").id).toBe("hermes");
+  });
+
+  it("mounts the contribution-owned history browser only after explicit navigation", () => {
+    const renderBrowser = vi.fn(({ onBack }: { onBack: () => void }) => (
+      <button type="button" onClick={onBack}>Back</button>
+    ));
+    const container = renderLauncher(
+      <TerminalLauncher
+        agentMode="chat"
+        discoveryPhase="ready"
+        availableAgentIds={[]}
+        chatRecipes={AGENT_CHAT_CREATION_RECIPES}
+        history={{ label: "Chat history", iconKey: null, renderBrowser }}
+        historyRootId="workspace-a"
+        historyRootPath="/workspace/a"
+        onCreateChat={vi.fn()}
+        onRestoreHistoryTarget={vi.fn(async () => true)}
+        onLaunch={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelectorAll(".desktop-terminal-launcher-group")).toHaveLength(2);
+    expect(renderBrowser).not.toHaveBeenCalled();
+    act(() => findButton(container, "Chat history")?.click());
+    expect(renderBrowser).toHaveBeenCalledWith(expect.objectContaining({
+      rootId: "workspace-a",
+      rootPath: "/workspace/a",
+    }));
+    expect(container.querySelector(".desktop-terminal-launcher.is-history")).not.toBeNull();
+    act(() => findButton(container, "Back")?.click());
+    expect(container.querySelector(".desktop-terminal-launcher-group.is-agents")).not.toBeNull();
   });
 
   it("keeps both frames available when a prior Shell start reports an error", () => {
@@ -227,7 +278,7 @@ describe("Unified Workbench launcher", () => {
 
     expect(container.querySelector('[role="alert"]')?.textContent)
       .toContain("The Agent could not start.");
-    expect(container.querySelectorAll(".desktop-terminal-launcher-group")).toHaveLength(2);
+    expect(container.querySelectorAll(".desktop-terminal-launcher-group")).toHaveLength(1);
   });
 });
 

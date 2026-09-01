@@ -9,6 +9,7 @@ export function setTerminalAgentVisible(
   if (visible) hidden.delete(agentId);
   else hidden.add(agentId);
   return {
+    ...settings,
     hiddenTerminalAgentIds: Array.from(hidden).sort((left, right) => left.localeCompare(right)),
   };
 }

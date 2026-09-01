@@ -3,7 +3,6 @@ import type { AgentStreamFlushScheduler } from "./AgentEventSynchronizer";
 import type { AgentClientProvider } from "./AgentClientPort";
 import { clearAgentChatTabStateRegistryForTests } from "./agent-chat-tab-state-registry";
 
-const MAX_CONTROLLERS = 8;
 const controllers = new Map<string, AgentSessionController>();
 
 /**
@@ -20,11 +19,8 @@ export function getAgentSessionController(
   let controller = controllers.get(controllerKey);
   if (!controller) {
     controller = new AgentSessionController(workspaceRoot, clientProvider, scheduleStreamFlush);
-  } else {
-    controllers.delete(controllerKey);
   }
   controllers.set(controllerKey, controller);
-  trimInactiveControllers(controllerKey);
   return controller;
 }
 
@@ -39,24 +35,15 @@ export async function closeAgentSessionController(workspaceRoot: string, tabId: 
   return true;
 }
 
-/** Disposes a controller whose reserved Workbench Item was never committed. */
-export function discardAgentSessionController(workspaceRoot: string, tabId: string) {
+/** Rolls back resources prepared for a Workbench Item that never committed. */
+export async function discardPreparedAgentSessionController(workspaceRoot: string, tabId: string) {
   const controllerKey = key(workspaceRoot, tabId);
   const controller = controllers.get(controllerKey);
   if (!controller) return;
-  controller.dispose();
+  // Remove ownership before awaiting native shutdown. A concurrent reservation
+  // for the same topology identity must never inherit the abandoned Controller.
   controllers.delete(controllerKey);
-}
-
-function trimInactiveControllers(currentControllerKey: string) {
-  while (controllers.size > MAX_CONTROLLERS) {
-    const candidate = Array.from(controllers.entries()).find(([controllerKey, controller]) => (
-      controllerKey !== currentControllerKey && !controller.hasSubscribers()
-    ));
-    if (!candidate) return;
-    candidate[1].dispose();
-    controllers.delete(candidate[0]);
-  }
+  await controller.rollbackPreparation();
 }
 
 function key(workspaceRoot: string, tabId: string) {

@@ -63,7 +63,12 @@ describe("OpenCode ACP AgentRuntimePort adapter", () => {
       account: { requiresRuntimeSetup: false },
       providers: [{ id: "openai", modelCount: 2 }],
       modes: expect.arrayContaining([expect.objectContaining({ id: "build", isDefault: true })]),
-      capabilities: { streamingText: true, manualApprovals: true, sessionHistory: false },
+      capabilities: {
+        streamingText: true,
+        manualApprovals: true,
+        sessionHistory: true,
+        history: { discovery: "unsupported", exactOpen: "supported", hydration: "push-replay" },
+      },
     });
     expect(inspection.capabilities.referenceInputs).toMatchObject({
       attachments: {

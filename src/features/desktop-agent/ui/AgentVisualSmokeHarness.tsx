@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { RENDERER_ASSET_PATHS, resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
+import { AGENT_BRAND_CATALOG, resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { DesktopOverlayPortal } from "../../app-shell/DesktopOverlayPortal";
 import { AgentComposer } from "./AgentComposer";
-import { AgentChangesPill } from "./AgentChangesPill";
+import { AgentChangesControl } from "./AgentChangesControl";
 import { AgentPanelLayout } from "./AgentPanelLayout";
 import { AgentRuntimePicker } from "./AgentRuntimePicker";
 import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
@@ -299,7 +299,7 @@ export function AgentVisualSmokeHarness() {
           conversation={<AgentTranscript projection={visibleProjection} loading={startupLoading} runtimeLabel={selectedRuntime.descriptor.displayName} />}
           dock={startupLoading ? null : <>
             <AgentComposer
-              floatingAccessory={<AgentChangesPill projection={visibleProjection} onViewChanges={() => {}} />}
+              floatingAccessory={<AgentChangesControl projection={visibleProjection} onViewChanges={() => {}} />}
               draft={draft}
               draftMentions={draftMentions}
               onDraftChange={setDraft}
@@ -322,7 +322,7 @@ export function AgentVisualSmokeHarness() {
               commands={[]}
               references={references}
               getReferencePreviewUrl={(id) => id === "attachment-capture"
-                ? resolveRendererPublicAssetUrl(RENDERER_ASSET_PATHS.icons.agents.codexLight)
+                ? resolveRendererPublicAssetUrl(AGENT_BRAND_CATALOG.codex.assets.light)
                 : null}
               referenceCapabilities={referenceCapabilities}
               onRemoveReference={(id) => setReferences((current) => current.filter((reference) => reference.id !== id))}

@@ -82,6 +82,7 @@ export function AuxiliaryPanelHost({
     minWidth,
     side: "inline-end",
     width: resolvedWidth,
+    widthChangeMode: "end",
     onCollapsedChange: onOpenChange
       ? (collapsed) => onOpenChange(!collapsed)
       : undefined,

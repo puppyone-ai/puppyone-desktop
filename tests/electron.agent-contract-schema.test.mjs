@@ -5,6 +5,7 @@ import {
   AGENT_IPC_CHANNELS,
   AGENT_READINESS_CODES,
   AGENT_RUNTIME_CAPABILITIES,
+  AGENT_SESSION_OPEN_ERROR_CODES,
   assertAgentEventEnvelope,
   assertAgentIpcResponse,
   assertAgentRuntimeCapabilities,
@@ -17,6 +18,8 @@ describe("shared Agent contract", () => {
     const source = readFileSync(new URL("../shared/agent-contract/types.ts", import.meta.url), "utf8");
     expect(typeLiterals(source, "AgentEventType", "AgentEventPayloadBase")).toEqual([...AGENT_EVENT_TYPES]);
     expect(typeLiterals(source, "AgentReadinessCode", "AgentRuntimeDescriptor")).toEqual([...AGENT_READINESS_CODES]);
+    expect(typeLiterals(source, "AgentSessionOpenErrorCode", "AgentSessionOpenResult"))
+      .toEqual([...AGENT_SESSION_OPEN_ERROR_CODES]);
     expect(typeKeys(source, "AgentCapabilities", "AgentAccountState")).toEqual([...AGENT_RUNTIME_CAPABILITIES]);
     expect(typeLiterals(source, "AgentIpcChannel", null)).toEqual([...AGENT_IPC_CHANNELS]);
   });
@@ -181,6 +184,7 @@ describe("shared Agent contract", () => {
       runtimeId: "codex",
       discoverNative: true,
       cursor: "page-2",
+      scanId: "scan-1",
       limit: 20,
       scanPrivateDatabase: true,
     })).toEqual({
@@ -188,6 +192,7 @@ describe("shared Agent contract", () => {
       runtimeId: "codex",
       discoverNative: true,
       cursor: "page-2",
+      scanId: "scan-1",
       limit: 20,
     });
     const response = assertAgentIpcResponse("agent:sessions-list", {
@@ -211,6 +216,7 @@ describe("shared Agent contract", () => {
         runtimeId: "codex",
         status: "partial",
         nextCursor: "page-3",
+        scanId: "scan-1",
         indexed: 1,
         warnings: [],
       },
@@ -218,11 +224,41 @@ describe("shared Agent contract", () => {
     });
     expect(response.sessions[0]).not.toHaveProperty("transcript");
     expect(response.sessions[0]).not.toHaveProperty("events");
+    expect(response.discovery.scanId).toBe("scan-1");
     expect(() => assertAgentIpcResponse("agent:sessions-list", {
       sessions: [],
       discovery: { runtimeId: "codex", status: "scanning-everything", nextCursor: null, indexed: 0, warnings: [] },
       warnings: [],
     })).toThrow(/discovery.status/i);
+  });
+
+  it("preserves structured exact-session open failures", () => {
+    expect(parseAgentIpcRequest("agent:session-open", {
+      rootPath: "/workspace",
+      sessionId: "saved-session",
+      runtimeId: "cursor",
+      providerSessionId: "must-not-cross",
+    })).toEqual({
+      rootPath: "/workspace",
+      sessionId: "saved-session",
+      runtimeId: "cursor",
+    });
+    expect(assertAgentIpcResponse("agent:session-open", {
+      status: "failed",
+      error: {
+        code: "SESSION_NOT_FOUND",
+        message: "This saved session is unavailable.",
+        retryable: false,
+        diagnostic: "private",
+      },
+    })).toEqual({
+      status: "failed",
+      error: {
+        code: "SESSION_NOT_FOUND",
+        message: "This saved session is unavailable.",
+        retryable: false,
+      },
+    });
   });
 
   it("requires methods for capabilities a runtime advertises", () => {

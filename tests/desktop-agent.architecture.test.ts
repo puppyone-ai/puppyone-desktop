@@ -24,6 +24,7 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(layout).toContain('className="desktop-agent-boundary"');
     expect(layout).toContain('className="desktop-agent-panel"');
     expect(layout).toContain('className="desktop-agent-conversation-region"');
+    expect(layout).toContain("desktop-agent-conversation-overlay");
     expect(layout).toContain('className="desktop-agent-dock-region"');
     expect(layout).not.toContain("dropActive");
     expect(layout).not.toContain("dropInvalid");
@@ -40,6 +41,8 @@ describe("Desktop Agent architecture boundaries", () => {
 
   it("enforces virtual, responsive, safe presentation contracts", () => {
     const timeline = source("src/features/desktop-agent/ui/AgentTranscript.tsx");
+    const timelineLayout = source("src/features/desktop-agent/ui/agent-timeline-layout.ts");
+    const timelinePresentation = source("src/features/desktop-agent/ui/agent-timeline-presentation.ts");
     const emptyState = source("src/features/desktop-agent/ui/AgentEmptyState.tsx");
     const markdown = source("src/features/desktop-agent/ui/SafeMarkdown.tsx");
     const composer = source("src/features/desktop-agent/ui/AgentComposer.tsx");
@@ -64,7 +67,14 @@ describe("Desktop Agent architecture boundaries", () => {
     const pickers = source("src/features/desktop-agent/ui/styles/pickers.css");
     const css = agentStyles();
     const globalLayout = source("src/styles/layout.css");
-    expect(timeline).toContain("MAX_MOUNTED_ROWS = 120");
+    expect(timelineLayout).toContain("maxMountedRows: 120");
+    expect(timelineLayout).toContain("buildAgentTimelineLayout");
+    expect(timelineLayout).toContain("agentTimelineGapAfter");
+    expect(timelinePresentation).toContain("buildAgentTimeline");
+    expect(timelinePresentation).toContain('part.kind !== "usage"');
+    expect(timeline).toContain("buildAgentTimeline(projection)");
+    expect(timeline).toContain("buildAgentTimelineLayout(timeline.rows");
+    expect(timeline).not.toContain("function buildLayout(");
     expect(timeline).toContain("emptyState?: ReactNode");
     expect(timeline).toContain("showEmptyState && emptyState");
     expect(emptyState).toContain("<AgentBrandMark");
@@ -81,15 +91,18 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(cssEntry.split("\n").length).toBeLessThan(30);
     expect(foundation).toMatch(/\.desktop-agent-boundary\s*\{[^}]*container:\s*desktop-agent \/ inline-size/s);
     expect(foundation).not.toMatch(/\.desktop-agent-panel\s*\{[^}]*container:/s);
-    expect(foundation).toMatch(/\.desktop-agent-panel\s*\{[^}]*display:\s*grid[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\) auto/s);
+    expect(foundation).toMatch(/\.desktop-agent-panel\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*minmax\(0, 1fr\)[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\) auto/s);
+    expect(foundation).toMatch(/\.desktop-agent-header-region,\s*\.desktop-agent-status-region,\s*\.desktop-agent-conversation-region,\s*\.desktop-agent-conversation-overlay,\s*\.desktop-agent-dock-region\s*\{[^}]*grid-column:\s*1/s);
     expect(foundation).toContain("--agent-radius-composer: 8px");
     expect(foundation).toContain("--agent-inline-inset: var(--desktop-sidebar-row-left-gap, 12px)");
     expect(foundation).toContain("--agent-composer-input-min-height: calc(var(--agent-composer-line-height) + var(--agent-composer-input-padding) + var(--agent-composer-input-padding));");
     expect(foundation).not.toContain("--agent-composer-input-min-height: 70px");
-    expect(theme).toContain("--agent-prompt-surface: var(--po-active)");
+    expect(theme).toContain("--agent-composer-surface: var(--po-active)");
+    expect(theme).toContain("--agent-user-message-surface: var(--po-hover)");
+    expect(theme).toContain("--agent-user-message-border: color-mix(in srgb, var(--agent-border-subtle) 62%, transparent)");
     expect(theme).not.toContain("--agent-connection-surface");
-    expect(theme).not.toMatch(/--agent-(?:composer|user-message)-surface:/);
-    expect(foundation).not.toContain("--agent-prompt-surface:");
+    expect(theme).not.toContain("--agent-prompt-surface:");
+    expect(foundation).not.toMatch(/--agent-(?:composer|user-message)-(?:surface|border):/);
     expect(pickers).toMatch(
       /\.desktop-agent-picker\.is-header \.desktop-agent-picker-trigger\s*\{[^}]*color:\s*var\(--desktop-titlebar-text-muted, var\(--po-text-muted\)\);[^}]*font-size:\s*var\(--po-font-size-chrome, 13px\);[^}]*font-weight:\s*var\(--po-font-weight-chrome, 500\);[^}]*line-height:\s*18px;/s,
     );
@@ -210,6 +223,27 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(controllerState).toContain('AgentSubmissionStage = "preparing-session" | "starting-turn" | null');
   });
 
+  it("separates History queries, prepared-session ownership, and optional Harness History operations", () => {
+    const browser = source("src/features/desktop-agent/workbench/AgentChatHistoryBrowser.tsx");
+    const historyController = source("src/features/desktop-agent/application/ConversationHistoryController.ts");
+    const registry = source("src/features/desktop-agent/application/controllerRegistry.ts");
+    const historyPort = source("electron/main/agent/runtime/agent-session-history-port.mjs");
+    const indexer = source("electron/main/agent/application/native-conversation-indexer.mjs");
+    const lifecycle = source("electron/main/agent/application/session/agent-session-lifecycle.mjs");
+
+    expect(browser).toContain("new ConversationHistoryController");
+    expect(browser).not.toMatch(/AgentSessionController|getAgentSessionController|controllerRegistry/);
+    expect(historyController).toContain("operation = this.runRefresh");
+    expect(historyController).toContain("generation === this.generation");
+    expect(historyController).not.toMatch(/createAgentSession|resumeAgentSession|openAgentSession|onAgentEvent/);
+    expect(registry).not.toMatch(/MAX_CONTROLLERS|trimInactiveControllers|hasSubscribers/);
+    expect(registry).toContain("await controller.rollbackPreparation()");
+    expect(historyPort).toContain("assertAgentSessionHistoryCapabilities");
+    expect(indexer).toContain("resolveAgentSessionHistoryPort(adapter)");
+    expect(lifecycle).toContain("resolveAgentSessionHistoryPort(session.adapter)");
+    expect(lifecycle).not.toMatch(/adapter\.readHistory/);
+  });
+
   it("keeps native transport internals out of Renderer", () => {
     const preload = source("electron/preload.cjs");
     const renderer = [
@@ -259,14 +293,18 @@ describe("Desktop Agent architecture boundaries", () => {
   it("keeps Core backend-neutral and concrete backends in the single production composition root", () => {
     const registry = source("electron/main/agent/runtime/agent-runtime-registry.mjs");
     const bootstrap = source("electron/main/agent/bootstrap/create-agent-runtime-host.mjs");
+    const reservedPuppyOneRuntime = source("electron/main/agent/runtimes/puppyone-agent/puppyone-agent-runtime-definition.mjs");
     const contract = source("shared/agent-contract/schema.mjs");
     expect(registry).not.toMatch(/opencode|codex|claude|cursor/i);
-    expect(bootstrap).toContain("createPuppyOneAgentRuntimeDefinition");
+    expect(bootstrap).not.toContain("createPuppyOneAgentRuntimeDefinition");
+    expect(bootstrap).not.toContain('"puppyone-agent"');
+    expect(reservedPuppyOneRuntime).toContain("createPuppyOneAgentRuntimeDefinition");
     expect(bootstrap).toContain("createCodexRuntimeDefinition");
     expect(bootstrap).toContain("createClaudeRuntimeDefinition");
     expect(bootstrap).toContain("createOpenCodeNativeRuntimeDefinition");
+    expect(bootstrap).toContain("createPiRuntimeDefinition");
     expect(bootstrap).toContain("createCursorRuntimeDefinition");
-    expect(bootstrap).toContain('DEFAULT_AGENT_RUNTIME_ID = "puppyone-agent"');
+    expect(bootstrap).toContain('DEFAULT_AGENT_RUNTIME_ID = "codex"');
     expect(contract).toContain("parseAgentIpcRequest");
     expect(contract).toContain("assertAgentIpcResponse");
   });

@@ -1,6 +1,8 @@
 import {
-  RENDERER_ASSET_PATHS,
-  resolveRendererPublicAssetUrl,
+  AgentBrandImage,
+  AgentMonochromeBrandImage,
+  isMonochromeAgentBrandId,
+  resolveAgentBrand,
 } from "@puppyone/shared-ui";
 import { PuppyBrandMark } from "../../../components/brand/PuppyBrandMark";
 
@@ -8,31 +10,36 @@ type AgentBrandMarkProps = {
   iconKey?: string | null;
   label: string;
   kind?: "agent" | "provider";
+  appearance?: "brand" | "monochrome";
 };
 
 /** Local official product marks; no remote fetches or backend protocol knowledge. */
-export function AgentBrandMark({ iconKey, label, kind = "agent" }: AgentBrandMarkProps) {
+export function AgentBrandMark({
+  iconKey,
+  label,
+  kind = "agent",
+  appearance = "brand",
+}: AgentBrandMarkProps) {
   const identity = `${iconKey || ""} ${label}`.toLowerCase();
-  const agents = RENDERER_ASSET_PATHS.icons.agents;
 
   if (identity.includes("puppyone")) {
     return <span className="desktop-agent-brand-mark is-puppyone" aria-hidden="true"><PuppyBrandMark tone="dark" /></span>;
   }
 
-  if (identity.includes("codex") || identity.includes("openai")) {
-    return <span className="desktop-agent-brand-mark is-codex" aria-hidden="true"><img src={resolveRendererPublicAssetUrl(agents.codexLight)} alt="" draggable={false} /></span>;
-  }
-
-  if (identity.includes("claude") || identity.includes("anthropic")) {
-    return <span className="desktop-agent-brand-mark is-claude" aria-hidden="true"><img src={resolveRendererPublicAssetUrl(agents.claudeCode)} alt="" draggable={false} /></span>;
-  }
-
-  if (identity.includes("cursor")) {
-    return <span className="desktop-agent-brand-mark is-cursor" aria-hidden="true"><img src={resolveRendererPublicAssetUrl(agents.cursor)} alt="" draggable={false} /></span>;
-  }
-
-  if (identity.includes("opencode")) {
-    return <span className="desktop-agent-brand-mark is-opencode" aria-hidden="true"><img src={resolveRendererPublicAssetUrl(agents.opencode)} alt="" draggable={false} /></span>;
+  const nativeBrand = resolveAgentBrand({ iconKey, label });
+  if (nativeBrand) {
+    const monochrome = appearance === "monochrome"
+      && isMonochromeAgentBrandId(nativeBrand.id);
+    return (
+      <span
+        className={`desktop-agent-brand-mark is-${nativeBrand.id}${monochrome ? " is-monochrome" : ""}`}
+        aria-hidden="true"
+      >
+        {monochrome
+          ? <AgentMonochromeBrandImage brandId={nativeBrand.id} />
+          : <AgentBrandImage brandId={nativeBrand.id} />}
+      </span>
+    );
   }
 
   const initials = label.trim().split(/\s+/).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "A";

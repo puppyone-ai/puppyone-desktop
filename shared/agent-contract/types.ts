@@ -141,6 +141,12 @@ export type AgentCapabilities = {
   mcp: boolean;
   skills: boolean;
   compaction: boolean;
+  /** Independent native History operations; sessionHistory is a compatibility projection. */
+  history?: {
+    discovery: "unsupported" | "paged";
+    exactOpen: "unsupported" | "supported";
+    hydration: "unsupported" | "push-replay" | "snapshot" | "paged";
+  };
   /** Changes whenever the runtime's effective negotiated capability surface changes. */
   revision?: string;
   /** Versioned native protocol and explicitly negotiated extension metadata. */
@@ -240,6 +246,8 @@ export type AgentSessionsListResponse = {
     runtimeId: AgentRuntimeId | null;
     status: AgentSessionDiscoveryStatus;
     nextCursor: string | null;
+    /** Opaque product scan identity required only while pagination is partial. */
+    scanId: string | null;
     indexed: number;
     warnings: string[];
   };
@@ -454,6 +462,33 @@ export type AgentSessionResumeRequest = {
   runtimeId?: AgentRuntimeId | null;
 };
 
+export type AgentSessionOpenRequest = {
+  rootPath: string;
+  sessionId: string;
+  runtimeId: AgentRuntimeId;
+};
+
+export type AgentSessionOpenErrorCode =
+  | "SESSION_NOT_FOUND"
+  | "AUTH_REQUIRED"
+  | "AUTH_EXPIRED"
+  | "RUNTIME_UNAVAILABLE"
+  | "RESUME_UNSUPPORTED"
+  | "RESUME_TIMED_OUT"
+  | "WORKSPACE_MISMATCH"
+  | "PROTOCOL_ERROR";
+
+export type AgentSessionOpenResult =
+  | { status: "opened"; snapshot: AgentSessionSnapshot }
+  | {
+      status: "failed";
+      error: {
+        code: AgentSessionOpenErrorCode;
+        message: string;
+        retryable: boolean;
+      };
+    };
+
 export type AgentSessionsListRequest = {
   rootPath: string;
   runtimeId?: AgentRuntimeId | null;
@@ -461,6 +496,8 @@ export type AgentSessionsListRequest = {
   /** Explicit user-requested native metadata discovery; false never starts a harness. */
   discoverNative?: boolean;
   cursor?: string | null;
+  /** Opaque product scan identity returned with a partial discovery page. */
+  scanId?: string | null;
   limit?: number;
 };
 
@@ -630,6 +667,7 @@ export type AgentIpcChannel =
   | "agent:account-read"
   | "agent:session-create"
   | "agent:session-resume"
+  | "agent:session-open"
   | "agent:session-replay"
   | "agent:sessions-list"
   | "agent:session-fork"

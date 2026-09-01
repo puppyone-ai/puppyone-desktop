@@ -323,6 +323,7 @@ function EditorPane({
       active={active}
       actionsOpen={actionsOpen}
       agentPresencePath={agentPresencePath}
+      contentState={editor ? "document" : "empty"}
       editorLabel={editor?.label ?? null}
       findCommand={findCommand}
       fileDrop={fileDrop}

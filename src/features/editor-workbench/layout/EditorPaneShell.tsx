@@ -21,6 +21,7 @@ export type EditorPaneShellProps = Readonly<{
   actionsOpen: boolean;
   agentPresencePath: string | null;
   children: ReactNode;
+  contentState: "empty" | "document";
   editorLabel: string | null;
   fileDrop: EditorFileDropController;
   findCommand: EditorFindCommand | null;
@@ -44,6 +45,7 @@ export function EditorPaneShell({
   actionsOpen,
   agentPresencePath,
   children,
+  contentState,
   editorLabel,
   fileDrop,
   findCommand,
@@ -74,7 +76,8 @@ export function EditorPaneShell({
       className="desktop-editor-pane"
       data-editor-pane-id={pane.id}
       data-active={active ? "true" : undefined}
-      data-empty={editorLabel ? undefined : "true"}
+      data-content-state={contentState}
+      data-empty={contentState === "empty" ? "true" : undefined}
       data-handle-hot={chromeReveal.revealed ? "true" : undefined}
       data-pane-menu-open={actionsOpen ? "true" : undefined}
       data-drop-target={dropEdge ?? undefined}
@@ -112,7 +115,13 @@ export function EditorPaneShell({
         onOpenExternal={onOpenExternal}
         onSplit={onSplit}
       />
-      <div className="desktop-editor-pane-content">{children}</div>
+      <div className="desktop-editor-pane-content">
+        {contentState === "document" ? children : (
+          <div className="desktop-editor-pane-empty" role="status">
+            <span>{t("shared-ui.preview.selectFile")}</span>
+          </div>
+        )}
+      </div>
       {dropEdge && <div className="desktop-editor-drop-preview" data-edge={dropEdge} />}
       <div className="desktop-editor-pane-interaction-frame" aria-hidden="true" />
     </section>

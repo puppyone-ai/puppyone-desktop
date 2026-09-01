@@ -39,6 +39,7 @@ const allowedCompositionRoot = path.join(mainRoot, "bootstrap", "create-agent-ru
 const allowedProviderNamedCoreFiles = new Set([
   path.join(mainRoot, "migrations", "legacy-session-format.mjs"),
 ]);
+const codexRuntimeRoot = path.join(mainRuntimesRoot, "codex");
 const legacyPresentationPaths = [
   "AgentActivityItem.tsx",
   "AgentApprovalDock.tsx",
@@ -57,6 +58,74 @@ const dynamicImportPattern = /\bimport\(\s*["']([^"']+)["']\s*\)/g;
 const providerNamePattern = /\b(?:opencode|codex|claude(?:\s+code)?|cursor\s+(?:cli|runtime))\b/i;
 const nativeReferenceTransportPattern = /\b(?:data-url|local-snapshot|snapshotUrl|resource_link|localImage|embeddedContext)\b/;
 const errors = [];
+
+const codexAdapterPath = path.join(codexRuntimeRoot, "codex-app-server-adapter.mjs");
+const codexHistoryReaderPath = path.join(codexRuntimeRoot, "codex-history-reader.mjs");
+const sessionLifecyclePath = path.join(mainRoot, "application", "session", "agent-session-lifecycle.mjs");
+const sessionHistoryPortPath = path.join(mainRuntimeRoot, "agent-session-history-port.mjs");
+const historyControllerPath = path.join(rendererApplicationRoot, "ConversationHistoryController.ts");
+const historyBrowserPath = path.join(rendererRoot, "workbench", "AgentChatHistoryBrowser.tsx");
+const controllerRegistryPath = path.join(rendererApplicationRoot, "controllerRegistry.ts");
+if (!existsSync(codexHistoryReaderPath)) {
+  errors.push(`${relative(codexHistoryReaderPath)} is required; Codex History pagination must not live in the runtime adapter facade`);
+} else {
+  const codexAdapterSource = readFileSync(codexAdapterPath, "utf8");
+  const codexHistoryReaderSource = readFileSync(codexHistoryReaderPath, "utf8");
+  if (!codexAdapterSource.includes('from "./codex-history-reader.mjs"')) {
+    errors.push("Codex app-server adapter must delegate native History pagination to codex-history-reader.mjs");
+  }
+  if (/thread\/read[\s\S]{0,120}includeTurns:\s*true/.test(stripComments(codexAdapterSource))) {
+    errors.push("Codex app-server adapter cannot eagerly hydrate full History through thread/read");
+  }
+  for (const method of ["thread/turns/list", "thread/items/list"]) {
+    if (!codexHistoryReaderSource.includes(method)) {
+      errors.push(`Codex History reader must implement ${method}`);
+    }
+  }
+}
+
+const sessionLifecycleSource = readFileSync(sessionLifecyclePath, "utf8");
+if (!sessionLifecycleSource.includes("hasConversationReplay(session.events)")) {
+  errors.push("Agent session resume must distinguish conversation replay from lifecycle and diagnostic events");
+}
+if (/session\.events\.length\s*===\s*0/.test(stripComments(sessionLifecycleSource))) {
+  errors.push("Agent session history hydration cannot use an empty-event-array gate; resume diagnostics may arrive first");
+}
+if (!existsSync(sessionHistoryPortPath)) {
+  errors.push(`${relative(sessionHistoryPortPath)} is required; optional native History operations need one explicit method group`);
+} else {
+  const historyPortSource = readFileSync(sessionHistoryPortPath, "utf8");
+  for (const requiredText of ["resolveAgentSessionHistoryPort", "assertAgentSessionHistoryCapabilities", "discover", "hydrate"]) {
+    if (!historyPortSource.includes(requiredText)) errors.push(`${relative(sessionHistoryPortPath)} is missing ${requiredText}`);
+  }
+  if (!sessionLifecycleSource.includes("resolveAgentSessionHistoryPort")) {
+    errors.push("Agent session lifecycle must hydrate through SessionHistoryPort, not adapter duck typing");
+  }
+}
+
+if (!existsSync(historyControllerPath) || !existsSync(historyBrowserPath)) {
+  errors.push("Chat History requires a page-scoped ConversationHistoryController and a separate Workbench browser");
+} else {
+  const historyControllerSource = stripComments(readFileSync(historyControllerPath, "utf8"));
+  const historyBrowserSource = stripComments(readFileSync(historyBrowserPath, "utf8"));
+  if (!historyBrowserSource.includes("new ConversationHistoryController")) {
+    errors.push("AgentChatHistoryBrowser must own a page-scoped ConversationHistoryController");
+  }
+  if (/AgentSessionController|getAgentSessionController|controllerRegistry/.test(historyBrowserSource)) {
+    errors.push("AgentChatHistoryBrowser cannot allocate or borrow a live Agent session Controller");
+  }
+  if (/createAgentSession|resumeAgentSession|openAgentSession|onAgentEvent|onAgentSessionExit/.test(historyControllerSource)) {
+    errors.push("ConversationHistoryController must remain query-only and cannot own live session operations");
+  }
+}
+
+const controllerRegistrySource = stripComments(readFileSync(controllerRegistryPath, "utf8"));
+if (/MAX_CONTROLLERS|trimInactiveControllers|hasSubscribers\(\)/.test(controllerRegistrySource)) {
+  errors.push("Agent Controller registry is a Workbench ownership map and cannot evict temporarily hidden tabs");
+}
+if (!controllerRegistrySource.includes("rollbackPreparation")) {
+  errors.push("Agent Controller registry must roll back native preparation before releasing abandoned ownership");
+}
 
 const composerRootSource = readFileSync(path.join(rendererUiRoot, "AgentComposer.tsx"), "utf8");
 for (const leaf of ["AgentAttachmentButton.tsx", "AgentCommandSuggestions.tsx", "AgentDraftReferenceList.tsx"]) {
@@ -298,7 +367,9 @@ if (themeImportIndex < 0 || foundationImportIndex < 0 || themeImportIndex > foun
   errors.push("Agent theme.css must be the first feature style contract, before structural foundation.css");
 }
 for (const token of [
-  "--agent-prompt-surface: var(--po-active)",
+  "--agent-composer-surface: var(--po-active)",
+  "--agent-user-message-surface: var(--po-hover)",
+  "--agent-user-message-border:",
   "--agent-reference-surface:",
   "--agent-reference-error-surface:",
 ]) {
@@ -307,7 +378,9 @@ for (const token of [
   }
 }
 for (const token of [
-  "--agent-prompt-surface:",
+  "--agent-composer-surface:",
+  "--agent-user-message-surface:",
+  "--agent-user-message-border:",
   "--agent-reference-surface:",
   "--agent-reference-error-surface:",
 ]) {
@@ -318,11 +391,14 @@ for (const token of [
 if (themeStyleSource.includes("--agent-connection-surface") || foundationStyleSource.includes("--agent-connection-surface")) {
   errors.push("Connection recovery is transient inline state and must not own a card-surface token");
 }
-if (!composerStyleSource.includes("background: var(--agent-prompt-surface)")
-  || !transcriptStyleSource.includes("background: var(--agent-prompt-surface)")) {
-  errors.push("Composer and transcript user prompts must consume one --agent-prompt-surface role");
+if (!composerStyleSource.includes("background: var(--agent-composer-surface)")) {
+  errors.push("Composer must consume the active --agent-composer-surface role");
 }
-const retiredPromptSurfacePattern = /--agent-(?:composer|user-message)-surface\b/;
+if (!transcriptStyleSource.includes("background: var(--agent-user-message-surface)")
+  || !transcriptStyleSource.includes("border: 1px solid var(--agent-user-message-border)")) {
+  errors.push("Transcript user prompts must consume the passive user-message surface and border roles");
+}
+const retiredPromptSurfacePattern = /--agent-prompt-surface\b/;
 const xpAgentStyleSource = readFileSync(
   path.join(repoRoot, "src", "styles", "interfaces", "windows-xp", "features", "agent.css"),
   "utf8",
@@ -335,7 +411,7 @@ for (const [label, source] of [
   ["Windows XP Agent adapter", xpAgentStyleSource],
 ]) {
   if (retiredPromptSurfacePattern.test(source)) {
-    errors.push(`${label} restores retired component-specific prompt surface tokens`);
+    errors.push(`${label} restores the retired ambiguous prompt-surface token`);
   }
 }
 for (const entry of readdirSync(agentStyleRoot)) {
@@ -453,6 +529,37 @@ const runtimeResolutionSource = readFileSync(
   path.join(mainApplicationRoot, "runtime-resolution", "runtime-resolution-coordinator.mjs"),
   "utf8",
 );
+const agentServiceFacadePath = path.join(mainApplicationRoot, "agent-service.mjs");
+const agentServiceFacadeSource = readFileSync(agentServiceFacadePath, "utf8");
+const agentServiceModules = [
+  ["session/agent-session-lifecycle.mjs", "createAgentSessionLifecycle"],
+  ["session/agent-session-runtime.mjs", "createAgentSessionRuntime"],
+  ["session/agent-session-commands.mjs", "createAgentSessionCommands"],
+  ["session/agent-session-open-errors.mjs", "classifySessionOpenFailure"],
+  ["turn/agent-turn-coordinator.mjs", "createAgentTurnCoordinator"],
+];
+if (agentServiceFacadeSource.split("\n").length > 180) {
+  errors.push("agent-service.mjs must remain a small composition facade; move command behavior into focused application coordinators");
+}
+for (const forbiddenDefinition of ["createSession", "resumeSession", "startTurn", "handleAdapterEvent", "forkSession"]) {
+  if (new RegExp(`(?:async\\s+)?function\\s+${forbiddenDefinition}\\b`).test(stripComments(agentServiceFacadeSource))) {
+    errors.push(`agent-service.mjs owns ${forbiddenDefinition}; the facade may compose and expose commands but not implement them`);
+  }
+}
+for (const [relativePath, factoryName] of agentServiceModules) {
+  const modulePath = path.join(mainApplicationRoot, relativePath);
+  if (!existsSync(modulePath)) {
+    errors.push(`${relative(modulePath)} is required by the Agent application facade`);
+    continue;
+  }
+  const moduleSource = readFileSync(modulePath, "utf8");
+  if (!moduleSource.includes(factoryName)) {
+    errors.push(`${relative(modulePath)} must expose ${factoryName}`);
+  }
+  if (moduleSource.split("\n").length > 450) {
+    errors.push(`${relative(modulePath)} exceeds the focused application-module budget; split by behavior, not provider`);
+  }
+}
 for (const lifecycleFile of ["agent-service.mjs", "native-conversation-indexer.mjs"]) {
   const lifecycleSource = readFileSync(path.join(mainApplicationRoot, lifecycleFile), "utf8");
   if (/runtimeRegistry\.discover\s*\(/.test(stripComments(lifecycleSource))) {

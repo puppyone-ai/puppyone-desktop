@@ -40,14 +40,6 @@ export function AgentComposerToolbar({
   return (
     <div className="desktop-agent-composer-trailing">
       <div className="desktop-agent-composer-leading">
-        <AgentAttachmentButton
-          capabilities={referenceCapabilities}
-          disabled={inputDisabled || configurationDisabled}
-          onAddExternalFiles={onAddExternalFiles}
-          onPickWorkspaceReferences={onPickWorkspaceReferences}
-        />
-      </div>
-      <div className="desktop-agent-composer-actions">
         {!hideConfiguration && sessionControls.map((control) => (
           <div className={`desktop-agent-composer-picker is-${control.id}`} key={control.id}>
             <AgentSessionControlPicker
@@ -57,6 +49,14 @@ export function AgentComposerToolbar({
             />
           </div>
         ))}
+      </div>
+      <div className="desktop-agent-composer-actions">
+        <AgentAttachmentButton
+          capabilities={referenceCapabilities}
+          disabled={inputDisabled || configurationDisabled}
+          onAddExternalFiles={onAddExternalFiles}
+          onPickWorkspaceReferences={onPickWorkspaceReferences}
+        />
         <button
           type="button"
           className={`desktop-agent-composer-action${running ? " is-stop" : ""}`}

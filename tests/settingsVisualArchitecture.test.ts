@@ -51,7 +51,13 @@ describe("settings visual architecture", () => {
     expect(localAgentHooks).toContain("selectableProviders.map");
     expect(localAgentHooks).toContain("provider.configurable");
     expect(localAgentHooks).toContain("<TerminalLauncherIcon");
-    expect(localAgentHooks).toContain("<details");
+    expect(localAgents).toContain("settings.localAgents.activeChat.title");
+    expect(localAgents).toContain("desktop-local-agent-settings-layout");
+    expect(localAgents).toContain("desktop-local-agent-group-title");
+    expect(localAgents).toContain("desktop-local-agent-settings-table");
+    expect(localAgentHooks).toContain("desktop-local-agent-group-title");
+    expect(localAgentHooks).toContain("desktop-local-agent-settings-table");
+    expect(localAgentHooks).not.toContain("<details");
     expect(localAgentHooks).not.toContain("<SettingsSectionHeader");
     expect(localAgentHooks).not.toContain("<small>{status}</small>");
     expect(localAgents).not.toContain("settings.localAgents.visible");
@@ -60,6 +66,7 @@ describe("settings visual architecture", () => {
     expect(localAgentHooks).not.toContain("desktop-utility-view");
     expect(view).not.toContain("<AgentFileActivityAppearanceSetting");
     expect(app).not.toContain("enabledRuntimeIds={enabledAgentRuntimeIds}");
+    expect(app).toContain("hiddenRuntimeIds={agentChatRuntimeVisibility.hiddenRuntimeIds}");
     expect(localProject).toContain("settings.localProject.path");
     expect(localProject).toContain("onUnlinkWorkspace");
     expect(localProject).not.toContain("DesktopBuildVersionSettingsRow");
@@ -147,7 +154,11 @@ describe("settings visual architecture", () => {
       }
       expect(catalog["localAgents.title"], locale).toBeTruthy();
       expect(catalog["localAgents.detail"], locale).toBeTruthy();
+      expect(catalog["localAgents.activeChat.title"], locale).toBeTruthy();
       expect(catalog["localAgents.toggle"], locale).toBeTruthy();
+      expect(catalog["localAgents.history.title"], locale).toBeTruthy();
+      expect(catalog["localAgents.history.detail"], locale).toBeTruthy();
+      expect(catalog["localAgents.history.toggle"], locale).toBeTruthy();
       expect(catalog["localAgentHooks.title"], locale).toBeTruthy();
       expect(catalog["localAgentHooks.manage"], locale).toBeTruthy();
       expect(catalog["localAgentHooks.choose"], locale).toBeTruthy();

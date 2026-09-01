@@ -247,14 +247,24 @@ describe("appearance preferences", () => {
 
 describe("local Agent preferences", () => {
   it("keeps only bounded, unique hidden Terminal Agent ids", () => {
-    expect(parseLocalAgentsSettings(null)).toEqual({ hiddenTerminalAgentIds: [] });
+    expect(parseLocalAgentsSettings(null)).toEqual({
+      hiddenTerminalAgentIds: [],
+      chatHistoryDiscoveryEnabled: false,
+    });
     expect(parseLocalAgentsSettings(JSON.stringify({
       hiddenTerminalAgentIds: ["codex", "claude", "codex", "../../bad", 7],
-    }))).toEqual({ hiddenTerminalAgentIds: ["codex", "claude"] });
+      chatHistoryDiscoveryEnabled: true,
+    }))).toEqual({
+      hiddenTerminalAgentIds: ["codex", "claude"],
+      chatHistoryDiscoveryEnabled: true,
+    });
     expect(parseLocalAgentsSettings(JSON.stringify({
       enabledAgentIds: ["codex"],
-    }))).toEqual({ hiddenTerminalAgentIds: [] });
-    expect(parseLocalAgentsSettings("invalid")).toEqual({ hiddenTerminalAgentIds: [] });
+    }))).toEqual({ hiddenTerminalAgentIds: [], chatHistoryDiscoveryEnabled: false });
+    expect(parseLocalAgentsSettings("invalid")).toEqual({
+      hiddenTerminalAgentIds: [],
+      chatHistoryDiscoveryEnabled: false,
+    });
   });
 });
 

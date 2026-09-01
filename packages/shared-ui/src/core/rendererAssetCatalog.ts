@@ -14,17 +14,33 @@ export const RENDERER_ASSET_PATHS = {
   },
   icons: {
     agents: {
-      chatgpt: "assets/icons/agents/chatgpt.png",
-      claudeCode: "assets/icons/agents/claude-code.svg",
-      codexDark: "assets/icons/agents/codex-dark.png",
-      codexLight: "assets/icons/agents/codex-light.png",
-      cursor: "assets/icons/agents/cursor.svg",
-      cursorDark: "assets/icons/agents/cursor-dark.svg",
-      hermes: "assets/icons/agents/hermes.png",
-      manus: "assets/icons/agents/manus.svg",
-      opencode: "assets/icons/agents/opencode.svg",
-      pi: "assets/icons/agents/pi.svg",
-      piDark: "assets/icons/agents/pi-dark.svg",
+      chatgpt: {
+        light: "assets/icons/agents/chatgpt.png",
+      },
+      claude: {
+        light: "assets/icons/agents/claude-code.svg",
+      },
+      codex: {
+        light: "assets/icons/agents/codex-light.png",
+        dark: "assets/icons/agents/codex-dark.png",
+      },
+      cursor: {
+        light: "assets/icons/agents/cursor.svg",
+        dark: "assets/icons/agents/cursor-dark.svg",
+      },
+      hermes: {
+        light: "assets/icons/agents/hermes.png",
+      },
+      manus: {
+        light: "assets/icons/agents/manus.svg",
+      },
+      opencode: {
+        light: "assets/icons/agents/opencode.svg",
+      },
+      pi: {
+        light: "assets/icons/agents/pi.svg",
+        dark: "assets/icons/agents/pi-dark.svg",
+      },
     },
     integrations: {
       airtable: "assets/icons/integrations/airtable.png",

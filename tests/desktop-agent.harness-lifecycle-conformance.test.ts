@@ -44,6 +44,16 @@ const harnessFixtures = [
       event("opencode", 4, "assistant.completed", { text: "Done" }, "opencode-message-1"),
     ],
   },
+  {
+    runtimeId: "pi",
+    events: [
+      event("pi", 1, "turn.started", { prompt: "Inspect it" }),
+      event("pi", 2, "reasoning.summary.delta", { delta: "", boundary: true }, "pi-reasoning-1"),
+      event("pi", 3, "tool.started", { kind: "command", tool: "bash", label: "Run command", status: "running" }, "pi-tool-1"),
+      event("pi", 4, "tool.completed", { kind: "command", tool: "bash", label: "Run command", status: "completed" }, "pi-tool-1"),
+      event("pi", 5, "assistant.completed", { text: "Done" }, "pi-message-1"),
+    ],
+  },
 ] satisfies Array<{ runtimeId: string; events: AgentEvent[] }>;
 
 const terminalScenarios = [

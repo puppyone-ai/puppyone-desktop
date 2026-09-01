@@ -16,7 +16,7 @@ const DISTRIBUTIONS = Object.freeze([
 ]);
 const CONTROLLERS = Object.freeze(["bundled-adapter", "bundled-sdk", "remote-client"]);
 const PROTOCOL_KINDS = Object.freeze(["acp", "app-server", "agent-sdk", "rpc", "http-api"]);
-const PROTOCOL_TRANSPORTS = Object.freeze(["stdio-json-rpc", "in-process-sdk", "https"]);
+const PROTOCOL_TRANSPORTS = Object.freeze(["stdio-json-rpc", "stdio-jsonl", "in-process-sdk", "https"]);
 const INTEGRATION_KINDS = Object.freeze([
   "managed-harness",
   "specialized-native",

@@ -289,10 +289,6 @@ const agentSessionRepository = createAgentSessionRepository({
 const agentProcessSupervisor = createAgentProcessSupervisor({ maxConcurrentStarts: 2 });
 const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
   appVersion: desktopBuildInfo.version,
-  appPath: app.getAppPath(),
-  resourcesPath: process.resourcesPath,
-  managedOpenCodeConfigDir: path.join(app.getPath("userData"), "agent-runtime", "opencode", "config"),
-  allowExternalOpenCode: !app.isPackaged && process.env.PUPPYONE_ALLOW_EXTERNAL_OPENCODE === "1",
 });
 const agentAttachmentStore = createAgentAttachmentStore({
   rootPath: path.join(app.getPath("userData"), "agent-runtime", "attachments"),

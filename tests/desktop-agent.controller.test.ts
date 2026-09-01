@@ -172,17 +172,17 @@ describe("AgentSessionController", () => {
   it("opens an explicitly selected saved conversation instead of implicitly resuming the latest session", async () => {
     const bridge = bridgeFixture(() => {});
     bridge.resumeAgentSession
-      .mockResolvedValueOnce(snapshot("session-1", []))
-      .mockResolvedValueOnce(snapshot("saved-session", [
+      .mockResolvedValueOnce(snapshot("session-1", []));
+    bridge.openAgentSession.mockResolvedValueOnce({ status: "opened", snapshot: snapshot("saved-session", [
         event(1, "turn.started", { prompt: "Past prompt" }, "past-turn", null, "saved-session"),
         event(2, "assistant.completed", { text: "Past answer" }, "past-turn", "past-answer", "saved-session"),
-      ]));
+      ]) });
     const controller = new AgentSessionController("/workspace", () => bridge as never);
 
     await controller.initialize();
     await controller.openSavedSession("saved-session", "opencode");
 
-    expect(bridge.resumeAgentSession).toHaveBeenCalledWith({
+    expect(bridge.openAgentSession).toHaveBeenCalledWith({
       rootPath: "/workspace",
       sessionId: "saved-session",
       runtimeId: "opencode",
@@ -190,6 +190,50 @@ describe("AgentSessionController", () => {
     expect(controller.getSnapshot().session?.id).toBe("saved-session");
     expect(controller.getSnapshot().projection.messages.map((message) => message.text))
       .toEqual(["Past prompt", "Past answer"]);
+  });
+
+  it("unconditionally closes a restored native session when Workbench preparation rolls back", async () => {
+    const bridge = bridgeFixture(() => {});
+    bridge.openAgentSession.mockResolvedValueOnce({
+      status: "opened",
+      snapshot: snapshot("prepared-session", [
+        event(1, "turn.started", { prompt: "Still running" }, "prepared-turn", null, "prepared-session"),
+      ]),
+    });
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+
+    await controller.openSavedSession("prepared-session", "opencode");
+    expect(controller.getSnapshot().projection.runningTurnId).toBe("prepared-turn");
+
+    await expect(controller.rollbackPreparation()).resolves.toBeUndefined();
+    expect(bridge.closeAgentSession).toHaveBeenCalledWith({
+      rootPath: "/workspace",
+      sessionId: "prepared-session",
+      removePersistence: false,
+    });
+  });
+
+  it("preserves an exact History open error instead of collapsing it to false", async () => {
+    const bridge = bridgeFixture(() => {});
+    bridge.openAgentSession.mockResolvedValueOnce({
+      status: "failed",
+      error: {
+        code: "SESSION_NOT_FOUND",
+        message: "This saved Agent session is no longer available.",
+        retryable: false,
+      },
+    });
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+
+    await expect(controller.openSavedSession("stale-session", "opencode")).rejects.toMatchObject({
+      code: "SESSION_NOT_FOUND",
+      retryable: false,
+    });
+    expect(controller.getSnapshot()).toMatchObject({
+      phase: "failed",
+      sessionPreparation: "failed",
+      error: { detail: "This saved Agent session is no longer available." },
+    });
   });
 
   it("refuses to close a tab while its turn is running", async () => {
@@ -883,6 +927,10 @@ function bridgeFixture(
     })),
     discoverLocalAgentConnections: vi.fn(async () => ({ connections: [], scannedAt: "2026-07-12T00:00:00.000Z", warnings: [] })),
     resumeAgentSession: vi.fn(async () => snapshot("session-1", [event(1, "session.resumed", { title: "Session" })], capabilityOverrides)),
+    openAgentSession: vi.fn(async () => ({
+      status: "opened" as const,
+      snapshot: snapshot("session-1", [event(1, "session.resumed", { title: "Session" })], capabilityOverrides),
+    })),
     createAgentSession: vi.fn(async () => snapshot("session-2", [event(1, "session.started", { title: "New" }, null, null, "session-2")], capabilityOverrides)),
     startAgentTurn: vi.fn(async () => ({ turnId: "turn-next" })),
     replayAgentSession: vi.fn(async () => snapshot("session-1", [event(4, "assistant.completed", { text: "Working" }, "turn-1", "message-1")], capabilityOverrides)),
@@ -915,6 +963,7 @@ function bridgeFixture(
         runtimeId: null,
         status: "not-requested" as const,
         nextCursor: null,
+        scanId: null,
         indexed: 0,
         warnings: [],
       },

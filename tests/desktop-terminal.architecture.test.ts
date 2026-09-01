@@ -291,7 +291,7 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(launcherCss).toContain(".desktop-terminal-launcher");
     expect(launcherCss).toContain("container-type: size");
     expect(launcherCss).toMatch(
-      /\.desktop-terminal-launcher\s*\{[^}]*place-items:\s*start center;[^}]*padding:\s*clamp\(56px, 20vh, 220px\) 0 32px;/s,
+      /\.desktop-terminal-launcher\s*\{[^}]*place-items:\s*safe center;[^}]*padding:\s*32px 0;/s,
     );
     expect(launcherCss).toMatch(
       /\.desktop-terminal-launcher-availability\s*\{[^}]*position:\s*absolute;[^}]*width:\s*1px;[^}]*height:\s*1px;/s,
@@ -306,13 +306,14 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(launcher).toContain("desktop-terminal-launcher-heading");
     expect(launcher).toContain("desktop-terminal-launcher-scan");
     expect(launcher).toContain("desktop-terminal-launcher-group is-agents");
-    expect(launcher).toContain("desktop-terminal-launcher-group is-shell");
+    expect(launcher).toContain("desktop-terminal-launcher-group is-history-entry");
+    expect(launcher).toContain("desktop-terminal-launcher-divider");
     expect(launcher).toContain('"terminal.launcher.title"');
-    expect(launcher).toContain('"terminal.launcher.shell.title"');
+    expect(launcher).toContain('"agent.history.continueTitle"');
     expect(launcher).toContain('aria-label={t("terminal.launcher.scanAgain")}');
     expect(launcherCss).toMatch(/\.desktop-terminal-launcher-content\s*\{[^}]*gap:\s*28px;/s);
     expect(launcherCss).toMatch(/\.desktop-terminal-launcher-heading h2\s*\{[^}]*font-size:\s*12px;[^}]*font-weight:\s*500;/s);
-    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-tool,\s*\.desktop-terminal-launcher-shell\s*\{[^}]*min-height:\s*34px;[^}]*border-radius:\s*6px;/s);
+    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-tool,\s*\.desktop-terminal-launcher-shell,\s*\.desktop-terminal-launcher-history\s*\{[^}]*min-height:\s*34px;[^}]*border-radius:\s*6px;/s);
     expect(launcherCss).toContain('.desktop-terminal-launcher-tool[data-status="coming-soon"]::after');
     expect(launcherCss).not.toContain("aspect-ratio:");
     expect(header).toContain('import "./terminal-session-header.css"');

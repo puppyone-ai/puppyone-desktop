@@ -25,6 +25,7 @@ import {
   closeAgentChatWorkbenchItem,
   discardPreparedAgentChatWorkbenchItem,
   isDesktopAgentChatEnabled,
+  loadAgentChatHistoryBrowser,
   loadAgentChatWorkbenchItem,
   prepareAgentChatWorkbenchItem,
   resolveAgentWorkspaceProviderPath,
@@ -101,12 +102,19 @@ import {
   useTypographyRuntime,
 } from "./features/typography";
 import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
-import type { AuxiliaryWorkbenchContribution } from "./features/app-shell/auxiliary-workbench/types";
-import { AGENT_CHAT_CREATION_RECIPES } from "./features/app-shell/auxiliary-workbench/agentChatCreationRecipes";
+import type {
+  AuxiliaryWorkbenchContribution,
+  AuxiliaryWorkbenchHistoryBrowserContext,
+} from "./features/app-shell/auxiliary-workbench/types";
+import {
+  AGENT_CHAT_CREATION_RECIPES,
+  localAgentIdForAgentChatRuntime,
+} from "./features/app-shell/auxiliary-workbench/agentChatCreationRecipes";
 import { SubThemeStyleHost } from "./features/themes/SubThemeStyleHost";
 import { useSubThemeCatalog, useSubThemeNativeMenu } from "./features/themes/useSubThemeCatalog";
 
 const AgentChatWorkbenchItem = lazy(loadAgentChatWorkbenchItem);
+const AgentChatHistoryBrowser = lazy(loadAgentChatHistoryBrowser);
 const EMPTY_WORKSPACE_FOLDERS: readonly WorkspaceFolder[] = Object.freeze([]);
 
 export function App() {
@@ -228,6 +236,7 @@ function AppContent() {
     setAgentPreferredRuntime,
     setAgentPreferredRoute,
     setAgentPreferredModel,
+    setLocalAgentsSettings,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
     setThemeMode,
@@ -236,6 +245,18 @@ function AppContent() {
     () => resolveVisibleCreateNewMenuItems(createNewMenuSettings, experimentalSettings),
     [createNewMenuSettings, experimentalSettings],
   );
+  const agentChatRuntimeVisibility = useMemo(() => {
+    const hiddenLocalAgentIds = new Set(localAgentsSettings.hiddenTerminalAgentIds);
+    const activeRecipes = AGENT_CHAT_CREATION_RECIPES.filter(
+      (recipe) => !hiddenLocalAgentIds.has(localAgentIdForAgentChatRuntime(recipe.id)),
+    );
+    const hiddenRuntimeIds: string[] = AGENT_CHAT_CREATION_RECIPES.flatMap(
+      (recipe) => hiddenLocalAgentIds.has(localAgentIdForAgentChatRuntime(recipe.id))
+        ? [recipe.id]
+        : [],
+    );
+    return Object.freeze({ activeRecipes, hiddenRuntimeIds });
+  }, [localAgentsSettings.hiddenTerminalAgentIds]);
   const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
     available: assetLibraryHomeAvailable,
     optedIn: experimentalSettings.enableAssetLibraryHome,
@@ -967,15 +988,34 @@ function AppContent() {
       }),
       maximumItems: 8,
       minimumSize: Object.freeze({ width: 280, height: 260 }),
-      creationRecipes: AGENT_CHAT_CREATION_RECIPES,
+      creationRecipes: agentChatRuntimeVisibility.activeRecipes,
+      history: Object.freeze({
+        label: t("agent.history.title"),
+        iconKey: null,
+        renderBrowser: (context: AuxiliaryWorkbenchHistoryBrowserContext) => (
+          <Suspense fallback={null}>
+            <AgentChatHistoryBrowser
+              {...context}
+              historyDiscoveryEnabled={localAgentsSettings.chatHistoryDiscoveryEnabled}
+              onHistoryDiscoveryEnabledChange={(enabled) => setLocalAgentsSettings({
+                ...localAgentsSettings,
+                chatHistoryDiscoveryEnabled: enabled,
+              })}
+            />
+          </Suspense>
+        ),
+      }),
       prepare: prepareAgentChatWorkbenchItem,
       discardPreparedItem: discardPreparedAgentChatWorkbenchItem,
       renderItem: (context) => (
         <Suspense fallback={null}>
           <AgentChatWorkbenchItem
             {...context}
-            enabledRuntimeIds={null}
-            preferredRuntimeId={agentPreferredRuntime}
+            hiddenRuntimeIds={agentChatRuntimeVisibility.hiddenRuntimeIds}
+            preferredRuntimeId={agentPreferredRuntime
+              && !agentChatRuntimeVisibility.hiddenRuntimeIds.includes(agentPreferredRuntime)
+              ? agentPreferredRuntime
+              : null}
             onPreferredRuntimeChange={setAgentPreferredRuntime}
             preferredRoute={agentPreferredRoute}
             onPreferredRouteChange={setAgentPreferredRoute}
@@ -993,13 +1033,16 @@ function AppContent() {
     agentPreferredModel,
     agentPreferredRoute,
     agentPreferredRuntime,
+    agentChatRuntimeVisibility,
     desktopAgentChatEnabled,
     handleAgentOpenFile,
     handleAgentViewChanges,
+    localAgentsSettings,
     resolveAgentWorkspaceReference,
     setAgentPreferredModel,
     setAgentPreferredRoute,
     setAgentPreferredRuntime,
+    setLocalAgentsSettings,
     t,
   ]);
   const auxiliaryWorkbenchContributions = useMemo(

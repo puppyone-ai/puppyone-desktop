@@ -1,4 +1,4 @@
-import { agentContractLimits } from "./constants.mjs";
+import { AGENT_SESSION_OPEN_ERROR_CODES, agentContractLimits } from "./constants.mjs";
 import { assertAgentEventEnvelope } from "./event-schema.mjs";
 import { sanitizeAgentLocalConnectionsSnapshot } from "./local-connection-schema.mjs";
 import {
@@ -62,6 +62,12 @@ export function parseAgentIpcRequest(channel, value) {
         sessionId: optionalOpaqueId(input.sessionId, "sessionId"),
         runtimeId: optionalRuntimeId(input.runtimeId),
       });
+    case "agent:session-open":
+      return {
+        rootPath: requiredString(input.rootPath, "rootPath", MAX_PATH_LENGTH),
+        sessionId: requiredOpaqueId(input.sessionId, "sessionId"),
+        runtimeId: assertRuntimeId(input.runtimeId, "runtimeId"),
+      };
     case "agent:session-replay":
       return {
         rootPath: requiredString(input.rootPath, "rootPath", MAX_PATH_LENGTH),
@@ -75,6 +81,7 @@ export function parseAgentIpcRequest(channel, value) {
         includeArchived: optionalBoolean(input.includeArchived, "includeArchived"),
         discoverNative: optionalBoolean(input.discoverNative, "discoverNative"),
         cursor: optionalString(input.cursor, "cursor", 1_024),
+        scanId: optionalOpaqueId(input.scanId, "scanId"),
         limit: optionalPageSize(input.limit, "limit"),
       });
     case "agent:session-fork":
@@ -183,6 +190,8 @@ export function assertAgentIpcResponse(channel, value) {
       return assertAgentSessionSnapshot(value);
     case "agent:session-resume":
       return value === null ? value : assertAgentSessionSnapshot(value);
+    case "agent:session-open":
+      return sanitizeAgentSessionOpenResult(value);
     case "agent:sessions-list":
       return sanitizeAgentSessionsListResponse(value);
     case "agent:session-archive":
@@ -247,10 +256,28 @@ function sanitizeAgentSessionsListResponse(value) {
         "not-requested", "unsupported", "partial", "complete", "failed",
       ]),
       nextCursor: optionalString(discovery.nextCursor, "session list.discovery.nextCursor", 1_024) ?? null,
+      scanId: optionalOpaqueId(discovery.scanId, "session list.discovery.scanId", { nullable: true }) ?? null,
       indexed: nonNegativeInteger(discovery.indexed, "session list.discovery.indexed"),
       warnings: safeWarnings(discovery.warnings, "session list.discovery.warnings"),
     },
     warnings: safeWarnings(response.warnings, "session list.warnings"),
+  };
+}
+
+function sanitizeAgentSessionOpenResult(value) {
+  const result = assertRecord(value, "Agent session open result");
+  const status = enumValue(result.status, "Agent session open result.status", ["opened", "failed"]);
+  if (status === "opened") {
+    return { status, snapshot: assertAgentSessionSnapshot(result.snapshot) };
+  }
+  const error = assertRecord(result.error, "Agent session open result.error");
+  return {
+    status,
+    error: {
+      code: enumValue(error.code, "Agent session open result.error.code", AGENT_SESSION_OPEN_ERROR_CODES),
+      message: requiredString(error.message, "Agent session open result.error.message", 1_000),
+      retryable: optionalBoolean(error.retryable, "Agent session open result.error.retryable") === true,
+    },
   };
 }
 

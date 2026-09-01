@@ -10,11 +10,9 @@ export function AgentPlanActivity({ activity }: { activity: AgentActivity }) {
     const value = step && typeof step === "object" ? step as Record<string, unknown> : {};
     return { step: String(value.step ?? "").slice(0, 2_000), status: String(value.status ?? "pending") };
   }).filter((step) => step.step) : [];
-  const completed = steps.filter((step) => step.status === "completed").length;
   return (
     <AgentActivityShell
       title={t("agent.tool.plan")}
-      summary={steps.length ? t("agent.activity.planProgress", { completed, count: steps.length }) : activity.label || t("agent.activity.plan-updated")}
       status={activity.status}
       icon={<ListTodo size={13} />}
       className="desktop-agent-plan"

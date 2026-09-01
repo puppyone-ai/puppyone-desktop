@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentSessionController } from "../application/AgentSessionController";
 import type { AgentSubmissionStage } from "../application/agent-controller-state";
 import type { AgentPromptReferenceMention } from "../domain/agent-contract";
-import { listAgentRuntimes, listEnabledAgentRuntimes } from "../domain/agent-backend-routing";
+import { listAgentRuntimes, listVisibleAgentRuntimes } from "../domain/agent-backend-routing";
 import type { AgentChatTabPresentation } from "../domain/agent-chat-tabs";
 import type { AgentRoutePreference } from "../domain/agent-route-preference";
 import { deriveAgentSessionControls } from "../domain/agent-session-controls";
 import { AgentApprovalDock } from "./AgentApprovalDock";
-import { AgentChangesPill } from "./AgentChangesPill";
+import { AgentChangesControl } from "./AgentChangesControl";
 import { AgentComposer, DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID } from "./AgentComposer";
 import { AgentEmptyState } from "./AgentEmptyState";
 import { AgentPanelLayout } from "./AgentPanelLayout";
@@ -17,7 +17,6 @@ import { AgentPanelStatus } from "./AgentPanelStatus";
 import { AgentQuestionDock } from "./AgentQuestionDock";
 import { AgentRuntimeLauncher } from "./AgentRuntimeLauncher";
 import { AgentTranscript } from "./AgentTranscript";
-import { useAgentConversationHistory } from "./useAgentConversationHistory";
 import { readinessStatusCode, sessionStatusCode } from "./agentPanelPresentation";
 import { useAgentReferenceIngestion } from "./useAgentReferenceIngestion";
 import type { AgentWorkspaceReferenceResolver } from "./useAgentReferenceIngestion";
@@ -40,8 +39,7 @@ type AgentChatTabPanelProps = {
   onPreferredRouteChange?: (route: AgentRoutePreference) => void;
   preferredModel: string | null;
   onPreferredModelChange?: (model: string) => void;
-  enabledRuntimeIds: readonly string[] | null;
-  openSessionIds: readonly string[];
+  hiddenRuntimeIds: readonly string[];
   resolveWorkspaceReference?: AgentWorkspaceReferenceResolver;
 };
 
@@ -60,14 +58,12 @@ export function AgentChatTabPanel({
   onPreferredRouteChange,
   preferredModel,
   onPreferredModelChange,
-  enabledRuntimeIds,
-  openSessionIds,
+  hiddenRuntimeIds,
   resolveWorkspaceReference,
 }: AgentChatTabPanelProps) {
   const presented = presentedProp ?? active;
   const commandTarget = commandTargetProp ?? active;
   const { t } = useLocalization();
-  const [historyOpen, setHistoryOpen] = useState(false);
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const referenceIngestion = useAgentReferenceIngestion({
     controller,
@@ -90,10 +86,10 @@ export function AgentChatTabPanel({
   const startupLoading = presented && (!state.initialized || loading) && !state.pendingPrompt && !hasCommittedTranscript;
   const sessionKey = state.session?.id || "new-agent-session";
   const viewport = useMemo(() => ({ sessionKey, value: controller.readViewport() }), [controller, sessionKey]).value;
-  const agentRuntimes = listEnabledAgentRuntimes(inspection, enabledRuntimeIds);
+  const agentRuntimes = listVisibleAgentRuntimes(inspection, hiddenRuntimeIds);
   const selectedRuntimeRegistered = listAgentRuntimes(inspection).some((entry) => (
     entry.descriptor.id === state.selectedRuntimeId
-    && (!enabledRuntimeIds || enabledRuntimeIds.includes(entry.descriptor.id))
+    && (Boolean(state.session) || !hiddenRuntimeIds.includes(entry.descriptor.id))
   ));
   // A direct creation recipe remains bound even when its runtime needs setup.
   // Only the chooser filters not-installed runtimes from subsequent selection.
@@ -134,20 +130,18 @@ export function AgentChatTabPanel({
   const statusCode = state.session ? sessionStatusCode(sessionStatus) : readinessStatusCode(readiness);
   const title = state.session?.title || (agentRuntimeSelected ? runtimeLabel : t("agent.header.newChat"));
   const hasStatus = unavailable || failed || Boolean(state.error);
+  const hasSubmittedConversation = hasCommittedTranscript
+    || Boolean(state.pendingPrompt)
+    || Boolean(state.pendingIntent)
+    || state.projection.approvals.length > 0
+    || state.projection.questions.length > 0;
   const showReadyEmptyState = routingReady
+    && state.initialized
+    && !loading
     && !hasStatus
-    && !state.draft.trim()
-    && state.references.length === 0
-    && state.projection.approvals.length === 0
-    && state.projection.questions.length === 0;
-  const history = useAgentConversationHistory({
-    active: commandTarget,
-    enabled: historyOpen && state.initialized && Boolean(inspection) && !agentRuntimeSelected && !loading && !failed,
-    controller,
-    runtimes: agentRuntimes,
-    excludedSessionIds: openSessionIds,
-  });
-
+    && !hasSubmittedConversation
+    && !state.projection.partialHistory
+    && !state.projection.connectionStatus;
   useEffect(() => {
     onPresentationChange({
       title,
@@ -174,26 +168,8 @@ export function AgentChatTabPanel({
       phase="selecting-runtime"
       conversation={<AgentRuntimeLauncher
         agentRuntimes={agentRuntimes}
-        onLaunch={(runtimeId) => {
-          setHistoryOpen(false);
-          routingPreferences.selectRuntime(runtimeId);
-        }}
+        onLaunch={routingPreferences.selectRuntime}
         onRefresh={() => void controller.initialize(true)}
-        historyOpen={historyOpen}
-        historySessions={history.sessions}
-        historyLoading={history.loading || !history.loaded}
-        historyRefreshing={history.refreshing}
-        historyLoadingMore={history.loadingMore}
-        historyHasMore={history.hasMore}
-        historyError={history.error}
-        onShowHistory={() => setHistoryOpen(true)}
-        onHideHistory={() => setHistoryOpen(false)}
-        onOpenSession={(session) => {
-          setHistoryOpen(false);
-          void controller.openSavedSession(session.id, session.runtimeId || session.runtime?.id || "");
-        }}
-        onRefreshHistory={() => void history.refreshNative()}
-        onLoadMoreHistory={() => void history.loadMoreNative()}
       />}
     />;
   }
@@ -207,15 +183,15 @@ export function AgentChatTabPanel({
       runtimeLabel={runtimeLabel} readiness={readiness ?? undefined}
       onRetry={() => void controller.initialize(true)}
     /> : null}
+    conversationOverlay={showReadyEmptyState
+      ? <AgentEmptyState runtimeIconKey={runtimeIconKey} runtimeLabel={runtimeLabel} />
+      : null}
     conversation={<AgentTranscript
       key={sessionKey} projection={state.projection} loading={startupLoading}
       pendingPrompt={state.pendingPrompt} pendingReferences={state.pendingIntent?.references ?? []}
       pendingPromptMentions={state.pendingIntent?.promptMentions ?? []}
       submissionStage={submissionStage} working={state.submitting || Boolean(state.projection.runningTurnId)}
       runtimeLabel={runtimeLabel} initialScrollTop={viewport.scrollTop}
-      emptyState={showReadyEmptyState
-        ? <AgentEmptyState runtimeIconKey={runtimeIconKey} runtimeLabel={runtimeLabel} />
-        : null}
       initialMeasurements={viewport.measurements} initialPinned={viewport.pinned}
       onViewportChange={handleViewportChange} onOpenFile={onOpenFile}
     />}
@@ -231,7 +207,7 @@ export function AgentChatTabPanel({
         onResolve={(resolution) => void controller.resolveQuestion(resolution)}
       />}
       <AgentComposer
-        floatingAccessory={state.projection.approvals.length === 0 && state.projection.questions.length === 0 ? <AgentChangesPill projection={state.projection} onViewChanges={onViewChanges} /> : null}
+        floatingAccessory={state.projection.approvals.length === 0 && state.projection.questions.length === 0 ? <AgentChangesControl projection={state.projection} onViewChanges={onViewChanges} /> : null}
         draft={state.draft} draftMentions={state.draftMentions} onDraftChange={handleDraftChange}
         onDraftDocumentChange={handleDraftDocumentChange}
         disabled={loading || unavailable || failed || !routingReady || state.projection.approvals.length > 0 || state.projection.questions.length > 0}

@@ -373,6 +373,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   readAgentAccount: (request) => ipcRenderer.invoke("agent:account-read", request),
   createAgentSession: (request) => ipcRenderer.invoke("agent:session-create", request),
   resumeAgentSession: (request) => ipcRenderer.invoke("agent:session-resume", request),
+  openAgentSession: (request) => ipcRenderer.invoke("agent:session-open", request),
   replayAgentSession: (request) => ipcRenderer.invoke("agent:session-replay", request),
   listAgentSessions: (request) => ipcRenderer.invoke("agent:sessions-list", request),
   forkAgentSession: (request) => ipcRenderer.invoke("agent:session-fork", request),

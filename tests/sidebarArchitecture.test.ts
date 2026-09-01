@@ -135,6 +135,7 @@ describe("Sidebar architecture", () => {
     expect(auxiliaryHostSource).not.toContain("desktop-right-sidebar-visible-width");
     expect(auxiliaryHostSource).toContain('className="desktop-right-sidebar-viewport"');
     expect(auxiliaryHostSource).toContain("lastExpandedWidth");
+    expect(auxiliaryHostSource).toContain('widthChangeMode: "end"');
     expect(sharedDataWorkspaceCss).not.toContain("--data-explorer-min-width");
     expect(collapsiblePaneResizeSource).toContain("canonical live resize width");
     expect(collapsiblePaneResizeSource).toContain("last-expanded content plane");

@@ -1,9 +1,7 @@
 import { FileSearch, FolderSearch, Globe2, Search, Wrench } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
 import {
-  agentActivitySummary,
   agentActivityToolId,
-  formatAgentActivityLabel,
   formatAgentToolName,
   isContextCompactionActivity,
   outputForActivity,
@@ -32,7 +30,6 @@ export function AgentGenericActivity({ activity }: { activity: AgentActivity }) 
   return (
     <AgentActivityShell
       title={formatAgentToolName(tool, t)}
-      summary={agentActivitySummary(activity) || formatAgentActivityLabel(activity, t)}
       status={activity.status}
       icon={iconFor(tool)}
       className="desktop-agent-generic-tool"

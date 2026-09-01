@@ -24,8 +24,8 @@ import {
 } from "./puppyflowModel";
 import { useEditableDocumentSource } from "../../document-session/EditableDocumentSourceContext";
 import type { PresetViewerRenderContext } from "../../registry/viewerTypes";
-import { RENDERER_ASSET_PATHS } from "../../../core/rendererAssetCatalog";
-import { resolveRendererPublicAssetUrl } from "../../../core/rendererPublicAsset";
+import { AgentBrandImage } from "../../../brand/AgentBrandImage";
+import { resolveAgentBrand } from "../../../core/agentBrandCatalog";
 
 type PuppyFlowViewerProps = Pick<
   PresetViewerRenderContext,
@@ -463,44 +463,8 @@ function PuppyFlowStepRow({
 }
 
 function PuppyFlowAgentLogo({ agentId }: { agentId: PuppyFlowAgentId }) {
-  if (agentId === "codex") {
-    return (
-      <img
-        className="is-codex"
-        src={resolveRendererPublicAssetUrl(RENDERER_ASSET_PATHS.icons.agents.codexLight)}
-        alt=""
-        draggable={false}
-      />
-    );
-  }
-
-  if (agentId === "claude-code") {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path
-          d="M12 3.25 13.86 9.1 19.7 7.25 15.7 12l4 4.75-5.84-1.85L12 20.75l-1.86-5.85-5.84 1.85 4-4.75-4-4.75L10.14 9.1 12 3.25Z"
-          fill="currentColor"
-        />
-      </svg>
-    );
-  }
-
-  if (agentId === "cursor-cli") {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M5.25 3.8 19.25 10.25 13.65 12.05 11.85 17.75 5.25 3.8Z" fill="currentColor" />
-        <path d="M12.2 12.25 17.6 17.65" stroke="var(--po-panel)" strokeWidth="2.2" strokeLinecap="round" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M6.2 7.6 3.75 12l2.45 4.4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M17.8 7.6 20.25 12l-2.45 4.4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M9.7 18.4 14.3 5.6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-    </svg>
-  );
+  const brand = resolveAgentBrand({ id: agentId });
+  return brand ? <AgentBrandImage brandId={brand.id} /> : null;
 }
 
 function getTitleFromFilename(name: string, fallback: string): string {

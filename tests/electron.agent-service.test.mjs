@@ -1,10 +1,12 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { createAgentService } from "../electron/main/agent/agent-service.mjs";
-import { createCodexRuntimeDefinition } from "../electron/main/agent/runtimes/codex/codex-runtime-definition.mjs";
-import { AgentRuntimeRegistry } from "../electron/main/agent/runtime/agent-runtime-registry.mjs";
 import { AgentProviderSessionUnavailableError } from "../electron/main/agent/runtime/agent-runtime-port.mjs";
-import { registerAgentIpcHandlers } from "../electron/main/ipc/agent-ipc.mjs";
+import {
+  createSender,
+  createServiceHarness,
+  semanticReferenceCapabilities,
+  sentAgentEvents,
+} from "./helpers/agentServiceHarness.mjs";
 
 describe("Electron AgentService ownership and lifecycle", () => {
   it("returns installed runtime inventory without inspecting or selecting a default runtime", async () => {
@@ -86,7 +88,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
     await harness.service.closeAll();
   });
 
-  it("supports multiple tab-owned live sessions in one workspace and preserves both locators on close", async () => {
+  it("supports multiple tab-owned live sessions in one workspace and preserves process-local recovery on close", async () => {
     const harness = createServiceHarness();
     const owner = createSender(33);
 
@@ -98,7 +100,33 @@ describe("Electron AgentService ownership and lifecycle", () => {
     await harness.service.closeSession(owner, { sessionId: first.session.id }, "/workspace");
     await harness.service.closeSession(owner, { sessionId: second.session.id }, "/workspace");
     expect(harness.persistence.remove).not.toHaveBeenCalled();
-    expect((await harness.persistence.list("/workspace"))).toHaveLength(2);
+    expect(harness.persistence.save).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: first.session.id }),
+      { promoteCatalog: false },
+    );
+    expect(harness.persistence.save).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: second.session.id }),
+      { promoteCatalog: false },
+    );
+  });
+
+  it("keeps an allocated empty session out of durable History until its first accepted turn", async () => {
+    const harness = createServiceHarness();
+    const owner = createSender(36);
+    const empty = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
+    await harness.service.closeSession(owner, { sessionId: empty.session.id }, "/workspace");
+    expect(harness.persistence.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionId: empty.session.id }),
+      { promoteCatalog: false },
+    );
+
+    const durable = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
+    await harness.service.startTurn(owner, { sessionId: durable.session.id, prompt: "Persist me" }, "/workspace");
+    await harness.service.closeSession(owner, { sessionId: durable.session.id }, "/workspace");
+    expect(harness.persistence.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionId: durable.session.id }),
+      { promoteCatalog: true },
+    );
   });
 
   it("allows two same-workspace Chat tabs to prepare sessions concurrently", async () => {
@@ -231,12 +259,13 @@ describe("Electron AgentService ownership and lifecycle", () => {
     });
     const owner = createSender(43);
     const created = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
+    await harness.service.startTurn(owner, { sessionId: created.session.id, prompt: "Make this conversation durable" });
     await harness.service.closeSessionsForWindow(owner.id);
 
     await expect(harness.service.resumeSession(owner, { runtimeId: "codex" }, "/workspace"))
       .resolves.toBeNull();
 
-    expect(harness.persistence.remove).toHaveBeenCalledWith(created.session.id);
+    expect(harness.persistence.markUnavailable).toHaveBeenCalledWith(created.session.id);
     expect(harness.service.getSessionCount()).toBe(0);
     await expect(harness.service.resumeSession(owner, { runtimeId: "codex" }, "/workspace"))
       .resolves.toBeNull();
@@ -254,6 +283,112 @@ describe("Electron AgentService ownership and lifecycle", () => {
     expect(harness.service.getRetainedSessionCount()).toBe(1);
     const resumed = await harness.service.resumeSession(owner, {}, "/workspace");
     expect(resumed).not.toBeNull();
+  });
+
+  it("opens an exact History target with a structured result", async () => {
+    const harness = createServiceHarness({
+      nativeSessions: [{
+        providerSessionId: "native-history",
+        title: "Saved chat",
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-09-01T00:00:01.000Z",
+      }],
+    });
+    const owner = createSender(44);
+    const listed = await harness.service.listSessions(owner, {
+      runtimeId: "codex",
+      discoverNative: true,
+    }, "/workspace");
+    const sessionId = listed.sessions[0].id;
+
+    await expect(harness.service.openSession(owner, {
+      sessionId,
+      runtimeId: "codex",
+    }, "/workspace")).resolves.toMatchObject({
+      status: "opened",
+      snapshot: { session: { id: sessionId } },
+    });
+  });
+
+  it("classifies a missing exact History target without throwing across IPC", async () => {
+    const harness = createServiceHarness();
+
+    await expect(harness.service.openSession(createSender(45), {
+      sessionId: "missing-session",
+      runtimeId: "codex",
+    }, "/workspace")).resolves.toEqual({
+      status: "failed",
+      error: {
+        code: "SESSION_NOT_FOUND",
+        message: "This saved Agent session is no longer available.",
+        retryable: false,
+      },
+    });
+  });
+
+  it("does not expose or open an unverified legacy locator", async () => {
+    const harness = createServiceHarness();
+    await harness.persistence.save({
+      sessionId: "legacy-empty-session",
+      workspaceRoot: "/workspace",
+      runtimeId: "codex",
+      providerSessionId: "thread-without-rollout",
+      title: "Codex session",
+      createdAt: "2026-09-01T00:00:00.000Z",
+      updatedAt: "2026-09-01T00:00:01.000Z",
+      availability: "unverified",
+    });
+
+    await expect(harness.service.listSessions(createSender(46), {
+      runtimeId: "codex",
+      discoverNative: false,
+    }, "/workspace")).resolves.toMatchObject({ sessions: [] });
+    await expect(harness.service.openSession(createSender(46), {
+      sessionId: "legacy-empty-session",
+      runtimeId: "codex",
+    }, "/workspace")).resolves.toMatchObject({
+      status: "failed",
+      error: { code: "SESSION_NOT_FOUND", retryable: false },
+    });
+    expect(harness.adapters).toHaveLength(0);
+  });
+
+  it("hydrates native history when resume emitted only lifecycle or diagnostic events", async () => {
+    const historicalEvents = [
+      { type: "turn.started", providerSessionId: "native-history", turnId: "turn-1", payload: { status: "running", restored: true, prompt: "hello" } },
+      { type: "assistant.completed", providerSessionId: "native-history", turnId: "turn-1", itemId: "answer-1", payload: { text: "hi" } },
+      { type: "turn.completed", providerSessionId: "native-history", turnId: "turn-1", payload: { status: "completed", restored: true } },
+    ];
+    const harness = createServiceHarness({
+      nativeSessions: [{
+        providerSessionId: "native-history",
+        title: "Saved chat",
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-09-01T00:00:01.000Z",
+      }],
+      resumeEvents: [
+        { type: "session.resumed", providerSessionId: "native-history", payload: { title: "Saved chat" } },
+        { type: "provider.warning", providerSessionId: "native-history", payload: { message: "operator diagnostic" } },
+      ],
+      historicalEvents,
+    });
+    const owner = createSender(47);
+    const listed = await harness.service.listSessions(owner, {
+      runtimeId: "codex",
+      discoverNative: true,
+    }, "/workspace");
+
+    const opened = await harness.service.openSession(owner, {
+      sessionId: listed.sessions[0].id,
+      runtimeId: "codex",
+    }, "/workspace");
+
+    expect(opened).toMatchObject({ status: "opened" });
+    expect(harness.adapters[1].readHistory).toHaveBeenCalledOnce();
+    expect(opened.snapshot.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "turn.started", payload: expect.objectContaining({ prompt: "hello" }) }),
+      expect.objectContaining({ type: "assistant.completed", payload: { text: "hi" } }),
+    ]));
   });
 
   it("rejects stale approvals and bounds retained replay for a slow renderer", async () => {
@@ -561,278 +696,3 @@ describe("Electron AgentService ownership and lifecycle", () => {
     }));
   });
 });
-
-describe("Agent IPC workspace authorization", () => {
-  it("authorizes create and resume roots before invoking the service", async () => {
-    const handlers = new Map();
-    const agentService = {
-      discoverProviders: vi.fn(),
-      listModels: vi.fn(),
-      readAccount: vi.fn(),
-      createSession: vi.fn(async () => ipcSnapshot()),
-      resumeSession: vi.fn(async () => ipcSnapshot()),
-      replay: vi.fn(),
-      closeSession: vi.fn(),
-      startTurn: vi.fn(),
-      steerTurn: vi.fn(async () => ({ sessionId: "s", turnId: "t", accepted: true })),
-      interruptTurn: vi.fn(),
-      resolveApproval: vi.fn(),
-      resolveQuestion: vi.fn(async () => ({ requestId: "r", resolved: true })),
-      listSessions: vi.fn(),
-      forkSession: vi.fn(),
-      archiveSession: vi.fn(),
-      deleteSession: vi.fn(),
-      compactSession: vi.fn(),
-      getReferenceInputCapabilities: vi.fn(() => semanticReferenceCapabilities()),
-    };
-    const authorizeWorkspaceRoot = vi.fn(async (_event, requested) => {
-      if (requested !== "/workspace") throw new Error("Requested workspace root does not match");
-      return "/canonical/workspace";
-    });
-    const localAgentInventory = {
-      discover: vi.fn(async () => ({ connections: [], scannedAt: new Date(0).toISOString(), warnings: [] })),
-    };
-    registerAgentIpcHandlers({
-      ipcMain: { handle: (channel, listener) => handlers.set(channel, listener) },
-      agentService,
-      localAgentInventory,
-      authorizeWorkspaceRoot,
-    });
-    const event = { sender: createSender(7) };
-    await expect(handlers.get("agent:session-create")(event, { rootPath: "/other" })).rejects.toThrow(/does not match/i);
-    expect(agentService.createSession).not.toHaveBeenCalled();
-    await handlers.get("agent:session-create")(event, { rootPath: "/workspace" });
-    expect(agentService.createSession).toHaveBeenCalledWith(event.sender, { rootPath: "/workspace" }, "/canonical/workspace");
-    await handlers.get("agent:session-resume")(event, { rootPath: "/workspace" });
-    expect(agentService.resumeSession).toHaveBeenCalledWith(event.sender, { rootPath: "/workspace" }, "/canonical/workspace");
-    await handlers.get("agent:local-connections-discover")(event, { rootPath: "/workspace", refresh: true, command: "unsafe" });
-    expect(localAgentInventory.discover).toHaveBeenCalledWith({ refresh: true, workspaceRoot: "/canonical/workspace" });
-    await expect(handlers.get("agent:local-connections-discover")(event, { rootPath: "/other" })).rejects.toThrow(/does not match/i);
-  });
-
-  it("registers the full README bridge list, including the fail-closed steer/question stubs", async () => {
-    const handlers = new Map();
-    const agentService = {
-      discoverProviders: vi.fn(),
-      listModels: vi.fn(),
-      readAccount: vi.fn(),
-      createSession: vi.fn(async () => ipcSnapshot()),
-      resumeSession: vi.fn(async () => ipcSnapshot()),
-      replay: vi.fn(),
-      closeSession: vi.fn(),
-      startTurn: vi.fn(),
-      steerTurn: vi.fn(async () => ({ sessionId: "s", turnId: "t", accepted: true })),
-      interruptTurn: vi.fn(),
-      resolveApproval: vi.fn(),
-      resolveQuestion: vi.fn(async () => ({ requestId: "r", resolved: true })),
-      listSessions: vi.fn(),
-      forkSession: vi.fn(),
-      archiveSession: vi.fn(),
-      deleteSession: vi.fn(),
-      compactSession: vi.fn(),
-      getReferenceInputCapabilities: vi.fn(() => semanticReferenceCapabilities()),
-    };
-    registerAgentIpcHandlers({
-      ipcMain: { handle: (channel, listener) => handlers.set(channel, listener) },
-      agentService,
-      localAgentInventory: { discover: vi.fn(async () => ({ connections: [], scannedAt: new Date(0).toISOString(), warnings: [] })) },
-      authorizeWorkspaceRoot: vi.fn(async () => "/canonical/workspace"),
-    });
-    for (const channel of [
-      "agent:providers-discover",
-      "agent:local-connections-discover",
-      "agent:models-list",
-      "agent:account-read",
-      "agent:session-create",
-      "agent:session-resume",
-      "agent:session-replay",
-      "agent:sessions-list",
-      "agent:session-fork",
-      "agent:session-archive",
-      "agent:session-delete",
-      "agent:session-close",
-      "agent:reference-stage",
-      "agent:reference-revoke",
-      "agent:reference-resolve-workspace",
-      "agent:reference-pick-workspace",
-      "agent:turn-start",
-      "agent:turn-steer",
-      "agent:turn-interrupt",
-      "agent:session-compact",
-      "agent:approval-resolve",
-      "agent:question-resolve",
-    ]) {
-      expect(handlers.has(channel)).toBe(true);
-    }
-    const event = { sender: createSender(8) };
-    const steerRequest = { rootPath: "/workspace", sessionId: "s", turnId: "t", message: "steer" };
-    await handlers.get("agent:turn-steer")(event, steerRequest);
-    expect(agentService.steerTurn).toHaveBeenCalledWith(event.sender, steerRequest, "/canonical/workspace");
-    const questionRequest = { rootPath: "/workspace", sessionId: "s", turnId: "t", requestId: "r" };
-    await handlers.get("agent:question-resolve")(event, questionRequest);
-    expect(agentService.resolveQuestion).toHaveBeenCalledWith(event.sender, questionRequest, "/canonical/workspace");
-  });
-});
-
-function createServiceHarness({
-  capabilities = { manualApprovals: true },
-  attachmentStore = null,
-  resumeSessionError = null,
-  nativeSessions = [],
-} = {}) {
-  const adapters = [];
-  const persisted = new Map();
-  const runtimeRegistry = new AgentRuntimeRegistry([createCodexRuntimeDefinition({
-    appVersion: "test",
-    discovery: {
-      discover: vi.fn(async () => ({
-        provider: "codex",
-        status: "ready",
-        code: "READY",
-        version: "0.144.1",
-        minimumVersion: "0.144.1",
-        executablePath: "/usr/local/bin/codex",
-        environment: {},
-        message: "ready",
-        selectable: true,
-      })),
-    },
-    adapterFactory: (options) => {
-      const adapter = createFakeAdapter(options, capabilities, resumeSessionError, nativeSessions);
-      adapters.push(adapter);
-      return adapter;
-    },
-  })]);
-  const persistence = {
-    findLatest: vi.fn(async (root) => Array.from(persisted.values()).find((entry) => entry.workspaceRoot === root) ?? null),
-    findById: vi.fn(async (id, root) => {
-      const entry = persisted.get(id);
-      return entry?.workspaceRoot === root ? entry : null;
-    }),
-    list: vi.fn(async (root) => Array.from(persisted.values()).filter((entry) => entry.workspaceRoot === root)),
-    save: vi.fn(async (entry) => persisted.set(entry.sessionId, entry)),
-    upsertNative: vi.fn(async (entry) => {
-      const existing = Array.from(persisted.values()).find((candidate) => (
-        candidate.workspaceRoot === entry.workspaceRoot
-        && candidate.runtimeId === entry.runtimeId
-        && candidate.providerSessionId === entry.providerSessionId
-      ));
-      const saved = { ...entry, sessionId: existing?.sessionId ?? `discovered-${persisted.size + 1}`, origin: "native-discovery" };
-      persisted.set(saved.sessionId, saved);
-      return saved;
-    }),
-    archive: vi.fn(async () => undefined),
-    remove: vi.fn(async (id) => persisted.delete(id)),
-  };
-  const service = createAgentService({
-    runtimeRegistry,
-    persistence,
-    logger: { warn: vi.fn() },
-    attachmentStore,
-  });
-  return { service, adapters, persistence };
-}
-
-function createFakeAdapter(options, capabilities, resumeSessionError = null, nativeSessions = []) {
-  return {
-    disposed: false,
-    inspect: vi.fn(async () => ({
-      account: { account: { type: "chatgpt", email: "user@example.com", planType: "plus" }, requiresOpenaiAuth: true },
-      models: [{ id: "gpt-5", model: "gpt-5", displayName: "GPT-5", isDefault: true }],
-      capabilities,
-      warnings: [],
-    })),
-    createSession: vi.fn(async () => ({
-      providerSessionId: "thread-1",
-      title: "Test session",
-      model: "gpt-5",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    })),
-    resumeSession: vi.fn(async () => {
-      if (resumeSessionError) throw resumeSessionError;
-      return {
-        providerSessionId: "thread-1",
-        title: "Test session",
-        model: "gpt-5",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-    }),
-    readHistory: vi.fn(async () => []),
-    discoverSessions: vi.fn(async () => ({ supported: true, sessions: nativeSessions, nextCursor: null })),
-    startTurn: vi.fn(async () => {
-      options.onEvent({ type: "turn.started", providerSessionId: "thread-1", turnId: "turn-1", payload: { status: "running" } });
-      return { turnId: "turn-1" };
-    }),
-    referenceMentionDelivery: vi.fn(() => "path"),
-    interruptTurn: vi.fn(async () => undefined),
-    resolveApproval: vi.fn(),
-    dispose: vi.fn(function dispose() { this.disposed = true; }),
-    emit: options.onEvent,
-    exit: options.onExit,
-  };
-}
-
-function createSender(id) {
-  return {
-    id,
-    isDestroyed: () => false,
-    send: vi.fn(),
-    once: vi.fn(),
-    removeListener: vi.fn(),
-  };
-}
-
-function sentAgentEvents(sender) {
-  return sender.send.mock.calls
-    .filter(([channel]) => channel === "agent:event")
-    .map(([, event]) => event);
-}
-
-function ipcSnapshot() {
-  return {
-    session: {
-      id: "session-1",
-      runtimeId: "codex",
-      provider: "codex",
-      providerSessionId: "thread-1",
-      workspaceRoot: "/canonical/workspace",
-      title: "Session",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      terminalState: "idle",
-      selectedModel: null,
-      activeTurnId: null,
-      lastSequence: 0,
-    },
-    account: null,
-    models: [],
-    capabilities: null,
-    events: [],
-    partial: false,
-    firstAvailableSequence: 0,
-    lastSequence: 0,
-  };
-}
-
-function semanticReferenceCapabilities() {
-  return {
-    schemaVersion: 1,
-    workspace: { files: true, directories: true },
-    attachments: {
-      image: { accepted: true, mimeTypes: ["image/png"] },
-      text: { accepted: false },
-      audio: { accepted: false },
-      video: { accepted: false },
-      binary: { accepted: false },
-    },
-    limits: {
-      maxCount: 32,
-      maxBytesPerReference: 25 * 1024 * 1024,
-      maxTotalBytes: 25 * 1024 * 1024,
-    },
-    steer: false,
-    attachmentOnly: false,
-  };
-}

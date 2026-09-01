@@ -22,17 +22,24 @@ afterEach(() => {
 
 describe("Local Agent settings views", () => {
   it("uses Terminal CLI detection and persists only hidden launcher ids", async () => {
-    window.puppyoneDesktop = bridge({ terminalAgents: ["codex", "pi"] });
+    window.puppyoneDesktop = bridge({ terminalAgents: ["codex", "pi", "hermes"] });
     const onChange = vi.fn();
     render(<LocalAgentsSettingsView
-      settings={{ hiddenTerminalAgentIds: [] }}
+      settings={{ hiddenTerminalAgentIds: [], chatHistoryDiscoveryEnabled: false }}
       onChange={onChange}
       onActivityIndicatorsEnabledChange={vi.fn()}
     />);
 
     await vi.waitFor(() => expect(document.body.textContent).toContain("Codex"));
-    expect(document.body.textContent).toContain("Detected local CLIs available from the Terminal launcher.");
+    expect(document.body.textContent).toContain("Configure local Agents, chat history discovery, and Hooks.");
     expect(document.body.textContent).toContain("Pi Agent");
+    expect(document.body.textContent).not.toContain("Hermes Agent");
+    expect(Array.from(document.querySelectorAll(".desktop-settings-section-header h2")).map((heading) => heading.textContent))
+      .toEqual(["Local Agents"]);
+    expect(Array.from(document.querySelectorAll(".desktop-local-agent-group-title")).map((heading) => heading.textContent))
+      .toEqual(["Active Chat", "Chat History", "Hooks"]);
+    expect(document.querySelectorAll(".desktop-local-agent-settings-group")).toHaveLength(3);
+    expect(document.querySelectorAll(".desktop-local-agent-settings-table")).toHaveLength(3);
     expect(document.querySelectorAll(".desktop-local-agent-identity > .desktop-terminal-launcher-icon").length)
       .toBeGreaterThanOrEqual(2);
     expect(document.querySelectorAll(".desktop-local-agent-name")).toHaveLength(2);
@@ -41,10 +48,21 @@ describe("Local Agent settings views", () => {
     expect(codexSwitch.checked).toBe(true);
 
     act(() => codexSwitch.click());
-    expect(onChange).toHaveBeenCalledWith({ hiddenTerminalAgentIds: ["codex"] });
+    expect(onChange).toHaveBeenCalledWith({
+      hiddenTerminalAgentIds: ["codex"],
+      chatHistoryDiscoveryEnabled: false,
+    });
+
+    const historySwitch = checkbox("Discover local Agent chat history");
+    expect(historySwitch.checked).toBe(false);
+    act(() => historySwitch.click());
+    expect(onChange).toHaveBeenCalledWith({
+      hiddenTerminalAgentIds: [],
+      chatHistoryDiscoveryEnabled: true,
+    });
   });
 
-  it("shows Hook enrollment below Local Agents and installs one provider at a time", async () => {
+  it("shows Hook enrollment as the third settings group and installs one provider at a time", async () => {
     const initial = [
       provider("codex", "Codex", true, "not-configured"),
       provider("claude", "Claude Code", true, "enabled"),
@@ -64,7 +82,7 @@ describe("Local Agent settings views", () => {
     });
     const onActivityIndicatorsEnabledChange = vi.fn();
     render(<LocalAgentsSettingsView
-      settings={{ hiddenTerminalAgentIds: [] }}
+      settings={{ hiddenTerminalAgentIds: [], chatHistoryDiscoveryEnabled: false }}
       onChange={vi.fn()}
       onActivityIndicatorsEnabledChange={onActivityIndicatorsEnabledChange}
     />);
@@ -75,8 +93,8 @@ describe("Local Agent settings views", () => {
     expect(document.body.textContent).not.toContain("Manual Hook setup");
     expect(document.querySelectorAll(".desktop-utility-view")).toHaveLength(1);
     expect(document.querySelector(".desktop-local-agent-hooks-section")).not.toBeNull();
-    expect(document.querySelector(".desktop-local-agent-hooks-disclosure")).not.toBeNull();
-    expect(document.querySelector(".desktop-local-agent-hooks-chevron")).not.toBeNull();
+    expect(document.querySelector(".desktop-local-agent-hooks-disclosure")).toBeNull();
+    expect(document.querySelector(".desktop-local-agent-hooks-chevron")).toBeNull();
     expect(document.querySelector(".desktop-local-agent-hooks-manage")).toBeNull();
     expect(document.querySelectorAll(".desktop-local-agent-hook-option")).toHaveLength(2);
     expect(document.querySelector(".desktop-local-agent-row-copy small")).toBeNull();

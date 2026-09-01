@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentProjection } from "../domain/agent-projection-types";
 
-type AgentChangesPillProps = {
+type AgentChangesControlProps = {
   projection: AgentProjection;
   onViewChanges?: () => void;
 };
@@ -13,21 +13,20 @@ export type AgentChangeSummary = {
   files: number;
 };
 
-export function AgentChangesPill({ projection, onViewChanges }: AgentChangesPillProps) {
+export function AgentChangesControl({ projection, onViewChanges }: AgentChangesControlProps) {
   const { t } = useLocalization();
   const summary = useMemo(() => summarizeAgentChanges(projection), [projection]);
   if (summary.files === 0) return null;
 
   return (
-    <div className="desktop-agent-changes-row">
+    <div className="desktop-agent-changes-control-wrap">
       <button
         type="button"
-        className="desktop-agent-changes-pill"
+        className="desktop-agent-changes-control"
         aria-label={t("agent.changes.ariaLabel", { additions: summary.additions, deletions: summary.deletions })}
         disabled={!onViewChanges}
         onClick={onViewChanges}
       >
-        <span>{t("agent.changes.label")}</span>
         <strong className="is-addition">+{summary.additions}</strong>
         <strong className="is-deletion">-{summary.deletions}</strong>
       </button>

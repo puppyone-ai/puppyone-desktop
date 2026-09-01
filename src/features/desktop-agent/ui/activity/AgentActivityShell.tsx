@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Circle, CircleAlert, CircleSlash2, LoaderCircle } from "lucide-react";
+import { Check, Circle, CircleAlert, CircleSlash2, LoaderCircle } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentActivityStatus } from "../../domain/agent-projection-types";
@@ -37,7 +37,6 @@ export function AgentActivityShell({
         >
           <span className="desktop-agent-tool-icon" aria-hidden="true">{icon}</span>
           <strong className="desktop-agent-tool-name">{title}</strong>
-          {hasDetail && <ChevronDown className={`desktop-agent-tool-chevron${expanded ? " is-expanded" : ""}`} size={12} aria-hidden="true" />}
           {visibleSummary && <span className="desktop-agent-tool-summary">{visibleSummary}</span>}
           <StatusIcon status={status} />
         </button>

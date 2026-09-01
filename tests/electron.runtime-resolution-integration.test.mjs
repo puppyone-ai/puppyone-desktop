@@ -210,7 +210,7 @@ function createHarness(readiness) {
 }
 
 function fakeAcpAdapter({ onExit = () => {} } = {}) {
-  return {
+  const adapter = {
     inspect: vi.fn(async () => inspection()),
     bootstrapSession: vi.fn(async ({ kind, threadId }) => ({
       inspection: inspection(),
@@ -241,6 +241,11 @@ function fakeAcpAdapter({ onExit = () => {} } = {}) {
     dispose: vi.fn(async () => undefined),
     emitExit: onExit,
   };
+  adapter.getSessionHistoryPort = () => ({
+    discover: (request) => adapter.discoverSessions(request),
+    hydrate: () => adapter.readHistory(),
+  });
+  return adapter;
 }
 
 function inspection() {

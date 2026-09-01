@@ -19,14 +19,11 @@ export function useEditorPaneSource(
   const [content, setContent] = useState<FileContent | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Track every selected source, not only sources that require a text read.
-  // Otherwise CSV -> image -> the same CSV leaves the ref pinned to the CSV
-  // while the image transition clears its content, so returning to the CSV is
-  // incorrectly treated as already loaded and remains pending forever.
-  const lastObservedPathRef = useRef<string | null>(null);
+  const [reloadSequence, setReloadSequence] = useState(0);
   const lastRefreshSequenceRef = useRef(refreshKey?.sequence ?? Number.NEGATIVE_INFINITY);
   const nodePath = node?.path ?? null;
-  const needsContent = Boolean(node && dataPort.readFile && shouldReadEditorContent(node));
+  const readFile = dataPort.readFile;
+  const needsContent = Boolean(node && readFile && shouldReadEditorContent(node));
   const sourceRequirement = node ? getEditorSourceRequirement(node) : "none";
   const needsResource = Boolean(
     node
@@ -39,23 +36,28 @@ export function useEditorPaneSource(
     setError(null);
   }, [nodePath]);
 
+  // Convert scoped workspace invalidations into a stable read dependency.
+  // Keeping the path guard inside the read effect is unsafe: React Strict Mode
+  // cleans up and replays effects, while refs survive that replay. The replay
+  // can then mistake an aborted first read for a completed read and skip the
+  // only live request, leaving the pane pending forever.
   useEffect(() => {
-    const pathChanged = lastObservedPathRef.current !== nodePath;
-    lastObservedPathRef.current = nodePath;
     const previousRefreshSequence = lastRefreshSequenceRef.current;
     lastRefreshSequenceRef.current = refreshKey?.sequence ?? previousRefreshSequence;
-    if (
-      !pathChanged
-      && !workspaceContentChangeMatchesResource(refreshKey, nodePath, previousRefreshSequence)
-    ) return undefined;
-    if (!nodePath || !needsContent || !dataPort.readFile) {
+    if (workspaceContentChangeMatchesResource(refreshKey, nodePath, previousRefreshSequence)) {
+      setReloadSequence((current) => current + 1);
+    }
+  }, [nodePath, refreshKey]);
+
+  useEffect(() => {
+    if (!nodePath || !needsContent || !readFile) {
       setLoading(false);
       return undefined;
     }
     const controller = new AbortController();
     setError(null);
     setLoading(true);
-    dataPort.readFile(nodePath, { signal: controller.signal })
+    readFile(nodePath, { signal: controller.signal })
       .then((nextContent) => {
         if (!controller.signal.aborted) setContent(nextContent);
       })
@@ -68,7 +70,7 @@ export function useEditorPaneSource(
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [dataPort, needsContent, nodePath, refreshKey]);
+  }, [needsContent, nodePath, readFile, reloadSequence]);
 
   const resource = useFileResourceLease({
     dataPort,

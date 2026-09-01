@@ -1,4 +1,5 @@
 import type { AuxiliaryWorkbenchPreparationContext } from "../app-shell/auxiliary-workbench/types";
+import { parseAgentChatHistoryTarget } from "./domain/agent-chat-history-target";
 export { isDesktopAgentChatEnabled } from "./featureGate";
 export { resolveAgentWorkspaceProviderPath } from "./domain/agent-workspace-path";
 
@@ -16,8 +17,25 @@ export function loadAgentChatWorkbenchItem() {
   }));
 }
 
+export function loadAgentChatHistoryBrowser() {
+  return import("./workbench/AgentChatHistoryBrowser").then(({ AgentChatHistoryBrowser }) => ({
+    default: AgentChatHistoryBrowser,
+  }));
+}
+
 export async function prepareAgentChatWorkbenchItem(context: AuxiliaryWorkbenchPreparationContext) {
   const module = await getAgentChatWorkbenchItemModule();
+  if (context.historyTarget) {
+    const target = parseAgentChatHistoryTarget(context.historyTarget);
+    if (!target) throw new Error("Invalid Agent chat history target.");
+    await module.restoreAgentChatWorkbenchItem(
+      context.item.rootId,
+      context.item.id,
+      target.sessionId,
+      target.runtimeId,
+    );
+    return;
+  }
   await module.prepareAgentChatWorkbenchItem(
     context.item.rootId,
     context.item.id,
@@ -28,7 +46,7 @@ export async function prepareAgentChatWorkbenchItem(context: AuxiliaryWorkbenchP
 export async function discardPreparedAgentChatWorkbenchItem(
   context: AuxiliaryWorkbenchPreparationContext,
 ) {
-  resolvedWorkbenchItemModule?.discardPreparedAgentChatWorkbenchItem(
+  await resolvedWorkbenchItemModule?.discardPreparedAgentChatWorkbenchItem(
     context.item.rootId,
     context.item.id,
   );

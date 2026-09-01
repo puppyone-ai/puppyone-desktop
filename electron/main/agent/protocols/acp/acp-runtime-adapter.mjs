@@ -23,6 +23,7 @@ import {
   materializeAcpReferences,
 } from "./acp-prompt-input.mjs";
 import { AcpHistoryCollector } from "./acp-history-collector.mjs";
+import { AgentProviderSessionUnavailableError } from "../../runtime/agent-runtime-port.mjs";
 
 const METADATA_SETTLE_MS = 75;
 export { ACP_INLINE_IMAGE_MAX_BYTES } from "./acp-limits.mjs";
@@ -61,6 +62,7 @@ export const BASE_ACP_CAPABILITIES = Object.freeze({
   modeSelection: true,
   slashCommands: true,
   sessionHistory: false,
+  history: Object.freeze({ discovery: "unsupported", exactOpen: "unsupported", hydration: "unsupported" }),
   usage: true,
   accountState: true,
   mcp: true,
@@ -98,6 +100,13 @@ export const BASE_ACP_CAPABILITIES = Object.freeze({
 /** Provider-neutral, workspace-bound adapter for a local ACP Agent harness. */
 export class AcpRuntimeAdapter {
   referenceMentionDelivery() { return "resource"; }
+
+  getSessionHistoryPort() {
+    return Object.freeze({
+      discover: (request) => this.discoverSessions(request),
+      hydrate: () => this.readHistory(),
+    });
+  }
 
   constructor({
     readiness,
@@ -207,11 +216,27 @@ export class AcpRuntimeAdapter {
     if (kind === "resume") {
       this.historyCollector = new AcpHistoryCollector();
       try {
-        response = await this.client.loadSession({
-          cwd: this.workspaceRoot,
-          mcpServers: [],
-          sessionId: requiredId(threadId, `${this.runtimeDescriptor.displayName} ACP session id`),
-        });
+        const sessionId = requiredId(threadId, `${this.runtimeDescriptor.displayName} ACP session id`);
+        const native = this.client?.agentCapabilities ?? {};
+        const parameters = { cwd: this.workspaceRoot, mcpServers: [], sessionId };
+        try {
+          if (native.loadSession === true) {
+            response = await this.client.loadSession(parameters);
+          } else if (native.sessionCapabilities?.resume != null) {
+            response = await this.client.resumeSession(parameters);
+          } else {
+            const unsupported = new Error(`${this.runtimeDescriptor.displayName} does not support session load or resume.`);
+            unsupported.code = "AGENT_SESSION_RESUME_UNSUPPORTED";
+            throw unsupported;
+          }
+        } catch (error) {
+          if (isUnavailableAcpSessionError(error)) {
+            throw new AgentProviderSessionUnavailableError(
+              `The saved ${this.runtimeDescriptor.displayName} session is no longer available.`,
+            );
+          }
+          throw error;
+        }
         this.sessionId = requiredId(
           response?.sessionId ?? threadId,
           `${this.runtimeDescriptor.displayName} ACP session id`,
@@ -488,6 +513,8 @@ export class AcpRuntimeAdapter {
 
   #capabilities() {
     const native = this.client?.agentCapabilities ?? {};
+    const canDiscoverHistory = Boolean(native.sessionCapabilities?.list);
+    const canOpenHistory = native.loadSession === true || Boolean(native.sessionCapabilities?.resume);
     const acceptsImages = Boolean(native.promptCapabilities?.image);
     const acceptsEmbeddedText = Boolean(
       this.referenceInputProfile.embeddedText && native.promptCapabilities?.embeddedContext,
@@ -496,7 +523,7 @@ export class AcpRuntimeAdapter {
       ...BASE_ACP_CAPABILITIES,
       resume: native.loadSession === true || Boolean(native.sessionCapabilities?.resume),
       fork: Boolean(native.sessionCapabilities?.fork),
-      sessionHistory: Boolean(native.sessionCapabilities?.list),
+      sessionHistory: canDiscoverHistory || canOpenHistory,
       structuredQuestions: this.questionMethods.size > 0,
       mcp: Boolean(native.mcpCapabilities?.http || native.mcpCapabilities?.sse),
       attachments: acceptsImages || acceptsEmbeddedText,
@@ -508,6 +535,11 @@ export class AcpRuntimeAdapter {
         extensions: extensionVersions(native?._meta),
       },
       ...this.capabilityOverrides,
+      history: {
+        discovery: canDiscoverHistory ? "paged" : "unsupported",
+        exactOpen: canOpenHistory ? "supported" : "unsupported",
+        hydration: canOpenHistory ? "push-replay" : "unsupported",
+      },
       referenceInputs: {
         ...BASE_ACP_CAPABILITIES.referenceInputs,
         ...(this.capabilityOverrides.referenceInputs ?? {}),
@@ -754,6 +786,12 @@ export class AcpRuntimeAdapter {
     if (this.disposed) throw new Error(`${this.runtimeDescriptor.displayName} ACP adapter is closed.`);
     if (!this.readiness.executablePath) throw new Error(`${this.runtimeDescriptor.displayName} ACP executable is unavailable.`);
   }
+}
+
+function isUnavailableAcpSessionError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return error?.code === -32602
+    || /invalid params|unknown session|session.{0,32}(?:not found|does not exist|unavailable)/iu.test(message);
 }
 
 function publicModels(config, fallbackProviderId) {

@@ -2,7 +2,6 @@ import { FilePenLine } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
 import {
   agentActivityToolId,
-  formatAgentActivityLabel,
   formatAgentToolName,
   diffLinesForActivity,
   fileChangesForActivity,
@@ -21,13 +20,9 @@ export function AgentFileChangeActivity({ activity, onOpenFile }: { activity: Ag
   if (!reviewable) return null;
   const tool = agentActivityToolId(activity);
   const title = formatAgentToolName(tool, t);
-  const summary = changes.length > 1
-    ? t("agent.activity.fileCount", { count: changes.length })
-    : path || formatAgentActivityLabel(activity, t);
   return (
     <AgentActivityShell
       title={title}
-      summary={summary}
       status={activity.status}
       icon={<FilePenLine size={13} />}
       className="desktop-agent-file-change"

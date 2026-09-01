@@ -6,6 +6,7 @@ type AgentPanelLayoutProps = {
   header?: ReactNode;
   status?: ReactNode;
   conversation: ReactNode;
+  conversationOverlay?: ReactNode;
   dock?: ReactNode;
   announcement?: string;
   onDragOver?: DragEventHandler<HTMLElement>;
@@ -25,6 +26,7 @@ export function AgentPanelLayout({
   header,
   status = null,
   conversation,
+  conversationOverlay = null,
   dock,
   announcement = "",
   onDragOver,
@@ -42,6 +44,9 @@ export function AgentPanelLayout({
         {header != null && <div className="desktop-agent-header-region">{header}</div>}
         {status && <div className="desktop-agent-status-region">{status}</div>}
         <div className="desktop-agent-conversation-region">{conversation}</div>
+        {conversationOverlay && (
+          <div className={`desktop-agent-conversation-overlay${dock != null ? " has-dock" : ""}`}>{conversationOverlay}</div>
+        )}
         {dock != null && <div className="desktop-agent-dock-region">{dock}</div>}
       </div>
       {announcement && <div className="desktop-agent-announcer" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>}

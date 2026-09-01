@@ -39,6 +39,9 @@ export function projectTypedPart(projection: AgentProjection, event: AgentEvent)
     const nextTurn = { ...turn, partIds: [...turn.partIds, part.id] };
     if (turnIndex !== undefined) projection.turns[turnIndex] = nextTurn;
   }
+  // Usage is session metadata, not visible transcript content. Keep the typed
+  // part for consumers that need it, but never allocate virtual-list geometry.
+  if (part.kind === "usage") return;
   const row: TimelineRow = {
     id: `row:${part.id}`,
     partId: part.id,

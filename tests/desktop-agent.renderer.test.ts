@@ -7,7 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentApprovalDock } from "../src/features/desktop-agent/ui/AgentApprovalDock";
-import { AgentChangesPill, summarizeAgentChanges } from "../src/features/desktop-agent/ui/AgentChangesPill";
+import { AgentChangesControl, summarizeAgentChanges } from "../src/features/desktop-agent/ui/AgentChangesControl";
 import { AgentComposer } from "../src/features/desktop-agent/ui/AgentComposer";
 import { AgentEmptyState } from "../src/features/desktop-agent/ui/AgentEmptyState";
 import { AgentPanelLayout } from "../src/features/desktop-agent/ui/AgentPanelLayout";
@@ -29,6 +29,7 @@ import { applyAgentEvents, createAgentProjection } from "../src/features/desktop
 import {
   listAgentRuntimes,
   listEnabledAgentRuntimes,
+  listVisibleAgentRuntimes,
 } from "../src/features/desktop-agent/domain/agent-backend-routing";
 import type { AgentRuntimeReadiness } from "../src/features/desktop-agent/agentTypes";
 import { stripBidiIsolation, testT, withTestLocalization } from "./testLocalization";
@@ -139,7 +140,37 @@ describe("Desktop Agent renderer surfaces", () => {
     }));
 
     expect(container.textContent).toContain(testT("agent.empty.prompt"));
-    expect(container.querySelector(".desktop-agent-empty-state .desktop-agent-brand-mark.is-codex")).not.toBeNull();
+    expect(container.querySelector(".desktop-agent-empty-state .desktop-agent-brand-mark.is-codex.is-monochrome")).not.toBeNull();
+    expect(container.querySelector(".desktop-agent-empty-state .po-agent-monochrome-brand-image")).not.toBeNull();
+    expect(container.querySelector(".desktop-agent-empty-state .po-agent-brand-image")).toBeNull();
+
+    const logoButton = container.querySelector<HTMLButtonElement>(".desktop-agent-empty-logo-button");
+    expect(stripBidiIsolation(logoButton?.getAttribute("aria-label"))).toBe("Spin the Codex logo");
+    expect(logoButton?.style.getPropertyValue("--desktop-agent-empty-logo-turns")).toBe("0");
+    act(() => {
+      logoButton?.click();
+      logoButton?.click();
+      logoButton?.click();
+    });
+    expect(logoButton?.style.getPropertyValue("--desktop-agent-empty-logo-turns")).toBe("3");
+  });
+
+  it("uses Pi's theme-colored normalized vector in the empty conversation", () => {
+    const container = render(React.createElement(AgentTranscript, {
+      projection: createAgentProjection(),
+      loading: false,
+      runtimeLabel: "Pi Agent",
+      emptyState: React.createElement(AgentEmptyState, {
+        runtimeIconKey: "pi",
+        runtimeLabel: "Pi Agent",
+      }),
+    }));
+
+    const brandMark = container.querySelector(
+      ".desktop-agent-empty-state .desktop-agent-brand-mark.is-pi.is-monochrome",
+    );
+    expect(brandMark?.querySelector('.po-agent-monochrome-brand-image[fill="currentColor"]')).not.toBeNull();
+    expect(brandMark?.querySelector(".po-agent-brand-image")).toBeNull();
   });
 
   it("removes the empty-state cue as soon as a prompt enters the live tail", () => {
@@ -184,6 +215,7 @@ describe("Desktop Agent renderer surfaces", () => {
       }),
       status: React.createElement("span", null, "Status"),
       conversation: React.createElement("span", null, "Conversation"),
+      conversationOverlay: React.createElement("span", null, "Stable empty state"),
       dock: React.createElement(AgentComposer, {
         draft: "Ready",
         onDraftChange: vi.fn(),
@@ -199,12 +231,16 @@ describe("Desktop Agent renderer surfaces", () => {
     }));
     const boundary = container.querySelector(".desktop-agent-boundary") as HTMLElement;
     const panel = container.querySelector(".desktop-agent-panel") as HTMLElement;
+    const conversationOverlay = container.querySelector(".desktop-agent-conversation-overlay") as HTMLElement;
     const dock = container.querySelector(".desktop-agent-dock-region") as HTMLElement;
 
     expect(style.sheet?.cssRules.length).toBeGreaterThan(0);
     expect(boundary.children).toHaveLength(1);
-    expect(panel.children).toHaveLength(4);
+    expect(panel.children).toHaveLength(5);
     expect(window.getComputedStyle(panel).display).toBe("grid");
+    expect(conversationOverlay.parentElement).toBe(panel);
+    expect(conversationOverlay.classList.contains("has-dock")).toBe(true);
+    expect(window.getComputedStyle(conversationOverlay).gridRow).toBe("3 / 5");
     expect(window.getComputedStyle(dock).paddingTop).toBe("12px");
     expect(window.getComputedStyle(dock).paddingRight).toBe("12px");
     expect(window.getComputedStyle(dock).paddingBottom).toBe("12px");
@@ -647,21 +683,21 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.querySelector('button[aria-label="Add context or change Agent mode"]')).toBeNull();
   });
 
-  it("exposes the managed Puppyone Agent and native Agent products in the Agent catalog", () => {
+  it("preserves registry-provided Agent products without provider-specific UI filtering", () => {
     const providers = listAgentRuntimes({
       runtimes: [
         {
-          descriptor: { id: "puppyone-agent", displayName: "PuppyOne Agent", distribution: "bundled" },
-          readiness: { runtimeId: "puppyone-agent", provider: "puppyone-agent", status: "ready", version: "1.0.0", minimumVersion: null, message: "Ready" },
+          descriptor: { id: "custom-agent", displayName: "Custom Agent", distribution: "bundled" },
+          readiness: { runtimeId: "custom-agent", provider: "custom-agent", status: "ready", version: "1.0.0", minimumVersion: null, message: "Ready" },
         },
         runtimeEntry("codex", "Codex"),
         runtimeEntry("claude", "Claude Agent"),
         runtimeEntry("opencode-native", "OpenCode"),
         runtimeEntry("cursor", "Cursor Agent"),
       ],
-      selectedRuntimeId: "puppyone-agent",
-      runtime: { id: "puppyone-agent", displayName: "PuppyOne Agent", distribution: "bundled" },
-      readiness: { runtimeId: "puppyone-agent", provider: "puppyone-agent", status: "ready", version: "1.0.0", minimumVersion: null, message: "Ready" },
+      selectedRuntimeId: "custom-agent",
+      runtime: { id: "custom-agent", displayName: "Custom Agent", distribution: "bundled" },
+      readiness: { runtimeId: "custom-agent", provider: "custom-agent", status: "ready", version: "1.0.0", minimumVersion: null, message: "Ready" },
       account: null,
       models: [],
       capabilities: null,
@@ -669,7 +705,7 @@ describe("Desktop Agent renderer surfaces", () => {
     });
 
     expect(providers.map((entry) => entry.descriptor.displayName)).toEqual([
-      "PuppyOne Agent",
+      "Custom Agent",
       "Codex",
       "Claude Agent",
       "OpenCode",
@@ -700,6 +736,8 @@ describe("Desktop Agent renderer surfaces", () => {
 
     expect(listEnabledAgentRuntimes(inspection, ["claude", "opencode-native", "cursor"])
       .map((entry) => entry.descriptor.id)).toEqual(["claude", "opencode-native"]);
+    expect(listVisibleAgentRuntimes(inspection, ["claude"])
+      .map((entry) => entry.descriptor.id)).toEqual(["codex", "opencode-native"]);
   });
 
   it("shows Agent in the header and withholds Model until a connected runtime is selected", () => {
@@ -904,7 +942,7 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("summarizes real file changes in the compact Changes pill", () => {
+  it("summarizes real file changes in the compact Changes control", () => {
     const projection = createAgentProjection();
     projection.activities.push({
       id: "change-1",
@@ -924,9 +962,9 @@ describe("Desktop Agent renderer surfaces", () => {
     });
     expect(summarizeAgentChanges(projection)).toEqual({ additions: 90, deletions: 13, files: 2 });
     const onViewChanges = vi.fn();
-    const container = render(React.createElement(AgentChangesPill, { projection, onViewChanges }));
-    const button = container.querySelector(".desktop-agent-changes-pill") as HTMLButtonElement;
-    expect(button.textContent).toContain("Changes+90-13");
+    const container = render(React.createElement(AgentChangesControl, { projection, onViewChanges }));
+    const button = container.querySelector(".desktop-agent-changes-control") as HTMLButtonElement;
+    expect(button.textContent).toBe("+90-13");
     act(() => button.click());
     expect(onViewChanges).toHaveBeenCalledTimes(1);
   });
@@ -951,12 +989,15 @@ describe("Desktop Agent renderer surfaces", () => {
     const container = render(React.createElement(AgentTranscript, { projection, loading: false }));
     const row = container.querySelector(".desktop-agent-tool-row") as HTMLButtonElement;
     expect(row.textContent).toContain("Bash");
-    expect(row.textContent).toContain("npm test");
-    expect(row.querySelector(".desktop-agent-tool-name")?.nextElementSibling).toBe(row.querySelector(".desktop-agent-tool-chevron"));
-    expect(row.querySelector(".desktop-agent-tool-chevron")?.nextElementSibling).toBe(row.querySelector(".desktop-agent-tool-summary"));
+    expect(row.textContent).not.toContain("npm test");
+    expect(row.querySelector(".desktop-agent-tool-chevron")).toBeNull();
+    expect(row.querySelector(".desktop-agent-tool-summary")).toBeNull();
     expect(row.getAttribute("aria-expanded")).toBe("false");
     act(() => row.click());
     expect(row.getAttribute("aria-expanded")).toBe("true");
+    expect(row.querySelector(".desktop-agent-tool-chevron")).toBeNull();
+    expect(row.querySelector(".desktop-agent-tool-summary")).toBeNull();
+    expect(row.textContent).not.toContain("npm test");
     const evidence = Array.from(container.querySelectorAll(".desktop-agent-evidence-node"));
     expect(evidence).toHaveLength(2);
     expect(evidence.map((node) => node.getAttribute("data-evidence-kind"))).toEqual(["command", "result"]);
@@ -990,9 +1031,12 @@ describe("Desktop Agent renderer surfaces", () => {
     const container = render(React.createElement(AgentTranscript, { projection, loading: false }));
     const row = container.querySelector(".desktop-agent-tool-row") as HTMLButtonElement;
     expect(row.textContent).toContain("Grep");
-    expect(row.textContent).toContain("rg -n -i liangyu src");
+    expect(row.textContent).not.toContain("rg -n -i liangyu src");
     expect(row.textContent).not.toContain("via Bash");
     expect(row.textContent).not.toContain("Exit 0");
+    act(() => row.click());
+    expect(row.textContent).not.toContain("rg -n -i liangyu src");
+    expect(container.querySelector(".desktop-agent-command-line")?.textContent).toContain("rg -n -i liangyu src");
     expect(container.querySelector(".desktop-agent-command.is-grep")).not.toBeNull();
   });
 
@@ -1013,8 +1057,10 @@ describe("Desktop Agent renderer surfaces", () => {
     const container = render(React.createElement(AgentTranscript, { projection, loading: false, onOpenFile }));
     const row = container.querySelector(".desktop-agent-tool-row") as HTMLButtonElement;
     expect(row.textContent).toContain("Grep");
-    expect(row.textContent).toContain("liangyu");
+    expect(row.textContent).not.toContain("liangyu");
     act(() => row.click());
+    expect(row.textContent).not.toContain("liangyu");
+    expect(container.querySelector(".desktop-agent-search-results")?.textContent).toContain("liangyu");
     expect(container.querySelectorAll(".desktop-agent-search-results > button")).toHaveLength(2);
     act(() => (container.querySelector(".desktop-agent-search-results > button") as HTMLButtonElement).click());
     expect(onOpenFile).toHaveBeenCalledWith("src/a.ts");
@@ -1042,8 +1088,10 @@ describe("Desktop Agent renderer surfaces", () => {
     const container = render(React.createElement(AgentTranscript, { projection, loading: false, onOpenFile }));
     const row = container.querySelector(".desktop-agent-tool-row") as HTMLButtonElement;
     expect(row.textContent).toContain("Edit");
-    expect(row.textContent).toContain("src/app.ts");
+    expect(row.textContent).not.toContain("src/app.ts");
     act(() => row.click());
+    expect(row.textContent).not.toContain("src/app.ts");
+    expect(container.querySelector(".desktop-agent-file-list")?.textContent).toContain("src/app.ts");
     expect(container.querySelectorAll(".desktop-agent-diff-line.is-addition")).toHaveLength(1);
     expect(container.querySelectorAll(".desktop-agent-diff-line.is-deletion")).toHaveLength(1);
     expect(container.textContent).toContain("+2");

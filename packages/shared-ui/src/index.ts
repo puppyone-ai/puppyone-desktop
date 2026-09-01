@@ -2,6 +2,20 @@ export * from "./core/types";
 export { RENDERER_ASSET_PATHS } from "./core/rendererAssetCatalog";
 export { resolveRendererPublicAssetUrl } from "./core/rendererPublicAsset";
 export {
+  AGENT_BRAND_CATALOG,
+  AGENT_BRAND_IDS,
+  getAgentBrand,
+  resolveAgentBrand,
+} from "./core/agentBrandCatalog";
+export type { AgentBrandDefinition, AgentBrandId } from "./core/agentBrandCatalog";
+export { AgentBrandImage } from "./brand/AgentBrandImage";
+export {
+  AgentMonochromeBrandImage,
+  MONOCHROME_AGENT_BRAND_IDS,
+  isMonochromeAgentBrandId,
+} from "./brand/AgentMonochromeBrandImage";
+export type { MonochromeAgentBrandId } from "./brand/AgentMonochromeBrandImage";
+export {
   assertValidDataResourceReference,
   collectDataResourceAncestors,
   getDataResourceName,

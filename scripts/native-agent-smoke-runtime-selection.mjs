@@ -1,9 +1,9 @@
 export const NATIVE_AGENT_RUNTIME_IDS = Object.freeze([
-  "puppyone-agent",
   "codex",
   "claude",
   "cursor",
   "opencode-native",
+  "pi",
 ]);
 
 export function requestedNativeAgentRuntimeIds(argv = [], environmentValue = "") {
