@@ -127,24 +127,6 @@ const applicationColorTokens = new Set([
   "--po-terminal-bright-cyan",
   "--po-terminal-bright-white",
 ]);
-const applicationModeCoupledSurfaceTokens = new Set([
-  "--po-surface-canvas",
-  "--po-surface-chrome",
-  "--po-surface-panel",
-  "--po-surface-panel-raised",
-  "--po-surface-overlay",
-  "--po-surface-inset",
-  "--po-surface-editor",
-  "--po-surface-terminal",
-  "--po-canvas",
-  "--po-chrome",
-  "--po-panel",
-  "--po-panel-raised",
-  "--po-overlay",
-  "--po-inset",
-  "--po-header",
-  "--po-sidebar",
-]);
 const markdownTokenMap = new Map([
   ["--po-md-surface-background", "--po-host-md-surface-background"],
   ["--po-md-content-color", "--po-host-md-content-color"],
@@ -315,7 +297,7 @@ function validateApplicationModeIsolation(root, { target, supportedModes }) {
     for (const node of rule.nodes) {
       if (node.type !== "decl") continue;
       const property = node.prop.toLowerCase();
-      if (!applicationModeCoupledSurfaceTokens.has(property)) continue;
+      if (!applicationColorTokens.has(property)) continue;
       if (hasDarkVariantSelector) darkTokens.add(property);
       if (hasSharedSelector && !isModeAdaptiveTokenValue(node.value)) {
         sharedStaticTokens.add(property);
@@ -328,7 +310,7 @@ function validateApplicationModeIsolation(root, { target, supportedModes }) {
     .sort();
   if (leakingTokens.length > 0) {
     throw new TypeError(
-      `A dual-mode Application Sub Theme must override static shell surface tokens in its dark variant: ${leakingTokens.join(", ")}.`,
+      `A dual-mode Application Sub Theme must override static color tokens in its dark variant: ${leakingTokens.join(", ")}.`,
     );
   }
 }

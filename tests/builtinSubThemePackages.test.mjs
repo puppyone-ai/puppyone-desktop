@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
+import postcss from "postcss";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { compileThemeCss } from "../electron/main/themes/theme-css-compiler.mjs";
@@ -8,6 +9,31 @@ import { parseSingleFileThemeCss } from "../electron/main/themes/theme-single-fi
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packagesRoot = path.join(repoRoot, "sub-themes");
+
+function declarationsForSelector(css, selector) {
+  const declarations = {};
+  postcss.parse(css).walkRules((rule) => {
+    if (rule.selector !== selector) return;
+    for (const node of rule.nodes) {
+      if (node.type === "decl") declarations[node.prop] = node.value;
+    }
+  });
+  return declarations;
+}
+
+function contrastRatio(foreground, background) {
+  const luminance = (hex) => {
+    const channels = [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
+    const [red, green, blue] = channels.map((channel) => (
+      channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+    ));
+    return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+  };
+  const foregroundLuminance = luminance(foreground);
+  const backgroundLuminance = luminance(background);
+  return (Math.max(foregroundLuminance, backgroundLuminance) + 0.05)
+    / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+}
 
 describe("built-in Sub Theme package architecture", () => {
   it("keeps one self-describing theme.css in every built-in package", () => {
@@ -127,6 +153,34 @@ describe("built-in Sub Theme package architecture", () => {
     expect(result.css).toContain(`${darkHost} {`);
     expect(result.css).toContain("--po-header: color-mix(in srgb, var(--po-surface-chrome) 40%, var(--po-surface-editor))");
     expect(result.css).toContain("--po-sidebar: color-mix(in srgb, var(--po-surface-chrome) 40%, var(--po-surface-editor))");
+  });
+
+  it("keeps Graphite's Dark text and syntax colors readable", async () => {
+    const sourcePath = "sub-themes/default-graphite/theme.css";
+    const theme = parseSingleFileThemeCss(
+      readFileSync(path.join(repoRoot, sourcePath), "utf8"),
+      {
+        sourcePath,
+        allowReservedBuiltinId: true,
+        allowBuiltinCompatibilityMetadata: true,
+      },
+    );
+    const result = await compileThemeCss({
+      css: theme.stylesheets.application,
+      themeId: theme.id,
+      target: "application",
+      supportedModes: theme.modes,
+      allowReservedBuiltinId: true,
+    });
+    const darkHost = `[data-po-appearance-root][data-sub-theme-id="default.graphite"]:where(.dark)`;
+    const darkTokens = declarationsForSelector(result.css, darkHost);
+    expect(darkTokens["--po-text"]).toBe("#fafafa");
+    expect(darkTokens["--po-text-muted"]).toBe("#a1a1aa");
+    expect(darkTokens["--po-text-subtle"]).toBe("#71717a");
+    expect(darkTokens["--po-json-key"]).toBe("#cbd5e1");
+    expect(darkTokens["--po-json-string"]).toBe("#7dd3fc");
+    expect(contrastRatio(darkTokens["--po-text"], darkTokens["--po-canvas"])).toBeGreaterThanOrEqual(7);
+    expect(contrastRatio(darkTokens["--po-text-muted"], darkTokens["--po-canvas"])).toBeGreaterThanOrEqual(4.5);
   });
 
   it("removes legacy preset palettes from the global token layer", () => {

@@ -121,22 +121,22 @@ describe("Sub Theme CSS compiler", () => {
     })).rejects.toThrow("must declare explicit dark root tokens");
   });
 
-  it("prevents static shell surfaces from leaking from light into dark mode", async () => {
+  it("prevents static application colors from leaking from light into dark mode", async () => {
     await expect(compileThemeCss({
       css: [
-        ":root { --po-canvas: #ffffff; --po-surface-chrome: #f8f8f8; --po-header: #f5f5f5; --po-sidebar: #eeeeee }",
+        ":root { --po-canvas: #ffffff; --po-surface-chrome: #f8f8f8; --po-header: #f5f5f5; --po-sidebar: #eeeeee; --po-text: #111111 }",
         ".dark .theme-root { --po-canvas: #111111 }",
       ].join("\n"),
       themeId: "com.example.leaking-shell",
       target: "application",
       supportedModes: ["light", "dark"],
     })).rejects.toThrow(
-      "must override static shell surface tokens in its dark variant: --po-header, --po-sidebar, --po-surface-chrome",
+      "must override static color tokens in its dark variant: --po-header, --po-sidebar, --po-surface-chrome, --po-text",
     );
 
     const result = await compileThemeCss({
       css: [
-        ":root { --po-canvas: #ffffff; --po-header: var(--po-surface-chrome); --po-sidebar: color-mix(in srgb, var(--po-surface-chrome) 40%, var(--po-surface-editor)) }",
+        ":root { --po-canvas: #ffffff; --po-header: var(--po-surface-chrome); --po-sidebar: color-mix(in srgb, var(--po-surface-chrome) 40%, var(--po-surface-editor)); --po-text: light-dark(#111111, #f5f5f5) }",
         ".dark .theme-root { --po-canvas: #111111 }",
       ].join("\n"),
       themeId: "com.example.adaptive-shell",
@@ -145,6 +145,7 @@ describe("Sub Theme CSS compiler", () => {
     });
     expect(result.css).toContain("--po-header: var(--po-surface-chrome)");
     expect(result.css).toContain("--po-sidebar: color-mix(");
+    expect(result.css).toContain("--po-text: light-dark(");
   });
 
   it.each([
