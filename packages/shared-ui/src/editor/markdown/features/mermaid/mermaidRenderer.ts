@@ -59,8 +59,11 @@ export function getMermaidThemeSnapshot(root: Element = document.documentElement
   const warning = read("--po-warning", "#d97706");
   const danger = read("--po-danger", "#dc2626");
   const fontFamily = read(
-    "--po-font-content",
-    read("--po-font-sans", "ui-sans-serif, system-ui, sans-serif"),
+    "--po-font-editor-content-user",
+    read(
+      "--po-editor-content-font",
+      read("--po-font-content", read("--po-font-sans", "ui-sans-serif, system-ui, sans-serif")),
+    ),
   );
   const isDark = isDarkColor(background);
 

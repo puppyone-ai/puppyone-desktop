@@ -12,8 +12,8 @@ describe("Sub Theme settings", () => {
     expect(section).toContain("rootThemeId");
     expect(section).toContain("effectiveColorMode");
     expect(section).toContain("onSubThemeChange");
-    expect(section).toContain("getCompatibleSubThemes");
-    expect(section).toContain("getCompatibleSubThemes(catalog.snapshot, rootThemeId, effectiveColorMode)");
+    expect(section).toContain("listSelectableSubThemes");
+    expect(section).toContain("listSelectableSubThemes(");
     expect(section).not.toContain("desktop-sub-theme-mode-badge");
     expect(section).toContain("FolderOpen");
     expect(section).toContain("<Plus");

@@ -179,7 +179,7 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/--agent-empty-brand-foreground-hover:\s*color-mix\(in srgb, var\(--agent-text-muted\) 76%, var\(--agent-canvas\)\)/);
     expect(css).toMatch(/\.desktop-agent-empty-logo-button:hover\s*\{[^}]*background:\s*transparent/s);
     expect(css).toMatch(/\.desktop-agent-empty-logo-button:hover \.desktop-agent-brand-mark\s*\{[^}]*color:\s*var\(--agent-empty-brand-foreground-hover\)/s);
-    expect(css).toMatch(/\.desktop-agent-empty-logo-button \.desktop-agent-brand-mark\s*\{[^}]*rotate\(calc\(var\(--desktop-agent-empty-logo-turns, 0\) \* 1turn\)\)[^}]*780ms cubic-bezier\(0\.16, 0\.86, 0\.22, 1\.1\)/s);
+    expect(css).toMatch(/\.desktop-agent-empty-logo-button \.desktop-agent-brand-mark\s*\{[^}]*rotate\(calc\(var\(--agent-empty-logo-turns, 0\) \* 1turn\)\)[^}]*780ms cubic-bezier\(0\.16, 0\.86, 0\.22, 1\.1\)/s);
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{[^}]*\.desktop-agent-empty-logo-button,[^{]*\.desktop-agent-empty-logo-button \.desktop-agent-brand-mark\s*\{[^}]*transform:\s*none[^}]*transition:\s*none/s);
     expect(css).toMatch(/\.desktop-agent-empty-state \.desktop-agent-brand-mark\s*\{[^}]*--desktop-agent-brand-mark-scale:\s*1[^}]*width:\s*28px[^}]*height:\s*28px[^}]*overflow:\s*visible[^}]*border-radius:\s*0[^}]*background:\s*transparent[^}]*color:\s*var\(--agent-empty-brand-foreground\)[^}]*filter:\s*none[^}]*opacity:\s*1/s);
     expect(css).toMatch(/\.desktop-agent-brand-mark\.is-cursor\s*\{[^}]*background:\s*transparent/s);

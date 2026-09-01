@@ -200,7 +200,7 @@ describe("desktop side-pane resize interactions", () => {
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
   });
 
-  it("grows the right sidebar pointer-synchronously up to the layout-supplied maximum", () => {
+  it("previews the right-sidebar width pointer-synchronously and commits it at gesture end", () => {
     vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
       callback(0);
       return 1;
@@ -229,11 +229,13 @@ describe("desktop side-pane resize interactions", () => {
     });
 
     expect(panel.style.getPropertyValue("--desktop-right-sidebar-width")).toBe("720px");
-    expect(onWidthChange).toHaveBeenLastCalledWith(720);
+    expect(onWidthChange).not.toHaveBeenCalled();
 
     act(() => {
       window.dispatchEvent(pointerEvent("pointerup", -300, 8));
     });
+
+    expect(onWidthChange).toHaveBeenCalledExactlyOnceWith(720);
   });
 
   it("follows the pointer down to the right-sidebar minimum, then holds while collapse is armed", () => {
@@ -266,21 +268,29 @@ describe("desktop side-pane resize interactions", () => {
     });
 
     expect(panel.style.getPropertyValue("--desktop-right-sidebar-width")).toBe("500px");
-    expect(onWidthChange).toHaveBeenLastCalledWith(500);
+    expect(onWidthChange).not.toHaveBeenCalled();
 
     act(() => {
       window.dispatchEvent(pointerEvent("pointerup", 200, 6));
+    });
+
+    expect(onWidthChange).toHaveBeenCalledExactlyOnceWith(500);
+
+    act(() => {
       handle.dispatchEvent(pointerEvent("pointerdown", 0, 6));
       window.dispatchEvent(pointerEvent("pointermove", 300, 6));
     });
 
     expect(panel.style.getPropertyValue("--desktop-right-sidebar-width")).toBe("420px");
-    expect(onWidthChange).toHaveBeenLastCalledWith(420);
+    expect(onWidthChange).toHaveBeenCalledExactlyOnceWith(500);
     expect(onOpenChange).not.toHaveBeenCalled();
 
     act(() => {
       window.dispatchEvent(pointerEvent("pointerup", 300, 6));
     });
+
+    expect(onWidthChange).toHaveBeenLastCalledWith(420);
+    expect(onWidthChange).toHaveBeenCalledTimes(2);
   });
 
   it("reveals a closed right sidebar immediately while dragging out and snaps back below half width", () => {

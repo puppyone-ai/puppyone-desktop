@@ -2,6 +2,7 @@ import { useLocalization } from "@puppyone/localization";
 import { FolderOpen, Plus } from "lucide-react";
 import {
   getCompatibleSubThemes,
+  listSelectableSubThemes,
 } from "../../themes/builtinSubThemes";
 import type { SubThemeCatalogController } from "../../themes/useSubThemeCatalog";
 import type { InterfaceStyle, ResolvedTheme } from "../../appearance/interfaceStyles";
@@ -24,9 +25,12 @@ export function SubThemeSettingsSection({
 }) {
   const { t } = useLocalization();
   const allowedTargets = getInterfaceStyleSubThemePolicy(rootThemeId).allowedTargets;
-  const variants = getCompatibleSubThemes(catalog.snapshot, rootThemeId, effectiveColorMode).filter((subTheme) => (
-    allowedTargets.every((target) => subTheme.targets.includes(target))
-  ));
+  const variants = listSelectableSubThemes(
+    catalog.snapshot,
+    rootThemeId,
+    effectiveColorMode,
+    allowedTargets,
+  );
   const selectedExists = variants.some((subTheme) => subTheme.id === requestedSubThemeId);
   const requestedExistsInCatalog = catalog.snapshot.subThemes.some(
     (subTheme) => subTheme.id === requestedSubThemeId,

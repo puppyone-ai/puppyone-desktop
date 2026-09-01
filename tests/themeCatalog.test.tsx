@@ -177,7 +177,10 @@ describe("renderer Sub Theme catalog", () => {
     });
 
     const request = syncNativeMenu.mock.calls.at(-1)?.[0];
-    expect(request).toMatchObject({ pack: "default.github" });
+    expect(request).toMatchObject({
+      pack: "default.github",
+      requiredTargets: ["application", "markdown", "csv"],
+    });
     expect(request?.themes.map(({ id }: { id: string }) => id)).toEqual([
       "default.neutral",
       "default.warm",

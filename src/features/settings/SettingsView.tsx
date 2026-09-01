@@ -7,7 +7,7 @@ import {
   FileGlyphIcon,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
-import { SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, TEXT_SIZE_PRESETS } from "../../preferences";
+import { SIDEBAR_NAVIGATION_LAYOUT_OPTIONS } from "../../preferences";
 import { getOrderedHeaderElementDefinitions } from "../app-shell/headerElements";
 import {
   isAppearanceDecisionLocked,
@@ -16,7 +16,6 @@ import {
 import { useFeatureFlag } from "../flags";
 import { LocalAgentsSettingsView } from "../local-agents";
 import { SettingsSectionHeader } from "./components";
-import { ContentFontSetting } from "./ContentFontSetting";
 import { AccountSettingsView } from "./main/AccountSettingsView";
 import { ExperimentalSettingsView } from "./main/ExperimentalSettingsView";
 import { FilesSettingsView } from "./main/FileSettingsViews";
@@ -52,7 +51,6 @@ export function SettingsView({
   localAgentsSettings,
   typographyPreferences,
   pointerCursors,
-  markdownPresentation,
   requestedSubThemeId,
   subThemeCatalog,
   fileIconTheme,
@@ -80,8 +78,6 @@ export function SettingsView({
   onTextSizeChange,
   onTypographyPreferencesChange,
   onPointerCursorsChange,
-  onMarkdownPresentationChange,
-  onSelectSettingsSection,
   onSubThemeChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
@@ -239,26 +235,22 @@ export function SettingsView({
   }
 
   if (activeSection === "editor") {
-    const activeMarkdownTheme = subThemeCatalog.snapshot.subThemes.find(
-      (subTheme) => subTheme.id === resolvedAppearance.subThemeId,
-    );
     return (
       <Suspense fallback={null}>
         <EditorSettingsView
-          markdownPresentation={markdownPresentation}
-          onMarkdownPresentationChange={onMarkdownPresentationChange}
-          activeMarkdownThemeName={activeMarkdownTheme?.name ?? resolvedAppearance.subThemeId}
-          onManageThemes={() => onSelectSettingsSection("appearance")}
+          textSizeDecision={resolvedAppearance.decisions.textSize}
+          typographyPreferences={typographyPreferences}
+          markdownThemeId={resolvedAppearance.subThemeId}
+          onTextSizeChange={onTextSizeChange}
+          onTypographyPreferencesChange={onTypographyPreferencesChange}
         />
       </Suspense>
     );
   }
 
   if (activeSection === "appearance") {
-    const textSizeDecision = resolvedAppearance.decisions.textSize;
     const fileIconDecision = resolvedAppearance.decisions.fileIconTheme;
     const navigationDecision = resolvedAppearance.decisions.sidebarNavigationLayout;
-    const textSizeLocked = isAppearanceDecisionLocked(textSizeDecision);
     const fileIconLocked = isAppearanceDecisionLocked(fileIconDecision);
     const navigationLocked = isAppearanceDecisionLocked(navigationDecision);
     return (
@@ -286,37 +278,6 @@ export function SettingsView({
                 effectiveSubThemeId={resolvedAppearance.subThemeId}
                 effectiveColorMode={resolvedAppearance.effectiveColorMode}
                 onSubThemeChange={onSubThemeChange}
-              />
-              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-                <span>{t("settings.appearance.textSize.title")}</span>
-                <div className="desktop-theme-segment desktop-appearance-option-segment desktop-appearance-hug-segment" aria-label={t("settings.appearance.textSize.ariaLabel")}>
-                  {TEXT_SIZE_PRESETS.map((option) => (
-                    <button
-                      key={option.value}
-                      className={`${textSizeDecision.effectiveValue === option.value ? "active" : ""}${textSizeLocked || !isAppearanceValueAllowed(textSizeDecision, option.value) ? " is-policy-controlled" : ""}`}
-                      type="button"
-                      title={textSizeDecision.reasonKey
-                        ? t(textSizeDecision.reasonKey)
-                        : t(`settings.appearance.textSize.${option.value}.description`)}
-                      aria-disabled={textSizeLocked || !isAppearanceValueAllowed(textSizeDecision, option.value)}
-                      aria-pressed={textSizeDecision.effectiveValue === option.value}
-                      onClick={() => {
-                        if (!textSizeLocked && isAppearanceValueAllowed(textSizeDecision, option.value)) {
-                          onTextSizeChange(option.value);
-                        }
-                      }}
-                    >
-                      <span>{t(`settings.appearance.textSize.${option.value}.label`)}</span>
-                    </button>
-                  ))}
-                </div>
-                {textSizeDecision.reasonKey && (
-                  <small className="desktop-appearance-policy-reason">{t(textSizeDecision.reasonKey)}</small>
-                )}
-              </div>
-              <ContentFontSetting
-                preferences={typographyPreferences}
-                onChange={onTypographyPreferencesChange}
               />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.fileIcons.title")}</span>

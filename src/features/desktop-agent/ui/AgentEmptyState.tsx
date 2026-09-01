@@ -1,7 +1,8 @@
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { AgentBrandMark } from "./AgentBrandMark";
+import { agentEmptyLogoGeometry } from "./agent-runtime-geometry";
 
 type AgentEmptyStateProps = {
   runtimeIconKey?: string | null;
@@ -12,16 +13,13 @@ type AgentEmptyStateProps = {
 export function AgentEmptyState({ runtimeIconKey, runtimeLabel }: AgentEmptyStateProps) {
   const { t } = useLocalization();
   const [logoTurns, setLogoTurns] = useState(0);
-  const logoStyle = {
-    "--desktop-agent-empty-logo-turns": logoTurns,
-  } as CSSProperties;
 
   return (
     <div className="desktop-agent-empty-state">
       <button
         type="button"
         className="desktop-agent-empty-logo-button"
-        style={logoStyle}
+        style={agentEmptyLogoGeometry(logoTurns)}
         aria-label={t("agent.empty.spinLogo", { agent: bidiIsolate(runtimeLabel) })}
         onClick={() => setLogoTurns((turns) => turns + 1)}
       >

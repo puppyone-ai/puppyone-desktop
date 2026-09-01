@@ -240,7 +240,7 @@ describe("Markdown HTML media layout", () => {
     expect(profileRule).toContain("--po-md-block-gap: var(--po-host-md-block-gap, 16px);");
     expect(profileRule).toContain("--po-md-heading-gap-before: var(--po-host-md-heading-gap-before, 24px);");
     expect(profileRule).toContain("--po-md-heading-gap-after: var(--po-host-md-heading-gap-after, 16px);");
-    expect(editorTextRule).toContain("font-family: var(--po-md-content-font);");
+    expect(editorTextRule).toContain("font-family: var(--po-editor-content-font);");
     expect(editorTextRule).toContain("font-size: var(--po-md-content-size);");
     expect(editorTextRule).toContain("font-weight: var(--po-md-content-weight);");
     expect(editorTextRule).toContain("letter-spacing: var(--po-md-content-letter-spacing);");

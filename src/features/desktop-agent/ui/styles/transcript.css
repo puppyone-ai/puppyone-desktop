@@ -165,7 +165,7 @@
 }
 .desktop-agent-empty-logo-button:active { transform: scale(0.91); }
 .desktop-agent-empty-logo-button .desktop-agent-brand-mark {
-  transform: rotate(calc(var(--desktop-agent-empty-logo-turns, 0) * 1turn));
+  transform: rotate(calc(var(--agent-empty-logo-turns, 0) * 1turn));
   transition:
     color 140ms ease-out,
     transform 780ms cubic-bezier(0.16, 0.86, 0.22, 1.1);

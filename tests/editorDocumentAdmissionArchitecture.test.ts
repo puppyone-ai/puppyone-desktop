@@ -30,7 +30,10 @@ describe("document admission architecture", () => {
   it("excludes folders from document and Viewer Host types", () => {
     expect(coreTypesSource).toContain('Exclude<DataNodeKind, "folder">');
     expect(viewerTypesSource).toContain("EditorDocumentKind = DocumentDataNodeKind");
-    expect(runtimeSource).toContain("if (invalidTreeNode) return null");
+    expect(runtimeSource).toContain("if (invalidTreeNode) {");
+    expect(runtimeSource).toContain('role="alert"');
+    expect(runtimeSource).toContain('t("editor.unavailable.title")');
+    expect(runtimeSource).not.toContain("if (invalidTreeNode) return null");
   });
 });
 

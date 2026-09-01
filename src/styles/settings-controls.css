@@ -138,6 +138,23 @@
   opacity: 0.58;
 }
 
+.desktop-theme-settings-folder-help {
+  margin: 8px 0 0;
+  width: min(100%, 360px);
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: end;
+}
+
+.desktop-theme-settings-help-row {
+  justify-content: flex-end;
+}
+
+.desktop-theme-settings-help-row .desktop-theme-settings-folder-help:first-child {
+  margin-top: 0;
+}
+
 .desktop-settings-visually-hidden {
   position: absolute;
   width: 1px;
@@ -199,15 +216,43 @@
   padding: 0;
 }
 
-.desktop-content-font-segment {
+.desktop-content-font-segment,
+.desktop-markdown-font-segment {
   max-width: 50%;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
 
+.desktop-editor-typography-preview.markdown-codemirror-editor {
+  container-name: desktop-editor-typography-preview;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  margin: 8px 10px 0;
+  border: 1px solid color-mix(in srgb, var(--po-divider) 88%, transparent);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: default;
+}
+
+.desktop-editor-typography-preview .cm-md-html-rendered-surface {
+  padding: 22px 24px;
+}
+
+.desktop-editor-typography-preview .desktop-editor-typography-preview-body {
+  margin-block-end: 0;
+}
+
 @media (max-width: 760px) {
-  .desktop-content-font-segment {
+  .desktop-content-font-segment,
+  .desktop-markdown-font-segment {
     max-width: 100%;
+  }
+}
+
+@container (max-width: 560px) {
+  .desktop-editor-typography-preview .cm-md-html-rendered-surface {
+    padding: 18px;
   }
 }
 

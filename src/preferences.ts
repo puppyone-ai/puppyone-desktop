@@ -285,78 +285,26 @@ export const TEXT_SIZE_PRESETS = [
   {
     value: "small",
     label: "Small",
-    description: "Sidebar 12px, content 13px, code 12px.",
-    sizes: {
-      micro: 9,
-      caption: 10,
-      meta: 11,
-      sidebar: 12,
-      body: 12,
-      bodyLarge: 13,
-      content: 13,
-      code: 12,
-      terminal: 12,
-      title: 15,
-      pageTitle: 18,
-      display: 22,
-    },
+    description: "Editor content 13px.",
+    sizes: { content: 13 },
   },
   {
     value: "default",
     label: "Default",
-    description: "Sidebar 13px, content 14px, code 13px.",
-    sizes: {
-      micro: 10,
-      caption: 11,
-      meta: 12,
-      sidebar: 13,
-      body: 13,
-      bodyLarge: 14,
-      content: 14,
-      code: 13,
-      terminal: 13,
-      title: 16,
-      pageTitle: 20,
-      display: 24,
-    },
+    description: "Editor content 14px.",
+    sizes: { content: 14 },
   },
   {
     value: "large",
     label: "Large",
-    description: "Sidebar 14px, content 16px, code 15px.",
-    sizes: {
-      micro: 11,
-      caption: 12,
-      meta: 13,
-      sidebar: 14,
-      body: 14,
-      bodyLarge: 16,
-      content: 16,
-      code: 15,
-      terminal: 15,
-      title: 18,
-      pageTitle: 22,
-      display: 28,
-    },
+    description: "Editor content 16px.",
+    sizes: { content: 16 },
   },
 ] as const satisfies ReadonlyArray<{
   value: TextSize;
   label: string;
   description: string;
-  sizes: {
-    micro: number;
-    caption: number;
-    meta: number;
-    sidebar: number;
-    body: number;
-    bodyLarge: number;
-    content: number;
-    code: number;
-    terminal: number;
-    title: number;
-    pageTitle: number;
-    display: number;
-  };
+  sizes: { content: number };
 }>;
 
 export function parseThemeMode(value: string | null | undefined): ThemeMode {

@@ -97,7 +97,7 @@ describe("settings visual architecture", () => {
     expect(language).not.toContain("<button");
   });
 
-  it("exposes Markdown presentation without reviving unfinished AI review preferences", () => {
+  it("exposes Editor typography without Markdown presentation overrides", () => {
     const sidebarModel = source("src/features/settings/sidebar/settingsSidebarModel.ts");
     const settingsView = source("src/features/settings/SettingsView.tsx");
     const editorSettings = source("src/features/settings/main/EditorSettingsView.tsx");
@@ -109,10 +109,13 @@ describe("settings visual architecture", () => {
     expect(sidebarModel).toContain('id: "editor"');
     expect(settingsView).toContain("<EditorSettingsView");
     expect(settingsView).toContain('import("./main/EditorSettingsView")');
-    expect(editorSettings).toContain("markdownPresentation");
-    expect(editorSettings).toContain("<MarkdownPresentationPreview");
-    expect(editorSettings).toContain("markdownPresentation.headingScale");
-    expect(editorSettings).not.toContain("markdownPresentation.h1Scale");
+    expect(settingsView).not.toContain("ContentFontSetting");
+    expect(settingsView).not.toContain("settings.appearance.textSize");
+    expect(editorSettings).toContain("settings.editor.typography");
+    expect(editorSettings).toContain("MarkdownFontSetting");
+    expect(editorSettings).not.toContain("markdownPresentation");
+    expect(editorSettings).not.toContain("<MarkdownPresentationPreview");
+    expect(editorSettings).not.toContain("markdownPresentation.headingScale");
     expect(editorSettings).not.toContain("aiEditAssistEnabled");
     expect(editorSettings).not.toContain("diffMarkers");
     expect(settingsView).not.toContain("onAiEditAssistEnabledChange");
@@ -327,8 +330,8 @@ describe("settings visual architecture", () => {
     expect(controls).toMatch(/\.desktop-settings-tool-list\s*{[^}]*width:\s*fit-content;[^}]*max-width:\s*100%;/s);
     expect(controls).toMatch(/\.desktop-settings-tool-item\s*{[^}]*grid-template-columns:\s*minmax\(0, max-content\) auto;[^}]*gap:\s*8px;[^}]*padding-inline:\s*8px 0;/s);
     expect(settings).not.toContain(".desktop-settings-wide-control-row > .desktop-settings-tool-list");
-    expect(view.match(/desktop-theme-segment desktop-appearance-option-segment/g)).toHaveLength(5);
-    expect(view.match(/desktop-appearance-hug-segment/g)).toHaveLength(4);
+    expect(view.match(/desktop-theme-segment desktop-appearance-option-segment/g)).toHaveLength(4);
+    expect(view.match(/desktop-appearance-hug-segment/g)).toHaveLength(3);
     expect(view).not.toContain("settings.appearance.editorPresentation");
     expect(view).not.toContain("settings.appearance.dockIcon");
     expect(localProject).not.toContain("<strong");

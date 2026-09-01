@@ -110,12 +110,8 @@ function applyDesktopOverlayTheme(
   else delete root.dataset.subThemeId;
   if (lightThemePreset) root.dataset.lightThemePreset = lightThemePreset;
   if (darkThemePreset) root.dataset.darkThemePreset = darkThemePreset;
-  if (textSize) {
-    root.dataset.textSize = textSize;
-    root.dataset.interfaceTextSize = textSize;
-    root.dataset.contentTextSize = textSize;
-    root.dataset.terminalTextSize = textSize;
-  }
+  if (textSize) root.dataset.contentTextSize = textSize;
+  else delete root.dataset.contentTextSize;
   if (typography) applyTypographyToElement(root, typography);
   if (pointerCursors !== undefined) root.dataset.pointerCursors = pointerCursors ? "true" : "false";
   if (diffMarkers) root.dataset.diffMarkers = diffMarkers;

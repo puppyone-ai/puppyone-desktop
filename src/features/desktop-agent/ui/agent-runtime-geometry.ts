@@ -19,6 +19,10 @@ export function agentVirtualRowGeometry(offset: number): AgentRuntimeGeometryVar
   return variables({ "--agent-virtual-row-offset": pixels(offset) });
 }
 
+export function agentEmptyLogoGeometry(turns: number): AgentRuntimeGeometryVariables {
+  return variables({ "--agent-empty-logo-turns": integer(turns) });
+}
+
 export function agentPickerOverlayGeometry(
   position: AnchoredOverlayPosition | null,
   measurementWidth: number,
@@ -38,6 +42,10 @@ function variables<T extends Record<`--agent-${string}`, string | number>>(value
 
 function pixels(value: number) {
   return `${Math.max(0, Number.isFinite(value) ? value : 0)}px`;
+}
+
+function integer(value: number) {
+  return Math.max(0, Math.trunc(Number.isFinite(value) ? value : 0));
 }
 
 function clamp(value: number, minimum: number, maximum: number) {

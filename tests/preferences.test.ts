@@ -139,17 +139,14 @@ describe("appearance preferences", () => {
     expect(parseAgentFileActivityIndicatorsEnabled("invalid")).toBe(false);
   });
 
-  it("defines curated integer typography presets", () => {
+  it("defines content-only integer typography presets", () => {
     expect(TEXT_SIZE_PRESETS.map((preset) => ({
       value: preset.value,
-      sidebar: preset.sizes.sidebar,
       content: preset.sizes.content,
-      code: preset.sizes.code,
-      terminal: preset.sizes.terminal,
     }))).toEqual([
-      { value: "small", sidebar: 12, content: 13, code: 12, terminal: 12 },
-      { value: "default", sidebar: 13, content: 14, code: 13, terminal: 13 },
-      { value: "large", sidebar: 14, content: 16, code: 15, terminal: 15 },
+      { value: "small", content: 13 },
+      { value: "default", content: 14 },
+      { value: "large", content: 16 },
     ]);
 
     for (const preset of TEXT_SIZE_PRESETS) {
@@ -164,60 +161,28 @@ describe("appearance preferences", () => {
     );
     const tokens = readFileSync(new URL("../src/styles/tokens.css", import.meta.url), "utf8");
     const blocks = {
-      small: [
-        readCssBlock(
-          css,
-          ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-interface-text-size="small"],\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="small"]:not([data-interface-text-size])',
-        ),
-        readCssBlock(
-          css,
-          ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-content-text-size="small"],\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="small"]:not([data-content-text-size])',
-        ),
-        readCssBlock(
-          css,
-          ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-terminal-text-size="small"],\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="small"]:not([data-terminal-text-size])',
-        ),
-      ].join("\n"),
+      small: readCssBlock(
+        css,
+        ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-content-text-size="small"]',
+      ),
       default: readCssBlock(
         css,
         ":root,\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface, .dark)",
       ),
-      large: [
-        readCssBlock(
-          css,
-          ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-interface-text-size="large"],\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="large"]:not([data-interface-text-size])',
-        ),
-        readCssBlock(
-          css,
-          ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-content-text-size="large"],\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="large"]:not([data-content-text-size])',
-        ),
-        readCssBlock(
-          css,
-          ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-terminal-text-size="large"],\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="large"]:not([data-terminal-text-size])',
-        ),
-      ].join("\n"),
+      large: readCssBlock(
+        css,
+        ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-content-text-size="large"]',
+      ),
     };
-    const tokenNames = {
-      micro: "--po-text-size-micro",
-      caption: "--po-text-size-caption",
-      meta: "--po-text-size-meta",
-      sidebar: "--po-text-size-sidebar",
-      body: "--po-text-size-body",
-      bodyLarge: "--po-text-size-body-lg",
-      content: "--po-text-size-content",
-      code: "--po-code-font-size",
-      terminal: "--po-terminal-font-size",
-      title: "--po-text-size-title",
-      pageTitle: "--po-text-size-page-title",
-      display: "--po-text-size-display",
-    } as const;
 
     for (const preset of TEXT_SIZE_PRESETS) {
       const block = blocks[preset.value];
-      for (const [role, size] of Object.entries(preset.sizes)) {
-        expect(block).toContain(`${tokenNames[role as keyof typeof tokenNames]}: ${size}px;`);
-      }
+      expect(block).toContain(`--po-text-size-content: ${preset.sizes.content}px;`);
     }
+
+    expect(css).not.toContain("data-interface-text-size");
+    expect(css).not.toContain("data-terminal-text-size");
+    expect(css).not.toContain("data-text-size");
 
     expect(tokens).toMatch(
       /:root,\s*:where\(\.app-shell, \.onboarding-shell, \.desktop-overlay-root, \.desktop-theme-preview-surface, \.dark\)\s*\{[^}]*--desktop-sidebar-font-size:\s*var\(--po-text-size-sidebar\);[^}]*--desktop-sidebar-font-size-meta:\s*var\(--po-text-size-meta\);/s,

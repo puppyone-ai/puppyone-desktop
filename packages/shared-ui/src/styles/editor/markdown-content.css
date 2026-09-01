@@ -8,7 +8,12 @@
 .markdown-codemirror-editor {
   --po-md-presentation-version: 2;
   --po-md-surface-background: var(--po-host-md-surface-background, var(--po-editor-bg));
-  --po-md-content-font: var(--po-host-md-content-font, var(--po-font-content, var(--po-font-sans)));
+  /* Themes own only the primary face. PuppyOne recomposes locale, Emoji, and
+     generic fallbacks at the document's lang boundary. */
+  --po-md-content-font-primary: var(--po-font-content-primary, "Geist Sans");
+  --po-md-content-font-fallback: var(--po-font-content-fallback, var(--po-font-locale-sans), var(--po-font-emoji), sans-serif);
+  --po-md-content-font: var(--po-host-md-content-font, var(--po-md-content-font-primary), var(--po-md-content-font-fallback));
+  --po-editor-content-font: var(--po-font-editor-content-user, var(--po-md-content-font));
   --po-md-content-size: var(--po-host-md-content-size, var(--po-text-size-content, 14px));
   --po-md-content-weight: var(--po-host-md-content-weight, var(--po-content-reading-weight, 450));
   --po-md-content-letter-spacing: var(--po-host-md-content-letter-spacing, var(--po-content-reading-letter-spacing, 0));
@@ -40,9 +45,9 @@
   --po-md-h1-size: var(--po-user-md-h1-size, var(--po-host-md-h1-size, 2em));
   --po-md-h2-size: var(--po-user-md-h2-size, var(--po-host-md-h2-size, 1.5em));
   --po-md-h3-size: var(--po-user-md-h3-size, var(--po-host-md-h3-size, 1.25em));
-  --po-md-h4-size: var(--po-host-md-h4-size, 1em);
-  --po-md-h5-size: var(--po-host-md-h5-size, 0.875em);
-  --po-md-h6-size: var(--po-host-md-h6-size, 0.85em);
+  --po-md-h4-size: var(--po-host-md-h4-size, 1.125em);
+  --po-md-h5-size: var(--po-host-md-h5-size, 1.0625em);
+  --po-md-h6-size: var(--po-host-md-h6-size, 1em);
   --po-md-strong-weight: var(--po-user-md-strong-weight, var(--po-host-md-strong-weight, 600));
   --po-md-strong-color: var(--po-user-md-strong-color, var(--po-host-md-strong-color, var(--po-text)));
   background: var(--po-md-surface-background);
@@ -56,6 +61,108 @@
     --po-host-md-content-color,
     color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted))
   );
+}
+
+/* An explicit Editor font is a user override above the selected Markdown
+   theme. Keep technical/code surfaces out of this list so their monospace
+   contract remains intact. Ordinary theme CSS cannot use !important. */
+:where([data-font-editor-content]:not([data-font-editor-content="theme"]))
+  [data-po-theme-surface="markdown"]
+  :where(
+    .cm-editor,
+    .cm-content,
+    .cm-line:not(.cm-md-code-block-line),
+    .cm-md-heading,
+    .cm-md-heading-1,
+    .cm-md-heading-2,
+    .cm-md-heading-3,
+    .cm-md-heading-4,
+    .cm-md-heading-5,
+    .cm-md-heading-6,
+    .cm-md-html-rendered-surface,
+    .cm-md-html-rendered-surface p,
+    .cm-md-html-rendered-surface li,
+    .cm-md-html-rendered-surface blockquote,
+    .cm-md-html-rendered-surface dt,
+    .cm-md-html-rendered-surface dd,
+    .cm-md-html-rendered-surface th,
+    .cm-md-html-rendered-surface td,
+    .cm-md-html-rendered-surface h1,
+    .cm-md-html-rendered-surface h2,
+    .cm-md-html-rendered-surface h3,
+    .cm-md-html-rendered-surface h4,
+    .cm-md-html-rendered-surface h5,
+    .cm-md-html-rendered-surface h6,
+    .cm-md-html-rendered-surface strong,
+    .cm-md-html-rendered-surface b,
+    .cm-md-html-rendered-surface em,
+    .cm-md-html-rendered-surface i,
+    .cm-md-html-rendered-surface a
+  ) {
+  font-family: var(--po-font-editor-content-user) !important;
+}
+
+:where([data-font-editor-content]:not([data-font-editor-content="theme"]))
+  [data-po-theme-surface="markdown"]
+  :where(.cm-line:not(.cm-md-code-block-line))
+  * {
+  font-family: var(--po-font-editor-content-user) !important;
+}
+
+:where([data-font-editor-content]:not([data-font-editor-content="theme"]))
+  [data-po-theme-surface="markdown"]
+  .cm-md-html-rendered-surface
+  * {
+  font-family: var(--po-font-editor-content-user) !important;
+}
+
+:where([data-font-editor-content]:not([data-font-editor-content="theme"]))
+  [data-po-theme-surface="markdown"]
+  .cm-md-table-cell-content,
+:where([data-font-editor-content]:not([data-font-editor-content="theme"]))
+  [data-po-theme-surface="markdown"]
+  .cm-md-table-cell-content *,
+:where([data-font-editor-content]:not([data-font-editor-content="theme"]))
+  [data-po-theme-surface="markdown"]
+  .cm-md-mdx-tab-panel,
+:where([data-font-editor-content]:not([data-font-editor-content="theme"]))
+  [data-po-theme-surface="markdown"]
+  .cm-md-mdx-tab-panel * {
+  font-family: var(--po-font-editor-content-user) !important;
+}
+
+/* Text font never changes technical content. Reassert the product code role
+   after prose rules. */
+[data-po-theme-surface="markdown"] .cm-md-code-block-line,
+[data-po-theme-surface="markdown"] .cm-md-code-block-line *,
+[data-po-theme-surface="markdown"] .cm-md-code-fence,
+[data-po-theme-surface="markdown"] .cm-md-code-fence *,
+[data-po-theme-surface="markdown"] .cm-md-syntax-monospace,
+[data-po-theme-surface="markdown"] .cm-md-syntax-monospace *,
+[data-po-theme-surface="markdown"] .cm-md-inline-code,
+[data-po-theme-surface="markdown"] .cm-md-inline-code *,
+[data-po-theme-surface="markdown"] .cm-md-table-line,
+[data-po-theme-surface="markdown"] .cm-md-table-line *,
+[data-po-theme-surface="markdown"] .cm-md-table-cell-content code,
+[data-po-theme-surface="markdown"] .cm-md-table-cell-content code *,
+[data-po-theme-surface="markdown"] .cm-md-mdx-tab-panel code,
+[data-po-theme-surface="markdown"] .cm-md-mdx-tab-panel code *,
+[data-po-theme-surface="markdown"] .cm-md-code-textarea,
+[data-po-theme-surface="markdown"] .cm-md-mermaid-source,
+[data-po-theme-surface="markdown"] .cm-md-mermaid-source-fallback,
+[data-po-theme-surface="markdown"] .cm-md-mermaid-source-fallback *,
+[data-po-theme-surface="markdown"] .cm-md-html-source-fallback pre,
+[data-po-theme-surface="markdown"] .cm-md-html-source-fallback pre *,
+[data-po-theme-surface="markdown"] .cm-md-mdx-source-toggle,
+[data-po-theme-surface="markdown"] .cm-md-html-rendered-surface pre,
+[data-po-theme-surface="markdown"] .cm-md-html-rendered-surface pre *,
+[data-po-theme-surface="markdown"] .cm-md-html-rendered-surface code,
+[data-po-theme-surface="markdown"] .cm-md-html-rendered-surface code *,
+[data-po-theme-surface="markdown"] .cm-md-html-rendered-surface kbd,
+[data-po-theme-surface="markdown"] .cm-md-html-rendered-surface kbd *,
+[data-po-theme-surface="markdown"] .cm-md-html-rendered-surface samp,
+[data-po-theme-surface="markdown"] .cm-md-html-rendered-surface samp * {
+  font-family: var(--po-font-code) !important;
 }
 
 .markdown-codemirror-editor .cm-scroller {

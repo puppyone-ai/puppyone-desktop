@@ -2,14 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopThemeSnapshot } from "../../types/electron";
 import {
   createSubThemeCatalogSnapshot,
-  getCompatibleSubThemes,
+  listSelectableSubThemes,
 } from "./builtinSubThemes";
+import type { InterfaceStyle } from "../appearance/interfaceStyles";
+import { getInterfaceStyleSubThemePolicy } from "../appearance/interfaceStyles";
 import type {
   SubThemeColorMode,
   SubThemeCatalogState,
   SubThemeCatalogSnapshot,
 } from "./themeTypes";
-import type { InterfaceStyle } from "../appearance/interfaceStyles";
 
 const EMPTY_HOST_SNAPSHOT: DesktopThemeSnapshot = Object.freeze({
   themes: Object.freeze([]),
@@ -118,10 +119,12 @@ export function useSubThemeNativeMenu({
 
   useEffect(() => {
     if (!desktopThemes?.syncNativeMenu) return;
+    const allowedTargets = getInterfaceStyleSubThemePolicy(rootThemeId).allowedTargets;
     void desktopThemes.syncNativeMenu({
       pack: selectedSubThemeId,
-      themes: getCompatibleSubThemes(snapshot, rootThemeId, colorMode)
-        .map(({ id, name, targets }) => ({ id, name, targets })),
+      requiredTargets: [...allowedTargets],
+      themes: listSelectableSubThemes(snapshot, rootThemeId, colorMode, allowedTargets)
+        .map(({ id, name, targets }) => ({ id, name, targets: [...targets] })),
     }).catch(() => undefined);
   }, [colorMode, desktopThemes, rootThemeId, selectedSubThemeId, snapshot]);
 

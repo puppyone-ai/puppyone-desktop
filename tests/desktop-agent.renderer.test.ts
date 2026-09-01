@@ -146,13 +146,13 @@ describe("Desktop Agent renderer surfaces", () => {
 
     const logoButton = container.querySelector<HTMLButtonElement>(".desktop-agent-empty-logo-button");
     expect(stripBidiIsolation(logoButton?.getAttribute("aria-label"))).toBe("Spin the Codex logo");
-    expect(logoButton?.style.getPropertyValue("--desktop-agent-empty-logo-turns")).toBe("0");
+    expect(logoButton?.style.getPropertyValue("--agent-empty-logo-turns")).toBe("0");
     act(() => {
       logoButton?.click();
       logoButton?.click();
       logoButton?.click();
     });
-    expect(logoButton?.style.getPropertyValue("--desktop-agent-empty-logo-turns")).toBe("3");
+    expect(logoButton?.style.getPropertyValue("--agent-empty-logo-turns")).toBe("3");
   });
 
   it("uses Pi's theme-colored normalized vector in the empty conversation", () => {

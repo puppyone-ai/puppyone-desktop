@@ -144,7 +144,6 @@ export function createSettingsWorkspaceSurface({
         textSize={preferences.textSize}
         typographyPreferences={preferences.typographyPreferences}
         pointerCursors={preferences.pointerCursors}
-        markdownPresentation={preferences.markdownPresentation}
         requestedSubThemeId={preferences.requestedSubThemeId}
         subThemeCatalog={subThemeCatalog}
         fileIconTheme={preferences.fileIconTheme}
@@ -173,8 +172,6 @@ export function createSettingsWorkspaceSurface({
         onTextSizeChange={preferences.setTextSize}
         onTypographyPreferencesChange={preferences.setTypographyPreferences}
         onPointerCursorsChange={preferences.setPointerCursors}
-        onMarkdownPresentationChange={preferences.setMarkdownPresentation}
-        onSelectSettingsSection={onSelectSection}
         onSubThemeChange={preferences.setSubThemeId}
         onFileIconThemeChange={preferences.setFileIconTheme}
         onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
