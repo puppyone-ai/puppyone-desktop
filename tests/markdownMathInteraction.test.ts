@@ -66,6 +66,17 @@ describe("Markdown math live preview", () => {
     expect(view.dom.querySelector(".cm-md-math-block-widget")).toBeNull();
     expect(view.contentDOM.textContent).toContain("E = mc^2");
   });
+
+  it("places the caret at math content start for indented display blocks", () => {
+    const source = "  $$\nE = mc^2\n  $$";
+    const view = mountMarkdown(source);
+    const block = view.dom.querySelector<HTMLElement>(".cm-md-math-block-widget");
+    if (!block) throw new Error("Display math widget did not mount.");
+
+    block.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));
+
+    expect(view.state.selection.main.head).toBe(source.indexOf("E"));
+  });
 });
 
 function mountMarkdown(source: string): EditorView {

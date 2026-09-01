@@ -124,7 +124,7 @@ export function createDesktopNativeMenuService({
     label: t("native.menu.paragraph"),
     enabled: isMarkdownEditorActive(),
     submenu: [
-      markdownItem("paragraph", "native.menu.paragraph.text", "CmdOrCtrl+0"),
+      markdownItem("paragraph", "native.menu.paragraph.text"),
       { type: "separator" },
       ...([1, 2, 3, 4, 5, 6].map((level) => (
         markdownItem(`heading-${level}`, `native.menu.paragraph.heading${level}`, `CmdOrCtrl+${level}`)

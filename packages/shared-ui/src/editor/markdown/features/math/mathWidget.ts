@@ -3,6 +3,7 @@ import { EditorView, WidgetType } from "@codemirror/view";
 import { render as renderKatex } from "katex";
 import { markdownRevealedSourceEffect } from "../../core/state/revealedSource";
 import { getMappedWidgetSourceRange, hasPointerMoved } from "../../shared/widgets/widgetDom";
+import { findMarkdownInlineMathTokens, getMarkdownMathBlock } from "./mathModel";
 
 type MathPresentation = "block" | "inline";
 
@@ -106,10 +107,9 @@ function installMathInteractions(
   const revealSource = () => {
     const range = getSourceRange();
     if (!range) return;
-    const markerOffset = presentation === "block" ? 3 : 1;
     view.dispatch({
       effects: markdownRevealedSourceEffect.of({ ...range, presentation }),
-      selection: EditorSelection.cursor(Math.min(range.to, range.from + markerOffset)),
+      selection: EditorSelection.cursor(resolveMathRevealCursor(view, range, presentation)),
     });
     view.focus();
   };
@@ -151,4 +151,23 @@ function installMathInteractions(
       if (view.dom.isConnected) view.focus();
     });
   });
+}
+
+function resolveMathRevealCursor(
+  view: EditorView,
+  range: { from: number; to: number },
+  presentation: MathPresentation,
+): number {
+  if (presentation === "inline") {
+    const token = findMarkdownInlineMathTokens(view.state, range.from, range.to)
+      .find((candidate) => candidate.from === range.from && candidate.to === range.to);
+    return token?.contentFrom ?? Math.min(range.to, range.from + 1);
+  }
+
+  const block = getMarkdownMathBlock(view.state, view.state.doc.lineAt(range.from).number);
+  if (block && block.from === range.from && block.to === range.to) {
+    return block.contentFrom;
+  }
+
+  return Math.min(range.to, range.from + 3);
 }

@@ -3,6 +3,7 @@ import {
   DEFAULT_MARKDOWN_PRESENTATION_SETTINGS,
   parseMarkdownPresentationSettings,
   resolveMarkdownPresentationStyle,
+  retireStoredMarkdownPresentationSettings,
   serializeMarkdownPresentationSettings,
 } from "../src/features/markdown/markdownPresentation";
 
@@ -94,5 +95,15 @@ describe("Markdown presentation preferences", () => {
       h2Scale: "compact",
       h3Scale: "large",
     }))).toEqual(DEFAULT_MARKDOWN_PRESENTATION_SETTINGS);
+  });
+
+  it("retires stored overrides after the settings UI was removed", () => {
+    expect(retireStoredMarkdownPresentationSettings(DEFAULT_MARKDOWN_PRESENTATION_SETTINGS))
+      .toEqual(DEFAULT_MARKDOWN_PRESENTATION_SETTINGS);
+    expect(retireStoredMarkdownPresentationSettings({
+      headingScale: "large",
+      strongColor: "accent",
+      strongWeight: "heavy",
+    })).toEqual(DEFAULT_MARKDOWN_PRESENTATION_SETTINGS);
   });
 });

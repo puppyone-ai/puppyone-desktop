@@ -218,6 +218,8 @@ describe("typography architecture", () => {
     expect(markdownContent).toContain("--po-editor-content-font: var(--po-font-editor-content-user, var(--po-md-content-font));");
     expect(markdownContent).toContain('[data-font-editor-content]:not([data-font-editor-content="theme"])');
     expect(markdownContent).toContain("font-family: var(--po-font-editor-content-user) !important;");
+    expect(markdownContent).toContain(".cm-md-math-inline-widget");
+    expect(markdownContent).toContain("font-family: revert !important;");
     expect(markdownContent).toContain(".cm-line:not(.cm-md-code-block-line)");
     expect(markdownContent).toContain('[data-po-theme-surface="markdown"] .cm-md-inline-code,');
     expect(markdownContent).toContain('[data-po-theme-surface="markdown"] .cm-md-code-textarea,');

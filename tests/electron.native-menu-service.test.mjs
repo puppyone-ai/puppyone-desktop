@@ -152,6 +152,7 @@ describe("DesktopNativeMenuService", () => {
     ]);
     expect(paragraph.submenu.every((item) => item.type === "separator" || item.enabled)).toBe(true);
     expect(format.submenu.every((item) => item.type === "separator" || item.enabled)).toBe(true);
+    expect(paragraph.submenu.find((item) => item.id === "markdown.paragraph")).not.toHaveProperty("accelerator");
 
     paragraph.submenu.find((item) => item.id === "markdown.math-block").click();
     format.submenu.find((item) => item.id === "markdown.inline-math").click();
@@ -220,6 +221,15 @@ describe("DesktopNativeMenuService", () => {
     expect(actions.selectTheme).toHaveBeenCalledWith({ kind: "pack", themeId: "default.neutral" });
     expect(actions.selectTheme).toHaveBeenCalledTimes(1);
     expect(actions.openThemesDirectory).toHaveBeenCalledOnce();
+  });
+
+  it("keeps CmdOrCtrl+0 available for the native View menu reset zoom accelerator", () => {
+    const { service } = createHarness();
+    const accelerators = service.createApplicationMenuTemplate().flatMap((item) => (
+      item.submenu?.map((entry) => entry.accelerator).filter(Boolean) ?? []
+    ));
+
+    expect(accelerators).not.toContain("CmdOrCtrl+0");
   });
 
   it("does not replace native menus outside macOS", () => {
