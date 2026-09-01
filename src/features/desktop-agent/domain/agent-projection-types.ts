@@ -135,6 +135,9 @@ export type AgentTurn = {
   status: "running" | AgentTurnTerminalState;
   startedAtSequence: number;
   startedAtMs: number | null;
+  /** Time spent waiting for an approval or question is not Agent work time. */
+  userWaitStartedAtMs?: number | null;
+  userWaitDurationMs?: number;
   completedAtSequence: number | null;
   durationMs: number | null;
   partIds: string[];

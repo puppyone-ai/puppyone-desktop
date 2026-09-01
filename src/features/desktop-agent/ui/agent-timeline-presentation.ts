@@ -3,6 +3,8 @@ import type {
   AgentProjection,
   TimelineRow,
 } from "../domain/agent-projection-types";
+import { outputForActivity } from "../domain/agent-activity-presentation";
+import { isLiveAgentActivityStatus } from "../domain/agent-turn-lifecycle";
 
 export type AgentTimeline = {
   rows: TimelineRow[];
@@ -39,7 +41,13 @@ export function buildAgentTimeline(projection: AgentProjection): AgentTimeline {
 }
 
 export function isVisibleAgentTimelinePart(part: AgentPart | undefined): part is AgentPart {
-  return Boolean(part && part.kind !== "usage");
+  if (!part || part.kind === "usage") return false;
+  if (part.kind !== "reasoning") return true;
+  if (isLiveAgentActivityStatus(part.status)) return false;
+  const summary = typeof part.detail.delta === "string"
+    ? part.detail.delta
+    : outputForActivity(part);
+  return summary.trim().length > 0;
 }
 
 function appendTurnSummaries(

@@ -1,4 +1,4 @@
-import { Check, Circle, CircleAlert, CircleSlash2, LoaderCircle } from "lucide-react";
+import { Check, Circle, CircleAlert, CircleSlash2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentActivityStatus } from "../../domain/agent-projection-types";
@@ -49,7 +49,10 @@ export function AgentActivityShell({
 function StatusIcon({ status }: { status: AgentActivityStatus }) {
   const { t } = useLocalization();
   if (["running", "pending", "in-progress"].includes(status)) {
-    return <LoaderCircle className="desktop-agent-tool-status desktop-agent-spin" size={12} aria-label={t("agent.status.running")} />;
+    // RunStatus in the live tail is the only animated progress owner. Activity
+    // rows describe evidence; giving every active row another spinner creates
+    // competing liveness signals for the same native turn.
+    return null;
   }
   if (["failed", "warning", "blocked"].includes(status)) {
     return <CircleAlert className="desktop-agent-tool-status is-failed" size={12} aria-label={t(`agent.status.${status === "warning" ? "warning" : "failed"}`)} />;

@@ -29,6 +29,8 @@ describe("Desktop Agent transcript projection", () => {
     expect(projection.turns[0]).toMatchObject({
       status: "completed",
       startedAtMs: 1_000,
+      userWaitStartedAtMs: null,
+      userWaitDurationMs: 0,
       durationMs: 4_000,
     });
   });
@@ -83,6 +85,10 @@ describe("Desktop Agent transcript projection", () => {
       state: "resolved",
     });
     expect(JSON.stringify(replayed)).toBe(JSON.stringify(settled));
+    expect(settled.turns[0]).toMatchObject({
+      userWaitStartedAtMs: null,
+      userWaitDurationMs: 1_000,
+    });
   });
 
   it("keeps a native assistant item segmented when its authoritative completion spans a tool", () => {
