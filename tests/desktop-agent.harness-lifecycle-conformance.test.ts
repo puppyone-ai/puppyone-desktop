@@ -1,0 +1,105 @@
+import { describe, expect, it } from "vitest";
+import {
+  applyAgentEvents,
+  createAgentProjection,
+} from "../src/features/desktop-agent/agentProjection";
+import type { AgentEvent, AgentEventType } from "../src/features/desktop-agent/agentTypes";
+
+const LIVE_ACTIVITY_STATUSES = new Set([
+  "queued",
+  "running",
+  "pending",
+  "in-progress",
+  "waiting-for-user",
+]);
+
+const harnessFixtures = [
+  {
+    runtimeId: "codex",
+    events: [
+      event("codex", 1, "turn.started", { prompt: "Inspect it" }),
+      event("codex", 2, "reasoning.summary.delta", { delta: "", boundary: true }, "reasoning-1"),
+      event("codex", 3, "assistant.delta", { delta: "Done" }, "assistant-1"),
+      event("codex", 4, "assistant.completed", { text: "Done" }, "assistant-1"),
+      event("codex", 5, "turn.completed", { status: "completed" }),
+    ],
+  },
+  {
+    runtimeId: "cursor",
+    events: [
+      event("cursor", 1, "turn.started", { prompt: "?" }),
+      event("cursor", 2, "reasoning.summary.delta", { delta: "", boundary: true, status: "working" }, "cursor-thought-1"),
+      event("cursor", 3, "assistant.delta", { delta: "I'm here." }, "cursor-message-1"),
+      event("cursor", 4, "assistant.completed", { text: "I'm here." }, "cursor-message-1"),
+      event("cursor", 5, "turn.completed", { status: "completed", stopReason: "end_turn" }),
+    ],
+  },
+  {
+    runtimeId: "claude",
+    events: [
+      event("claude", 1, "turn.started", { prompt: "Inspect it" }),
+      event("claude", 2, "reasoning.summary.delta", { delta: "", boundary: true }, "claude-thinking-1"),
+      event("claude", 3, "tool.started", { kind: "read", tool: "read", label: "Read file", status: "running" }, "tool-1"),
+      event("claude", 4, "tool.completed", { kind: "read", tool: "read", label: "Read file", status: "completed" }, "tool-1"),
+      event("claude", 5, "assistant.completed", { text: "Done" }, "claude-message-1"),
+      event("claude", 6, "turn.completed", { status: "completed" }),
+    ],
+  },
+  {
+    runtimeId: "opencode",
+    events: [
+      event("opencode", 1, "turn.started", { prompt: "Inspect it" }),
+      event("opencode", 2, "reasoning.summary.delta", { delta: "", boundary: true, status: "working" }, "opencode-thought-1"),
+      event("opencode", 3, "plan.updated", { steps: [{ step: "Inspect", status: "in-progress" }] }, "current-plan"),
+      event("opencode", 4, "assistant.completed", { text: "Done" }, "opencode-message-1"),
+      event("opencode", 5, "turn.completed", { status: "completed" }),
+    ],
+  },
+] satisfies Array<{ runtimeId: string; events: AgentEvent[] }>;
+
+describe("Desktop Agent normalized Harness lifecycle conformance", () => {
+  it.each(harnessFixtures)("settles every live child when $runtimeId completes its turn", ({ events }) => {
+    const projection = applyAgentEvents(createAgentProjection(), events);
+    const turn = projection.turns.find((entry) => entry.id === "turn-1");
+    const liveActivities = projection.activities.filter((activity) => LIVE_ACTIVITY_STATUSES.has(activity.status));
+    const liveParts = projection.parts.filter((part) => (
+      "status" in part && typeof part.status === "string" && LIVE_ACTIVITY_STATUSES.has(part.status)
+    ));
+
+    expect(turn).toMatchObject({ status: "completed" });
+    expect(projection.runningTurnId).toBeNull();
+    expect(projection.connectionStatus).toBeNull();
+    expect(projection.approvals).toHaveLength(0);
+    expect(projection.questions).toHaveLength(0);
+    expect(liveActivities).toEqual([]);
+    expect(liveParts).toEqual([]);
+    expect(projection.parts.filter((part) => part.kind === "reasoning")).toEqual([
+      expect.objectContaining({ turnId: "turn-1", status: "completed" }),
+    ]);
+    expect(projection.parts.find((part) => part.kind === "assistant")).toMatchObject({
+      streaming: false,
+      terminalState: "completed",
+    });
+  });
+});
+
+function event(
+  provider: string,
+  sequence: number,
+  type: AgentEventType,
+  payload: Record<string, unknown>,
+  itemId: string | null = null,
+): AgentEvent {
+  return {
+    schemaVersion: 1,
+    sequence,
+    sessionId: `session-${provider}`,
+    provider,
+    providerSessionId: `${provider}-native-session`,
+    turnId: "turn-1",
+    itemId,
+    emittedAt: new Date(sequence * 1000).toISOString(),
+    type,
+    payload,
+  };
+}

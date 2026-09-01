@@ -24,7 +24,7 @@ import {
 import { registerAgentToolRenderer } from "../src/features/desktop-agent/ui/AgentToolRendererRegistry";
 import { agentToolEvidenceLimits } from "../src/features/desktop-agent/domain/agent-tool-evidence";
 import { resolveAnchoredOverlayPosition } from "../src/features/app-shell/useAnchoredOverlayPosition";
-import { createAgentProjection } from "../src/features/desktop-agent/agentProjection";
+import { applyAgentEvents, createAgentProjection } from "../src/features/desktop-agent/agentProjection";
 import {
   listAgentRuntimes,
   listEnabledAgentRuntimes,
@@ -1187,6 +1187,35 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.querySelector(".desktop-agent-message")).toBeNull();
     act(() => (container.querySelector(".desktop-agent-tool-row") as HTMLButtonElement).click());
     expect(container.textContent).toContain("Compared the provider boundaries.");
+  });
+
+  it("never renders a live reasoning spinner after the owning turn settles", () => {
+    const base = {
+      schemaVersion: 1 as const,
+      sessionId: "session-cursor",
+      provider: "cursor",
+      providerSessionId: "cursor-native-session",
+      turnId: "turn-cursor",
+    };
+    const projection = applyAgentEvents(createAgentProjection(), [
+      { ...base, sequence: 1, itemId: null, emittedAt: new Date(1_000).toISOString(), type: "turn.started", payload: { prompt: "?" } },
+      { ...base, sequence: 2, itemId: "cursor-thought", emittedAt: new Date(2_000).toISOString(), type: "reasoning.summary.delta", payload: { delta: "", boundary: true, status: "working" } },
+      { ...base, sequence: 3, itemId: "cursor-message", emittedAt: new Date(3_000).toISOString(), type: "assistant.completed", payload: { text: "I'm here." } },
+      { ...base, sequence: 4, itemId: null, emittedAt: new Date(4_000).toISOString(), type: "turn.completed", payload: { status: "completed" } },
+    ]);
+
+    const container = render(React.createElement(AgentTranscript, {
+      projection,
+      loading: false,
+      working: false,
+      runtimeLabel: "Cursor Agent",
+    }));
+
+    expect(container.querySelector(".desktop-agent-reasoning")).not.toBeNull();
+    expect(container.querySelector(".desktop-agent-reasoning .desktop-agent-spin")).toBeNull();
+    expect(container.querySelector(".desktop-agent-working-indicator")).toBeNull();
+    expect(container.textContent).toContain("Thought briefly");
+    expect(container.textContent).not.toContain("Working through the request");
   });
 
   it("renders context compaction as a divider instead of a generic Tool timeline row", () => {
