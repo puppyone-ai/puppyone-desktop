@@ -5,6 +5,7 @@ const METHOD_CANDIDATES = Object.freeze({
   authenticate: Object.freeze(["authenticate"]),
   newSession: Object.freeze(["session/new", "newSession"]),
   loadSession: Object.freeze(["session/load", "loadSession"]),
+  resumeSession: Object.freeze(["session/resume", "resumeSession"]),
   listSessions: Object.freeze(["session/list", "listSessions"]),
   closeSession: Object.freeze(["session/close", "closeSession"]),
   forkSession: Object.freeze(["session/fork", "forkSession"]),

@@ -5,6 +5,7 @@ import {
   assertAgentRuntimeCapabilities,
   normalizeCapabilitySnapshot,
 } from "../../../../shared/agent-contract/schema.mjs";
+import { assertAgentSessionHistoryCapabilities } from "./agent-session-history-port.mjs";
 
 export { AGENT_RUNTIME_CAPABILITIES, REQUIRED_AGENT_RUNTIME_METHODS, normalizeCapabilitySnapshot };
 
@@ -36,5 +37,6 @@ export function assertAgentRuntimePort(adapter, runtimeId = "unknown") {
 export function assertAgentRuntimeInspection(adapter, inspection, runtimeId = "unknown") {
   assertAgentInspection(inspection);
   const capabilities = assertAgentRuntimeCapabilities(adapter, inspection.capabilities, runtimeId);
+  assertAgentSessionHistoryCapabilities(adapter, capabilities, runtimeId);
   return { ...inspection, capabilities };
 }

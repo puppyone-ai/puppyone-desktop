@@ -36,6 +36,7 @@ export type FilePreviewProps = {
   fileUrlLoading?: boolean;
   fileUrlError?: string | null;
   loading?: boolean;
+  loadingIndicator?: ReactNode;
   error?: string | null;
   aiEditFile?: AiEditFile | null;
   showHeader?: boolean;
@@ -68,6 +69,7 @@ export function FilePreview({
   fileUrlLoading = false,
   fileUrlError = null,
   loading = false,
+  loadingIndicator,
   error = null,
   aiEditFile = null,
   showHeader = true,
@@ -112,6 +114,7 @@ export function FilePreview({
     <DocumentSurfaceHost
       surfaceKey={surfaceKey}
       surfacePreparation={surfacePreparation}
+      pendingIndicator={loadingIndicator}
     >
       {({ onSurfaceReady }) => node ? (
         <div className={`file-preview-shell ${showHeader ? "" : "without-header"}`}>
@@ -155,6 +158,8 @@ export function FilePreview({
                 fileUrlLoading={fileUrlLoading}
                 fileUrlError={fileUrlError}
                 loading={loading}
+                loadingIndicator={loadingIndicator}
+                surfacePreparation={surfacePreparation}
                 error={error}
                 aiEditFile={aiEditFile}
                 documentPersistence={documentPersistence}

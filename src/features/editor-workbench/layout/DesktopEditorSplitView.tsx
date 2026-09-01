@@ -323,6 +323,7 @@ function EditorPane({
       active={active}
       actionsOpen={actionsOpen}
       agentPresencePath={agentPresencePath}
+      contentState={editor ? "document" : "empty"}
       editorLabel={editor?.label ?? null}
       findCommand={findCommand}
       fileDrop={fileDrop}
@@ -342,7 +343,9 @@ function EditorPane({
     >
       <EditorPaneRenderBoundary
         failureTitle={t("shared-ui.preview.crashed")}
-        resetKey={editor?.resource ?? null}
+        resetKey={editor?.resource
+          ? `${editor.resource}:${refreshKey?.sequence ?? 0}`
+          : null}
       >
         <EditorPaneRuntime
           aiEditFile={getAiEditFileForPath(aiEditRequest, editor?.resource) ?? null}

@@ -1,7 +1,7 @@
 {
   "name": "@puppyone/desktop",
   "private": true,
-  "version": "0.3.15",
+  "version": "0.3.16",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -20,8 +20,10 @@
   "scripts": {
     "generate:dmg-background": "node scripts/render-dmg-background.mjs",
     "generate:interface-styles": "node scripts/generate-interface-styles.mjs",
+    "generate:sub-themes": "node scripts/generate-builtin-sub-themes.mjs",
     "check:interface-styles": "node scripts/generate-interface-styles.mjs --check",
-    "check:boundaries": "npm run check:interface-styles && node scripts/check-repository-layout.mjs && node scripts/check-puppy-brand-assets.mjs && node scripts/check-renderer-asset-architecture.mjs && node scripts/check-test-fixture-privacy.mjs && node scripts/check-local-workspace-architecture.mjs && node scripts/check-cloud-frontend-architecture.mjs && node scripts/check-repository-target-architecture.mjs && node scripts/check-desktop-platform-architecture.mjs && node scripts/check-desktop-build-identity-architecture.mjs && node scripts/check-desktop-telemetry-architecture.mjs && node scripts/check-git-auto-commit-architecture.mjs && node scripts/check-macos-release-config.mjs && node scripts/check-localization.mjs && node scripts/check-renderer-style-architecture.mjs && node scripts/check-window-layout-architecture.mjs && node scripts/check-native-surface-layering.mjs && node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-editor-document-session.mjs && node scripts/check-sidebar-architecture.mjs && node scripts/check-agent-architecture.mjs && node scripts/check-agent-activity-architecture.mjs && node scripts/check-opencode-provenance.mjs && node scripts/check-claude-agent-sdk-provenance.mjs && node scripts/check-agent-ui-provenance.mjs && node scripts/check-automation-plugin-boundaries.mjs",
+    "check:sub-themes": "node scripts/generate-builtin-sub-themes.mjs --check",
+    "check:boundaries": "npm run check:interface-styles && npm run check:sub-themes && node scripts/check-repository-layout.mjs && node scripts/check-puppy-brand-assets.mjs && node scripts/check-renderer-asset-architecture.mjs && node scripts/check-test-fixture-privacy.mjs && node scripts/check-local-workspace-architecture.mjs && node scripts/check-cloud-frontend-architecture.mjs && node scripts/check-repository-target-architecture.mjs && node scripts/check-desktop-platform-architecture.mjs && node scripts/check-desktop-build-identity-architecture.mjs && node scripts/check-desktop-telemetry-architecture.mjs && node scripts/check-git-auto-commit-architecture.mjs && node scripts/check-macos-release-config.mjs && node scripts/check-localization.mjs && node scripts/check-renderer-style-architecture.mjs && node scripts/check-window-layout-architecture.mjs && node scripts/check-native-surface-layering.mjs && node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-editor-document-session.mjs && node scripts/check-sidebar-architecture.mjs && node scripts/check-agent-architecture.mjs && node scripts/check-agent-activity-architecture.mjs && node scripts/check-opencode-provenance.mjs && node scripts/check-claude-agent-sdk-provenance.mjs && node scripts/check-agent-ui-provenance.mjs && node scripts/check-automation-plugin-boundaries.mjs",
     "check:puppy-brand-assets": "node scripts/check-puppy-brand-assets.mjs",
     "check:renderer-assets": "node scripts/check-renderer-asset-architecture.mjs",
     "check:test-fixture-privacy": "node scripts/check-test-fixture-privacy.mjs",
@@ -63,11 +65,14 @@
     "smoke:markdown-pane-focus-continuity": "electron scripts/smoke-markdown-pane-focus-continuity.mjs",
     "smoke:markdown-line-geometry": "npm run build && electron scripts/smoke-markdown-line-geometry.mjs",
     "smoke:appearance-visual": "electron scripts/smoke-appearance-visual-matrix.mjs",
+    "smoke:appearance-dialog": "electron scripts/smoke-appearance-visual-matrix.mjs --dialog-only",
     "smoke:workspace-menu": "electron scripts/smoke-workspace-menu-visual.mjs",
     "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
     "smoke:native-agents": "node scripts/smoke-native-agent-roundtrip.mjs",
+    "smoke:native-agent-references": "node scripts/smoke-native-agent-references.mjs",
     "smoke:terminal-p0": "electron scripts/smoke-terminal-p0.mjs",
     "smoke:agent-references": "electron scripts/smoke-agent-reference-ingestion.mjs",
+    "smoke:agent-tool-stability": "npm run build && node scripts/run-agent-tool-stability-smoke.mjs",
     "smoke:viewer-pack": "electron scripts/smoke-viewer-pack.mjs",
     "smoke:app-preview": "electron scripts/smoke-app-preview-iframe.mjs",
     "smoke:pdf-preview": "electron scripts/smoke-pdf-preview.mjs",
@@ -95,6 +100,7 @@
     "intl-messageformat": "^11.2.2",
     "jszip": "^3.10.1",
     "node-pty": "^1.1.0",
+    "postcss": "^8.5.26",
     "semver": "^7.7.3"
   },
   "devDependencies": {
@@ -139,7 +145,6 @@
     "mermaid": "^11.16.1",
     "pdfjs-dist": "^6.2.108",
     "plist": "3.1.0",
-    "postcss": "^8.5.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "saxes": "^6.0.0",

@@ -91,17 +91,28 @@ export type AgentRuntimeCatalogEntry = {
   readiness: AgentRuntimeReadiness;
 };
 
-export type AgentReferenceTransport = "none" | "data-url" | "local-snapshot" | "resource";
+export type AgentAttachmentKind = "image" | "text" | "audio" | "video" | "binary";
+
+/** Renderer-safe admission policy. Native wire transports stay private to each runtime adapter. */
+export type AgentAttachmentInputCapability = {
+  accepted: boolean;
+  mimeTypes?: string[];
+  extensions?: string[];
+  maxBytes?: number;
+};
 
 export type AgentReferenceInputCapabilities = {
-  workspaceFiles: boolean;
-  workspaceDirectories: boolean;
-  images: AgentReferenceTransport;
-  genericFiles: AgentReferenceTransport;
-  acceptedMimeTypes?: string[];
-  maxReferences: number;
-  maxReferenceBytes: number;
-  maxTotalReferenceBytes: number;
+  schemaVersion: 1;
+  workspace: {
+    files: boolean;
+    directories: boolean;
+  };
+  attachments: Record<AgentAttachmentKind, AgentAttachmentInputCapability>;
+  limits: {
+    maxCount: number;
+    maxBytesPerReference: number;
+    maxTotalBytes: number;
+  };
   /** Whether the native steer operation accepts reference inputs. */
   steer: boolean;
   /** Whether an otherwise-empty prompt is accepted with references. */
@@ -130,6 +141,12 @@ export type AgentCapabilities = {
   mcp: boolean;
   skills: boolean;
   compaction: boolean;
+  /** Independent native History operations; sessionHistory is a compatibility projection. */
+  history?: {
+    discovery: "unsupported" | "paged";
+    exactOpen: "unsupported" | "supported";
+    hydration: "unsupported" | "push-replay" | "snapshot" | "paged";
+  };
   /** Changes whenever the runtime's effective negotiated capability surface changes. */
   revision?: string;
   /** Versioned native protocol and explicitly negotiated extension metadata. */
@@ -229,6 +246,8 @@ export type AgentSessionsListResponse = {
     runtimeId: AgentRuntimeId | null;
     status: AgentSessionDiscoveryStatus;
     nextCursor: string | null;
+    /** Opaque product scan identity required only while pagination is partial. */
+    scanId: string | null;
     indexed: number;
     warnings: string[];
   };
@@ -261,6 +280,7 @@ export type AgentEventType =
   | "question.requested"
   | "question.resolved"
   | "provider.activity"
+  | "provider.connection.updated"
   | "provider.warning"
   | "provider.error";
 
@@ -275,6 +295,7 @@ export type AgentEventPayloadMap = {
     prompt?: string;
     status?: string;
     referenceDisplays?: AgentReferenceDisplay[];
+    promptMentions?: AgentPromptReferenceMention[];
   };
   "turn.completed": AgentEventPayloadBase & { status?: string; durationMs?: number };
   "turn.failed": AgentEventPayloadBase & { status?: string; message?: string; durationMs?: number };
@@ -294,6 +315,12 @@ export type AgentEventPayloadMap = {
   "question.requested": AgentEventPayloadBase & AgentBlockingPayload & { questions: unknown[] };
   "question.resolved": AgentEventPayloadBase & AgentBlockingPayload & { rejected?: boolean };
   "provider.activity": AgentEventPayloadBase & AgentActivityPayload;
+  "provider.connection.updated": AgentEventPayloadBase & {
+    state: "reconnecting" | "fallback" | "connected";
+    message?: string;
+    attempt?: number;
+    maxAttempts?: number;
+  };
   "provider.warning": AgentEventPayloadBase & { message?: string };
   "provider.error": AgentEventPayloadBase & { message?: string };
 };
@@ -435,6 +462,33 @@ export type AgentSessionResumeRequest = {
   runtimeId?: AgentRuntimeId | null;
 };
 
+export type AgentSessionOpenRequest = {
+  rootPath: string;
+  sessionId: string;
+  runtimeId: AgentRuntimeId;
+};
+
+export type AgentSessionOpenErrorCode =
+  | "SESSION_NOT_FOUND"
+  | "AUTH_REQUIRED"
+  | "AUTH_EXPIRED"
+  | "RUNTIME_UNAVAILABLE"
+  | "RESUME_UNSUPPORTED"
+  | "RESUME_TIMED_OUT"
+  | "WORKSPACE_MISMATCH"
+  | "PROTOCOL_ERROR";
+
+export type AgentSessionOpenResult =
+  | { status: "opened"; snapshot: AgentSessionSnapshot }
+  | {
+      status: "failed";
+      error: {
+        code: AgentSessionOpenErrorCode;
+        message: string;
+        retryable: boolean;
+      };
+    };
+
 export type AgentSessionsListRequest = {
   rootPath: string;
   runtimeId?: AgentRuntimeId | null;
@@ -442,6 +496,8 @@ export type AgentSessionsListRequest = {
   /** Explicit user-requested native metadata discovery; false never starts a harness. */
   discoverNative?: boolean;
   cursor?: string | null;
+  /** Opaque product scan identity returned with a partial discovery page. */
+  scanId?: string | null;
   limit?: number;
 };
 
@@ -475,7 +531,7 @@ export type AgentWorkspaceEntryReference = {
   id: string;
   kind: "workspace-entry";
   entryType: "file" | "directory";
-  path: string;
+  /** Portable identity resolved against the owning Agent session at send time. */
   relativePath: string;
   displayName: string;
   mime?: string;
@@ -498,6 +554,14 @@ export type AgentStagedAttachmentReference = {
 /** Renderer draft/request representation. It never contains external paths or bytes. */
 export type AgentDraftReference = AgentWorkspaceEntryReference | AgentStagedAttachmentReference;
 
+/** A renderer-safe atomic file mention embedded in the user's prompt text. */
+export type AgentPromptReferenceMention = {
+  referenceId: string;
+  /** UTF-16 offsets into the associated prompt string. */
+  start: number;
+  end: number;
+};
+
 /** Renderer-safe transcript representation. */
 export type AgentReferenceDisplay = {
   id: string;
@@ -516,6 +580,7 @@ export type AgentSubmissionIntent = {
   effort: string | null;
   mode: string | null;
   references: AgentDraftReference[];
+  promptMentions: AgentPromptReferenceMention[];
 };
 
 export type AgentTurnStartRequest = {
@@ -526,6 +591,7 @@ export type AgentTurnStartRequest = {
   effort?: string | null;
   mode?: string | null;
   referenceEpoch?: string;
+  promptMentions?: AgentPromptReferenceMention[];
   attachments?: AgentFileReference[];
   contextReferences?: AgentFileReference[];
   references?: AgentDraftReference[];
@@ -537,6 +603,7 @@ export type AgentTurnSteerRequest = {
   turnId: string;
   message: string;
   referenceEpoch?: string;
+  promptMentions?: AgentPromptReferenceMention[];
   references?: AgentDraftReference[];
 };
 
@@ -600,6 +667,7 @@ export type AgentIpcChannel =
   | "agent:account-read"
   | "agent:session-create"
   | "agent:session-resume"
+  | "agent:session-open"
   | "agent:session-replay"
   | "agent:sessions-list"
   | "agent:session-fork"

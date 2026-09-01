@@ -40,7 +40,7 @@ describe("Agent runtime manifest", () => {
       id: "pi",
       displayName: "Pi",
       execution: { kind: "local-process", distribution: "user-installed", controller: "bundled-adapter" },
-      protocol: { kind: "rpc", transport: "stdio-json-rpc" },
+      protocol: { kind: "rpc", transport: "stdio-jsonl" },
       integration: { kind: "specialized-native", adapter: "specialized" },
       trust: { level: "first-party", publisher: "Pi" },
       ownership: {
@@ -53,7 +53,7 @@ describe("Agent runtime manifest", () => {
     });
 
     expect(runtimeDescriptorFromManifest(pi)).toMatchObject({
-      protocol: { kind: "rpc" },
+      protocol: { kind: "rpc", transport: "stdio-jsonl" },
       integration: { kind: "specialized-native", adapter: "specialized" },
       ownership: { credentials: ["user-provider"], models: "runtime" },
     });

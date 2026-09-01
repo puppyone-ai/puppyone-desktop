@@ -140,6 +140,7 @@ describe("AgentSessionController", () => {
     controller.rememberViewport(320, { "row:assistant:message-1": 88 }, false);
     expect(controller.readViewport()).toEqual({
       draft: "",
+      draftMentions: [],
       scrollTop: 320,
       measurements: { "row:assistant:message-1": 88 },
       pinned: false,
@@ -171,17 +172,17 @@ describe("AgentSessionController", () => {
   it("opens an explicitly selected saved conversation instead of implicitly resuming the latest session", async () => {
     const bridge = bridgeFixture(() => {});
     bridge.resumeAgentSession
-      .mockResolvedValueOnce(snapshot("session-1", []))
-      .mockResolvedValueOnce(snapshot("saved-session", [
+      .mockResolvedValueOnce(snapshot("session-1", []));
+    bridge.openAgentSession.mockResolvedValueOnce({ status: "opened", snapshot: snapshot("saved-session", [
         event(1, "turn.started", { prompt: "Past prompt" }, "past-turn", null, "saved-session"),
         event(2, "assistant.completed", { text: "Past answer" }, "past-turn", "past-answer", "saved-session"),
-      ]));
+      ]) });
     const controller = new AgentSessionController("/workspace", () => bridge as never);
 
     await controller.initialize();
     await controller.openSavedSession("saved-session", "opencode");
 
-    expect(bridge.resumeAgentSession).toHaveBeenCalledWith({
+    expect(bridge.openAgentSession).toHaveBeenCalledWith({
       rootPath: "/workspace",
       sessionId: "saved-session",
       runtimeId: "opencode",
@@ -189,6 +190,50 @@ describe("AgentSessionController", () => {
     expect(controller.getSnapshot().session?.id).toBe("saved-session");
     expect(controller.getSnapshot().projection.messages.map((message) => message.text))
       .toEqual(["Past prompt", "Past answer"]);
+  });
+
+  it("unconditionally closes a restored native session when Workbench preparation rolls back", async () => {
+    const bridge = bridgeFixture(() => {});
+    bridge.openAgentSession.mockResolvedValueOnce({
+      status: "opened",
+      snapshot: snapshot("prepared-session", [
+        event(1, "turn.started", { prompt: "Still running" }, "prepared-turn", null, "prepared-session"),
+      ]),
+    });
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+
+    await controller.openSavedSession("prepared-session", "opencode");
+    expect(controller.getSnapshot().projection.runningTurnId).toBe("prepared-turn");
+
+    await expect(controller.rollbackPreparation()).resolves.toBeUndefined();
+    expect(bridge.closeAgentSession).toHaveBeenCalledWith({
+      rootPath: "/workspace",
+      sessionId: "prepared-session",
+      removePersistence: false,
+    });
+  });
+
+  it("preserves an exact History open error instead of collapsing it to false", async () => {
+    const bridge = bridgeFixture(() => {});
+    bridge.openAgentSession.mockResolvedValueOnce({
+      status: "failed",
+      error: {
+        code: "SESSION_NOT_FOUND",
+        message: "This saved Agent session is no longer available.",
+        retryable: false,
+      },
+    });
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+
+    await expect(controller.openSavedSession("stale-session", "opencode")).rejects.toMatchObject({
+      code: "SESSION_NOT_FOUND",
+      retryable: false,
+    });
+    expect(controller.getSnapshot()).toMatchObject({
+      phase: "failed",
+      sessionPreparation: "failed",
+      error: { detail: "This saved Agent session is no longer available." },
+    });
   });
 
   it("refuses to close a tab while its turn is running", async () => {
@@ -496,6 +541,25 @@ describe("AgentSessionController", () => {
     expect(controller.getSnapshot().submitting).toBe(false);
   });
 
+  it("captures reference mention ranges in the immutable submission intent", async () => {
+    const bridge = bridgeFixture(() => {});
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+    await controller.addWorkspacePaths(["architecture.md"]);
+    const reference = controller.getSnapshot().references[0]!;
+    const prompt = "Explain @architecture.md";
+    controller.setDraftDocument(prompt, [{ referenceId: reference.id, start: 8, end: 24 }]);
+
+    await expect(controller.submit(prompt)).resolves.toBe(true);
+
+    expect(bridge.startAgentTurn).toHaveBeenCalledWith(expect.objectContaining({
+      prompt,
+      promptMentions: [{ referenceId: reference.id, start: 8, end: 24 }],
+      references: [expect.objectContaining({ id: reference.id })],
+    }));
+    expect(controller.getSnapshot()).toMatchObject({ draft: "", draftMentions: [] });
+  });
+
   it("shares one background session preparation with the first submit and exposes truthful transport stages", async () => {
     let eventListener: ((event: AgentEvent) => void) | null = null;
     let resolveCreate: ((value: AgentSessionSnapshot) => void) | null = null;
@@ -556,6 +620,74 @@ describe("AgentSessionController", () => {
       rootPath: "/workspace",
       sessionId: "session-stale",
       removePersistence: true,
+    });
+  });
+
+  it("lets capability controls supersede an in-flight prewarm and closes the stale native session", async () => {
+    const bridge = bridgeFixture(() => {});
+    const models = [
+      { id: "openai/gpt-5", model: "openai/gpt-5", providerId: "openai", displayName: "GPT-5", description: "", isDefault: true },
+      { id: "openai/gpt-5-mini", model: "openai/gpt-5-mini", providerId: "openai", displayName: "GPT-5 Mini", description: "", isDefault: false },
+    ];
+    bridge.discoverAgentRuntimes.mockResolvedValueOnce({
+      runtimes: [{ descriptor: { id: "opencode", displayName: "OpenCode" }, readiness: readiness() }],
+      selectedRuntimeId: "opencode",
+      runtime: { id: "opencode", displayName: "OpenCode" },
+      readiness: readiness(),
+      account: null,
+      providers: [{ id: "openai", displayName: "OpenAI", defaultModel: "openai/gpt-5", modelCount: 2 }],
+      models,
+      modes: [
+        { id: "build", displayName: "Build", description: "", isDefault: true },
+        { id: "plan", displayName: "Plan", description: "", isDefault: false },
+      ],
+      commands: [],
+      capabilities: capabilities(),
+      warnings: [],
+    });
+    bridge.resumeAgentSession.mockResolvedValueOnce(null);
+    const resolvers: Array<(value: AgentSessionSnapshot) => void> = [];
+    bridge.createAgentSession.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)));
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+
+    const firstPreparation = controller.prepareSession();
+    await vi.waitFor(() => expect(controller.getSnapshot().sessionPreparation).toBe("preparing"));
+    controller.selectModel("openai/gpt-5-mini");
+    controller.selectMode("plan");
+    expect(controller.getSnapshot()).toMatchObject({
+      selectedModel: "openai/gpt-5-mini",
+      selectedMode: "plan",
+      sessionPreparation: "idle",
+    });
+
+    resolvers[0](snapshot("session-stale", []));
+    await expect(firstPreparation).resolves.toBe(false);
+    await vi.waitFor(() => expect(bridge.createAgentSession).toHaveBeenCalledTimes(2));
+    expect(bridge.closeAgentSession).toHaveBeenCalledWith({
+      rootPath: "/workspace",
+      sessionId: "session-stale",
+      removePersistence: true,
+    });
+    const latest = snapshot("session-latest", []);
+    latest.models = models;
+    latest.modes = [
+      { id: "build", displayName: "Build", description: "", isDefault: true },
+      { id: "plan", displayName: "Plan", description: "", isDefault: false },
+    ];
+    latest.session.selectedModel = "openai/gpt-5-mini";
+    latest.session.selectedMode = "plan";
+    resolvers[1](latest);
+
+    await vi.waitFor(() => expect(controller.getSnapshot()).toMatchObject({
+      session: { id: "session-latest" },
+      selectedModel: "openai/gpt-5-mini",
+      selectedMode: "plan",
+      sessionPreparation: "ready",
+    }));
+    expect(bridge.createAgentSession.mock.calls[1][0]).toMatchObject({
+      model: "openai/gpt-5-mini",
+      mode: "plan",
     });
   });
 
@@ -648,13 +780,17 @@ describe("AgentSessionController", () => {
     const failed = new AgentSessionController("/workspace", () => failedBridge as never);
     await failed.initialize();
     await failed.addWorkspacePaths(["restore.md"]);
-    failed.setDraft("Retry me");
-    await expect(failed.submit("Retry me")).resolves.toBe(false);
+    const restoreReference = failed.getSnapshot().references[0]!;
+    const retryPrompt = "Retry with @restore.md";
+    failed.setDraftDocument(retryPrompt, [{ referenceId: restoreReference.id, start: 11, end: 22 }]);
+    await expect(failed.submit(retryPrompt)).resolves.toBe(false);
     expect(failed.getSnapshot()).toMatchObject({
-      draft: "Retry me",
+      draft: retryPrompt,
+      draftMentions: [{ referenceId: restoreReference.id, start: 11, end: 22 }],
       pendingIntent: null,
       references: [expect.objectContaining({ relativePath: "restore.md" })],
     });
+    expect(failedBridge.startAgentTurn).not.toHaveBeenCalled();
   });
 
   it("merges a failed immutable intent with edits and references added while session preparation is pending", async () => {
@@ -791,6 +927,10 @@ function bridgeFixture(
     })),
     discoverLocalAgentConnections: vi.fn(async () => ({ connections: [], scannedAt: "2026-07-12T00:00:00.000Z", warnings: [] })),
     resumeAgentSession: vi.fn(async () => snapshot("session-1", [event(1, "session.resumed", { title: "Session" })], capabilityOverrides)),
+    openAgentSession: vi.fn(async () => ({
+      status: "opened" as const,
+      snapshot: snapshot("session-1", [event(1, "session.resumed", { title: "Session" })], capabilityOverrides),
+    })),
     createAgentSession: vi.fn(async () => snapshot("session-2", [event(1, "session.started", { title: "New" }, null, null, "session-2")], capabilityOverrides)),
     startAgentTurn: vi.fn(async () => ({ turnId: "turn-next" })),
     replayAgentSession: vi.fn(async () => snapshot("session-1", [event(4, "assistant.completed", { text: "Working" }, "turn-1", "message-1")], capabilityOverrides)),
@@ -809,7 +949,6 @@ function bridgeFixture(
       id: `workspace-${index}-${referencePath.replace(/[^A-Za-z0-9]/g, "-")}`,
       kind: "workspace-entry",
       entryType: referencePath === "src" ? "directory" : "file",
-      path: referencePath,
       relativePath: referencePath,
       displayName: referencePath.split("/").at(-1) || referencePath,
       mime: "text/markdown",
@@ -824,6 +963,7 @@ function bridgeFixture(
         runtimeId: null,
         status: "not-requested" as const,
         nextCursor: null,
+        scanId: null,
         indexed: 0,
         warnings: [],
       },
@@ -928,7 +1068,24 @@ function capabilities(overrides: Record<string, unknown> = {}) {
 }
 
 function referenceCapabilities() {
-  return { workspaceFiles: true, workspaceDirectories: true, images: "local-snapshot", genericFiles: "none", acceptedMimeTypes: ["image/png"], maxReferences: 32, maxReferenceBytes: 25 * 1024 * 1024, maxTotalReferenceBytes: 25 * 1024 * 1024, steer: false, attachmentOnly: false };
+  return {
+    schemaVersion: 1 as const,
+    workspace: { files: true, directories: true },
+    attachments: {
+      image: { accepted: true, mimeTypes: ["image/png"] },
+      text: { accepted: false },
+      audio: { accepted: false },
+      video: { accepted: false },
+      binary: { accepted: false },
+    },
+    limits: {
+      maxCount: 32,
+      maxBytesPerReference: 25 * 1024 * 1024,
+      maxTotalBytes: 25 * 1024 * 1024,
+    },
+    steer: false,
+    attachmentOnly: false,
+  };
 }
 
 function event(sequence: number, type: AgentEvent["type"], payload: Record<string, unknown>, turnId: string | null = null, itemId: string | null = null, sessionId = "session-1"): AgentEvent {

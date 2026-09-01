@@ -87,17 +87,20 @@ export function createSingleFolderWorkbenchWorkspace(workspace: Workspace): Work
 
 /**
  * Creates the first immutable snapshot for an ordered window composition.
- * The Workbench identity is anchored to the primary Folder so attaching a
- * sibling never changes Editor or persistence scope identity.
+ * Folder order is presentation state only. Production callers should supply
+ * the main-process-owned identity so adding, removing, or reordering any
+ * Folder never changes Editor or persistence scope identity.
  */
-export function createWorkbenchWorkspace(workspaces: readonly Workspace[]): WorkbenchWorkspace {
+export function createWorkbenchWorkspace(
+  workspaces: readonly Workspace[],
+  options: Readonly<{ id?: WorkbenchWorkspaceId }> = {},
+): WorkbenchWorkspace {
   if (!Array.isArray(workspaces) || workspaces.length === 0) {
     throw new TypeError("A Workbench Workspace requires at least one Folder.");
   }
   const folders = workspaces.map((workspace, index) => createWorkspaceFolder(workspace, { index }));
-  const primaryFolder = folders[0]!;
   return freezeWorkspace({
-    id: `single:${primaryFolder.id}`,
+    id: normalizeWorkbenchWorkspaceId(options.id ?? createTransientWorkbenchWorkspaceId()),
     folders,
     transient: true,
     revision: 0,
@@ -231,9 +234,9 @@ export class WorkbenchWorkspaceContext {
 }
 
 function normalizeWorkspace(workspace: WorkbenchWorkspace): WorkbenchWorkspace {
-  if (!workspace?.id?.trim()) throw new TypeError("Workbench Workspace identity is required.");
   return freezeWorkspace({
     ...workspace,
+    id: normalizeWorkbenchWorkspaceId(workspace?.id),
     revision: Number.isSafeInteger(workspace.revision) && workspace.revision >= 0
       ? workspace.revision
       : 0,
@@ -303,6 +306,18 @@ function freezeChange(change: WorkspaceFoldersChange): WorkspaceFoldersChange {
 function normalizeIndex(index: number): number {
   if (!Number.isFinite(index)) return 0;
   return Math.max(0, Math.trunc(index));
+}
+
+function normalizeWorkbenchWorkspaceId(value: string | undefined): WorkbenchWorkspaceId {
+  const id = typeof value === "string" ? value.trim() : "";
+  if (!id) throw new TypeError("Workbench Workspace identity is required.");
+  return id;
+}
+
+function createTransientWorkbenchWorkspaceId(): WorkbenchWorkspaceId {
+  const randomUuid = globalThis.crypto?.randomUUID?.();
+  if (randomUuid) return `workbench:${randomUuid}`;
+  return `workbench:${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
 function uriDepth(uri: ResourceUri): number {

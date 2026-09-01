@@ -80,6 +80,7 @@
 :root[data-interface-style]:not([data-interface-style="default"])
   :where(
     .po-button--neutral,
+    .po-button--danger,
     .desktop-dialog-button,
     .desktop-settings-action,
     .desktop-settings-row-action,

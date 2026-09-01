@@ -24,7 +24,11 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(layout).toContain('className="desktop-agent-boundary"');
     expect(layout).toContain('className="desktop-agent-panel"');
     expect(layout).toContain('className="desktop-agent-conversation-region"');
+    expect(layout).toContain("desktop-agent-conversation-overlay");
     expect(layout).toContain('className="desktop-agent-dock-region"');
+    expect(layout).not.toContain("dropActive");
+    expect(layout).not.toContain("dropInvalid");
+    expect(layout).not.toContain("desktop-agent-reference-drop-overlay");
     expect(controller).not.toMatch(/from ["']react["']|JSX\.|<section/);
     expect(controller).toContain("agentControllerTransitions");
     expect(controller).toContain("prepareSession()");
@@ -37,36 +41,68 @@ describe("Desktop Agent architecture boundaries", () => {
 
   it("enforces virtual, responsive, safe presentation contracts", () => {
     const timeline = source("src/features/desktop-agent/ui/AgentTranscript.tsx");
+    const timelineLayout = source("src/features/desktop-agent/ui/agent-timeline-layout.ts");
+    const timelinePresentation = source("src/features/desktop-agent/ui/agent-timeline-presentation.ts");
+    const emptyState = source("src/features/desktop-agent/ui/AgentEmptyState.tsx");
     const markdown = source("src/features/desktop-agent/ui/SafeMarkdown.tsx");
     const composer = source("src/features/desktop-agent/ui/AgentComposer.tsx");
+    const promptEditor = source("src/features/desktop-agent/ui/composer/AgentPromptEditor.tsx");
     const composerToolbar = source("src/features/desktop-agent/ui/composer/AgentComposerToolbar.tsx");
     const attachmentButton = source("src/features/desktop-agent/ui/composer/AgentAttachmentButton.tsx");
     const commandSuggestions = source("src/features/desktop-agent/ui/composer/AgentCommandSuggestions.tsx");
     const draftReferences = source("src/features/desktop-agent/ui/composer/AgentDraftReferenceList.tsx");
-    const modelPicker = source("src/features/desktop-agent/ui/AgentModelPicker.tsx");
-    const effortPicker = source("src/features/desktop-agent/ui/AgentEffortPicker.tsx");
+    const sessionControlPicker = source("src/features/desktop-agent/ui/AgentSessionControlPicker.tsx");
+    const sessionControls = source("src/features/desktop-agent/domain/agent-session-controls.ts");
     const picker = source("src/features/desktop-agent/ui/AgentPickerPopover.tsx");
     const pickerPresentation = source("src/features/desktop-agent/ui/agent-picker-presentation.ts");
     const desktopMenu = source("src/components/DesktopMenu.tsx");
     const eventSynchronizer = source("src/features/desktop-agent/application/AgentEventSynchronizer.ts");
     const streamScheduler = source("src/features/desktop-agent/ui/agent-stream-frame-scheduler.ts");
+    const streamPresentation = source("src/features/desktop-agent/ui/useAgentStreamPresentation.ts");
+    const streamPolicy = source("src/features/desktop-agent/domain/agent-stream-presentation.ts");
     const runtimeGeometry = source("src/features/desktop-agent/ui/agent-runtime-geometry.ts");
     const cssEntry = source("src/features/desktop-agent/ui/desktop-agent.css");
+    const theme = source("src/features/desktop-agent/ui/styles/theme.css");
     const foundation = source("src/features/desktop-agent/ui/styles/foundation.css");
     const pickers = source("src/features/desktop-agent/ui/styles/pickers.css");
     const css = agentStyles();
     const globalLayout = source("src/styles/layout.css");
-    expect(timeline).toContain("MAX_MOUNTED_ROWS = 120");
+    expect(timelineLayout).toContain("maxMountedRows: 120");
+    expect(timelineLayout).toContain("buildAgentTimelineLayout");
+    expect(timelineLayout).toContain("agentTimelineGapAfter");
+    expect(timelinePresentation).toContain("buildAgentTimeline");
+    expect(timelinePresentation).toContain('part.kind !== "usage"');
+    expect(timeline).toContain("buildAgentTimeline(projection)");
+    expect(timeline).toContain("buildAgentTimelineLayout(timeline.rows");
+    expect(timeline).not.toContain("function buildLayout(");
+    expect(timeline).toContain("emptyState?: ReactNode");
+    expect(timeline).toContain("showEmptyState && emptyState");
+    expect(emptyState).toContain("<AgentBrandMark");
+    expect(emptyState).not.toMatch(/selectedModel|AgentModelPicker/);
+    expect(source("src/features/desktop-agent/ui/AgentChatTabPanel.tsx")).toContain(
+      "const showReadyEmptyState = routingReady",
+    );
     expect(markdown).not.toContain("dangerouslySetInnerHTML");
     expect(markdown).toContain('["https:", "http:", "mailto:"]');
+    expect(cssEntry).toContain('@import "./styles/theme.css"');
     expect(cssEntry).toContain('@import "./styles/foundation.css"');
+    expect(cssEntry.indexOf('styles/theme.css')).toBeLessThan(cssEntry.indexOf('styles/foundation.css'));
     expect(cssEntry).toContain('@import "./styles/pickers.css"');
     expect(cssEntry.split("\n").length).toBeLessThan(30);
     expect(foundation).toMatch(/\.desktop-agent-boundary\s*\{[^}]*container:\s*desktop-agent \/ inline-size/s);
     expect(foundation).not.toMatch(/\.desktop-agent-panel\s*\{[^}]*container:/s);
-    expect(foundation).toMatch(/\.desktop-agent-panel\s*\{[^}]*display:\s*grid[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\) auto/s);
-    expect(foundation).toContain("--agent-radius-composer: 12px");
+    expect(foundation).toMatch(/\.desktop-agent-panel\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*minmax\(0, 1fr\)[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\) auto/s);
+    expect(foundation).toMatch(/\.desktop-agent-header-region,\s*\.desktop-agent-status-region,\s*\.desktop-agent-conversation-region,\s*\.desktop-agent-conversation-overlay,\s*\.desktop-agent-dock-region\s*\{[^}]*grid-column:\s*1/s);
+    expect(foundation).toContain("--agent-radius-composer: 8px");
     expect(foundation).toContain("--agent-inline-inset: var(--desktop-sidebar-row-left-gap, 12px)");
+    expect(foundation).toContain("--agent-composer-input-min-height: calc(var(--agent-composer-line-height) + var(--agent-composer-input-padding-block) + var(--agent-composer-input-padding-block));");
+    expect(foundation).not.toContain("--agent-composer-input-min-height: 70px");
+    expect(theme).toContain("--agent-composer-surface: var(--po-active)");
+    expect(theme).toContain("--agent-user-message-surface: var(--po-hover)");
+    expect(theme).toContain("--agent-user-message-border: color-mix(in srgb, var(--agent-border-subtle) 62%, transparent)");
+    expect(theme).not.toContain("--agent-connection-surface");
+    expect(theme).not.toContain("--agent-prompt-surface:");
+    expect(foundation).not.toMatch(/--agent-(?:composer|user-message)-(?:surface|border):/);
     expect(pickers).toMatch(
       /\.desktop-agent-picker\.is-header \.desktop-agent-picker-trigger\s*\{[^}]*color:\s*var\(--desktop-titlebar-text-muted, var\(--po-text-muted\)\);[^}]*font-size:\s*var\(--po-font-size-chrome, 13px\);[^}]*font-weight:\s*var\(--po-font-weight-chrome, 500\);[^}]*line-height:\s*18px;/s,
     );
@@ -82,14 +118,18 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(composer).toContain("<AgentDraftReferenceList");
     expect(composer).toContain("<AgentComposerToolbar");
     expect(composerToolbar).toContain("<AgentAttachmentButton");
-    expect(composerToolbar).toContain("<AgentModelPicker");
-    expect(composerToolbar).toContain("<AgentEffortPicker");
-    expect(modelPicker).not.toContain("AgentEffortPicker");
-    expect(modelPicker).toContain('width="medium"');
-    expect(effortPicker).toContain('indicator="none"');
-    expect(effortPicker).toContain('width="narrow"');
-    expect(effortPicker).not.toContain("Brain");
+    expect(composerToolbar).toContain("<AgentSessionControlPicker");
+    expect(composerToolbar).not.toMatch(/AgentModelPicker|AgentEffortPicker/);
+    expect(sessionControlPicker).toContain('indicator="none"');
+    expect(sessionControlPicker).not.toMatch(/codex|cursor|opencode|claude/i);
+    expect(sessionControls).toContain("deriveAgentSessionControls");
+    expect(sessionControls).not.toMatch(/codex|cursor|opencode|claude/i);
+    expect(sessionControls).toContain('id: "mode"');
     expect(markdown).not.toContain("useDeferredValue");
+    expect(markdown).toContain("splitStreamingMarkdown");
+    expect(streamPresentation).toContain("nextAgentStreamText");
+    expect(streamPresentation).not.toContain("useDeferredValue");
+    expect(streamPolicy).toContain("TARGET_CATCH_UP_FRAMES");
     expect(eventSynchronizer).not.toMatch(/requestAnimationFrame|document\.|window\./);
     expect(eventSynchronizer).toContain("AgentStreamFlushScheduler");
     expect(streamScheduler).toContain('typeof window.requestAnimationFrame === "function"');
@@ -101,8 +141,16 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(draftReferences).not.toMatch(/useState|AgentSessionController/);
     expect(composer).not.toMatch(/\.style(?:\.|\[)/);
     expect(composer).not.toContain("ResizeObserver");
-    expect(composer).toContain("rows={1}");
-    expect(css).toMatch(/\.desktop-agent-composer textarea\s*\{[^}]*field-sizing:\s*content[^}]*overflow-y:\s*auto/s);
+    expect(composer).toContain("<AgentPromptEditor");
+    expect(composer).not.toContain("onMouseDown=");
+    expect(composer).not.toContain('querySelector(".cm-content")');
+    expect(promptEditor).toContain("EditorView.atomicRanges");
+    expect(promptEditor).toContain("class AgentPromptReferenceWidget extends WidgetType");
+    expect(promptEditor).toContain("Decoration.replace");
+    expect(promptEditor).not.toContain("Decoration.mark");
+    expect(promptEditor).not.toContain("focusAtCoordinates");
+    expect(promptEditor).not.toMatch(/mousedown\s*:/);
+    expect(css).toMatch(/\.desktop-agent-prompt-editor \.cm-scroller\s*\{[^}]*max-height:\s*calc\(var\(--agent-composer-text-max-height\) \+ var\(--agent-composer-input-padding-block\) \+ var\(--agent-composer-input-padding-block\)\)[^}]*overflow-y:\s*auto/s);
     expect(composer).not.toContain("<select");
     expect(picker).toContain("DesktopOverlayLayer");
     expect(picker).toContain("useAnchoredOverlayPosition");
@@ -110,8 +158,11 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(picker).toContain("DesktopMenuSection");
     expect(picker).toContain("DesktopMenuItem");
     expect(picker).not.toMatch(/className\?: string|preferredWidth\?: number|showChevron\?: boolean/);
-    expect(pickerPresentation).toContain('export type AgentPickerPlacement = "default" | "header"');
+    expect(pickerPresentation).toContain('export type AgentPickerPlacement = "composer" | "header"');
     expect(pickerPresentation).toContain('export type AgentPickerWidth = "wide" | "medium" | "narrow"');
+    expect(picker).toContain('placement = "composer"');
+    expect(picker).toContain('placementPreference: placement === "composer" ? "above" : "below"');
+    expect(picker).toContain("preferredWidth,\n              agentPickerMaxHeightPixels");
     expect(desktopMenu).toContain('tone?: "default" | "quiet"');
     expect(desktopMenu).toContain("forwardRef<HTMLButtonElement, DesktopMenuItemProps>");
     expect(timeline).not.toContain("style={{");
@@ -172,6 +223,27 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(controllerState).toContain('AgentSubmissionStage = "preparing-session" | "starting-turn" | null');
   });
 
+  it("separates History queries, prepared-session ownership, and optional Harness History operations", () => {
+    const browser = source("src/features/desktop-agent/workbench/AgentChatHistoryBrowser.tsx");
+    const historyController = source("src/features/desktop-agent/application/ConversationHistoryController.ts");
+    const registry = source("src/features/desktop-agent/application/controllerRegistry.ts");
+    const historyPort = source("electron/main/agent/runtime/agent-session-history-port.mjs");
+    const indexer = source("electron/main/agent/application/native-conversation-indexer.mjs");
+    const lifecycle = source("electron/main/agent/application/session/agent-session-lifecycle.mjs");
+
+    expect(browser).toContain("new ConversationHistoryController");
+    expect(browser).not.toMatch(/AgentSessionController|getAgentSessionController|controllerRegistry/);
+    expect(historyController).toContain("operation = this.runRefresh");
+    expect(historyController).toContain("generation === this.generation");
+    expect(historyController).not.toMatch(/createAgentSession|resumeAgentSession|openAgentSession|onAgentEvent/);
+    expect(registry).not.toMatch(/MAX_CONTROLLERS|trimInactiveControllers|hasSubscribers/);
+    expect(registry).toContain("await controller.rollbackPreparation()");
+    expect(historyPort).toContain("assertAgentSessionHistoryCapabilities");
+    expect(indexer).toContain("resolveAgentSessionHistoryPort(adapter)");
+    expect(lifecycle).toContain("resolveAgentSessionHistoryPort(session.adapter)");
+    expect(lifecycle).not.toMatch(/adapter\.readHistory/);
+  });
+
   it("keeps native transport internals out of Renderer", () => {
     const preload = source("electron/preload.cjs");
     const renderer = [
@@ -183,17 +255,56 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(renderer).not.toMatch(/OpenCodeHttpClient|OPENCODE_SERVER_PASSWORD|\/global\/event/);
   });
 
+  it("models provider recovery as replaceable live state rather than transcript history", () => {
+    const projection = source("src/features/desktop-agent/domain/agent-projection.ts");
+    const typedProjection = source("src/features/desktop-agent/domain/agent-typed-part-projection.ts");
+    const notice = source("src/features/desktop-agent/ui/activity/AgentNoticeActivity.tsx");
+    const connection = source("src/features/desktop-agent/ui/AgentConnectionStatus.tsx");
+    const codex = source("electron/main/agent/runtimes/codex/codex-app-server-adapter.mjs");
+    const claude = source("electron/main/agent/runtimes/claude/claude-events.mjs");
+    expect(projection).toContain('case "provider.connection.updated"');
+    expect(typedProjection).toContain('event.type === "provider.connection.updated"');
+    expect(notice).not.toContain("recoverable");
+    expect(notice).not.toContain("desktop-agent-spin");
+    expect(connection).toContain('data-state={status.state}');
+    expect(codex).toContain('type: params.willRetry ? "provider.connection.updated" : "provider.error"');
+    expect(claude).toContain('event("provider.connection.updated"');
+  });
+
+  it("uses one terminal lifecycle authority and a provider-neutral semantic Renderer registry", () => {
+    const lifecycle = source("src/features/desktop-agent/domain/agent-turn-lifecycle.ts");
+    const projection = source("src/features/desktop-agent/domain/agent-projection.ts");
+    const typedProjection = source("src/features/desktop-agent/domain/agent-typed-part-projection.ts");
+    const renderer = source("src/features/desktop-agent/ui/AgentPartRenderer.tsx");
+    const registry = source("src/features/desktop-agent/ui/AgentPartRendererRegistry.tsx");
+
+    expect(lifecycle).toContain("reconcileTerminalAgentTurn");
+    expect(lifecycle).toContain("LIVE_AGENT_ACTIVITY_STATUSES");
+    expect(projection).toContain("reconcileTerminalAgentTurn(next, event)");
+    expect(projection).not.toContain("LIVE_ACTIVITY_STATUSES");
+    expect(typedProjection).toContain("agentTurnTerminalState(event)");
+    expect(typedProjection).not.toContain("isLiveActivityStatus");
+    expect(registry).toContain("AgentPartByKind");
+    expect(registry).toContain("registerAgentPartRenderer");
+    expect(renderer).toContain("resolveAgentPartRenderer(props.part.kind)");
+    expect(renderer).not.toMatch(/provider\s*===|switch\s*\(.*provider/i);
+  });
+
   it("keeps Core backend-neutral and concrete backends in the single production composition root", () => {
     const registry = source("electron/main/agent/runtime/agent-runtime-registry.mjs");
     const bootstrap = source("electron/main/agent/bootstrap/create-agent-runtime-host.mjs");
+    const reservedPuppyOneRuntime = source("electron/main/agent/runtimes/puppyone-agent/puppyone-agent-runtime-definition.mjs");
     const contract = source("shared/agent-contract/schema.mjs");
     expect(registry).not.toMatch(/opencode|codex|claude|cursor/i);
-    expect(bootstrap).toContain("createPuppyOneAgentRuntimeDefinition");
+    expect(bootstrap).not.toContain("createPuppyOneAgentRuntimeDefinition");
+    expect(bootstrap).not.toContain('"puppyone-agent"');
+    expect(reservedPuppyOneRuntime).toContain("createPuppyOneAgentRuntimeDefinition");
     expect(bootstrap).toContain("createCodexRuntimeDefinition");
     expect(bootstrap).toContain("createClaudeRuntimeDefinition");
     expect(bootstrap).toContain("createOpenCodeNativeRuntimeDefinition");
+    expect(bootstrap).toContain("createPiRuntimeDefinition");
     expect(bootstrap).toContain("createCursorRuntimeDefinition");
-    expect(bootstrap).toContain('DEFAULT_AGENT_RUNTIME_ID = "puppyone-agent"');
+    expect(bootstrap).toContain('DEFAULT_AGENT_RUNTIME_ID = "codex"');
     expect(contract).toContain("parseAgentIpcRequest");
     expect(contract).toContain("assertAgentIpcResponse");
   });
@@ -226,7 +337,7 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(acpCore).toContain("publicProviders");
     expect(acpCore).toContain("PuppyOne deliberately does not");
     expect(controller).toContain("selectedProviderId");
-    expect(panel.indexOf("agentRuntimes=")).toBeLessThan(panel.indexOf("models="));
+    expect(panel.indexOf("agentRuntimes=")).toBeLessThan(panel.indexOf("sessionControls="));
     expect(panel).toContain("conversation={<AgentRuntimeLauncher");
     expect(panel).not.toContain("<AgentRuntimePicker");
     expect(source("src/features/desktop-agent/ui/AgentComposer.tsx")).not.toContain("AgentRuntimePicker");
@@ -255,7 +366,7 @@ function source(relativePath: string) {
 }
 
 function agentStyles() {
-  return ["foundation", "transcript", "activities", "blocking", "composer", "pickers", "responsive"]
+  return ["theme", "foundation", "transcript", "activities", "blocking", "composer", "pickers", "responsive"]
     .map((name) => source(`src/features/desktop-agent/ui/styles/${name}.css`))
     .join("\n");
 }

@@ -1,4 +1,8 @@
-import type { AuxiliaryWorkbenchCreationRecipe } from "../../app-shell/auxiliary-workbench/types";
+import type {
+  AuxiliaryWorkbenchCreationRecipe,
+  AuxiliaryWorkbenchHistoryContribution,
+  AuxiliaryWorkbenchHistoryTarget,
+} from "../../app-shell/auxiliary-workbench/types";
 import type {
   AvailableTerminalAgentId,
   TerminalAgentDiscoveryPhase,
@@ -19,6 +23,9 @@ type TerminalSessionHostProps = {
   chatCreationAvailable?: boolean;
   chatPreparing?: boolean;
   chatRecipes?: readonly AuxiliaryWorkbenchCreationRecipe[];
+  history?: AuxiliaryWorkbenchHistoryContribution | null;
+  historyRootId?: string;
+  excludedHistoryResourceIds?: readonly string[];
   focused: boolean;
   onFocus: () => void;
   presented: boolean;
@@ -27,6 +34,7 @@ type TerminalSessionHostProps = {
   terminalEnabled?: boolean;
   workspacePath: string;
   onCreateChat?: (recipe: AuxiliaryWorkbenchCreationRecipe) => void;
+  onRestoreHistoryTarget?: (target: AuxiliaryWorkbenchHistoryTarget) => Promise<boolean>;
   onLaunch: (launcherId: DesktopTerminalLauncherId) => void;
   onRefresh: () => void;
 };
@@ -39,9 +47,13 @@ export function TerminalSessionHost({
   chatCreationAvailable = true,
   chatPreparing = false,
   chatRecipes = [],
+  history = null,
+  historyRootId = "",
+  excludedHistoryResourceIds = [],
   focused,
   onFocus,
   onCreateChat,
+  onRestoreHistoryTarget,
   onLaunch,
   onRefresh,
   presented,
@@ -64,8 +76,13 @@ export function TerminalSessionHost({
             chatCreationAvailable={chatCreationAvailable}
             chatPreparing={chatPreparing}
             chatRecipes={chatRecipes}
+            history={history}
+            historyRootId={historyRootId}
+            historyRootPath={workspacePath}
+            excludedHistoryResourceIds={excludedHistoryResourceIds}
             launchError={session.launchError}
             onCreateChat={onCreateChat}
+            onRestoreHistoryTarget={onRestoreHistoryTarget}
             onLaunch={onLaunch}
             onRefresh={onRefresh}
             terminalEnabled={terminalEnabled}

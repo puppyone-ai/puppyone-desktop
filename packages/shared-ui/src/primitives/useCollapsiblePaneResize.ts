@@ -35,8 +35,10 @@ export type CollapsiblePaneResizeState = {
 
 /**
  * Owns the pointer state machine for a resizable pane with a pull-to-collapse
- * threshold. A pane has one rendered width: the host, its content, its resize
- * handle, and accessibility metadata must all consume the returned value.
+ * threshold. The returned value is the canonical live resize width. During a
+ * direct pointer resize, host and content consume it together. A visibility
+ * transition may keep a separate last-expanded content plane while its outer
+ * track consumes this value, preventing text reflow during enter and exit.
  */
 export function useCollapsiblePaneResize({
   bodyClassName,

@@ -123,12 +123,13 @@ describe("multi-project Workspace experiment", () => {
       },
     });
     const persistence = service.dataPort.documentPersistence!;
-    const legacyPath = "legacy notes/README.md";
+    const firstPath = "legacy notes/README.md";
     const routedPath = "docs with space/群群.md";
+    const firstResource = createWorkspaceResourceUri(workbench!.folders[0]!.uri, firstPath);
     const routedResource = createWorkspaceResourceUri(workbench!.folders[1]!.uri, routedPath);
-    const legacy = getOrCreateDocumentWorkingCopy({
-      documentId: legacyPath,
-      initialContent: "legacy initial",
+    const firstCopy = getOrCreateDocumentWorkingCopy({
+      documentId: firstResource,
+      initialContent: "first initial",
       initialVersion: "v1",
       saveMode: "manual",
       persistence,
@@ -140,18 +141,24 @@ describe("multi-project Workspace experiment", () => {
       saveMode: "manual",
       persistence,
     });
-    const detachLegacy = editWorkingCopy(legacy.session, "legacy initial", "legacy saved");
+    const detachFirst = editWorkingCopy(firstCopy.session, "first initial", "first saved");
     const detachRouted = editWorkingCopy(routed.session, "routed initial", "routed saved");
 
-    await Promise.all([legacy.session.requestSave(), routed.session.requestSave()]);
+    await Promise.all([firstCopy.session.requestSave(), routed.session.requestSave()]);
 
-    expect(legacy.identity.resourcePath).toBe(legacyPath);
+    expect(firstCopy.identity.resourcePath).toBe(firstResource);
     expect(routed.identity.resourcePath).toBe(routedResource);
     expect(providers.get(workbench!.folders[0]!.id)?.documentPersistence?.persist)
-      .toHaveBeenCalledWith(expect.objectContaining({ path: legacyPath, content: "legacy saved" }));
+      .toHaveBeenCalledWith(expect.objectContaining({ path: firstPath, content: "first saved" }));
     expect(providers.get(workbench!.folders[1]!.id)?.documentPersistence?.persist)
       .toHaveBeenCalledWith(expect.objectContaining({ path: routedPath, content: "routed saved" }));
 
+    await expect(persistence.persist({
+      path: routedPath,
+      content: "ambiguous write must fail closed",
+      baseVersion: "v1",
+      reason: "manual",
+    })).rejects.toThrow(/ambiguous.*Resource URI/i);
     await expect(persistence.persist({
       path: `puppyone-local:/workspace/${workbench!.folders[1]!.id}/${routedPath}`,
       content: "must not write",
@@ -161,11 +168,11 @@ describe("multi-project Workspace experiment", () => {
     expect(providers.get(workbench!.folders[0]!.id)?.documentPersistence?.persist).toHaveBeenCalledOnce();
     expect(providers.get(workbench!.folders[1]!.id)?.documentPersistence?.persist).toHaveBeenCalledOnce();
 
-    detachLegacy();
+    detachFirst();
     detachRouted();
     await closeDocumentWorkingCopy({
       storageIdentity: persistence.storageIdentity,
-      resourcePath: legacyPath,
+      resourcePath: firstResource,
     });
     await closeDocumentWorkingCopy({
       storageIdentity: persistence.storageIdentity,
@@ -202,6 +209,34 @@ describe("multi-project Workspace experiment", () => {
     expect(harness.onWorkspaceActivated).toHaveBeenCalledOnce();
     await act(async () => harness.current.addProject());
     expect(localFiles.selectWorkspaceFolderToAttach).toHaveBeenCalledOnce();
+  });
+
+  it("preserves Workbench identity when the primary Folder is detached", async () => {
+    const primary = workspace("detach-primary", "Primary", "/projects/detach-primary");
+    const sibling = workspace("detach-sibling", "Sibling", "/projects/detach-sibling");
+    localFiles.getInitialWorkspace.mockResolvedValue({
+      workspaceId: "workbench:stable-window",
+      path: primary.path,
+      workspace: primary,
+      workspaces: [primary, sibling],
+      error: null,
+    });
+    localFiles.detachWorkspaceFolder.mockResolvedValue({
+      status: "detached-current",
+      workspaceId: "workbench:stable-window",
+      path: primary.path,
+      workspace: primary,
+      workspaces: [sibling],
+    });
+    const harness = await renderHarness(true, vi.fn());
+
+    expect(harness.current.workbenchWorkspace?.id).toBe("workbench:stable-window");
+    await act(async () => harness.current.removeProject(primary.path));
+
+    expect(harness.current.workbenchWorkspace?.id).toBe("workbench:stable-window");
+    expect(harness.current.workbenchWorkspace?.folders.map((folder) => folder.id)).toEqual([
+      sibling.workspaceInstanceId,
+    ]);
   });
 });
 

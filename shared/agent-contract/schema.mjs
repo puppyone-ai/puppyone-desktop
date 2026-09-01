@@ -1,4 +1,4 @@
-import { agentContractLimits } from "./constants.mjs";
+import { AGENT_SESSION_OPEN_ERROR_CODES, agentContractLimits } from "./constants.mjs";
 import { assertAgentEventEnvelope } from "./event-schema.mjs";
 import { sanitizeAgentLocalConnectionsSnapshot } from "./local-connection-schema.mjs";
 import {
@@ -23,6 +23,7 @@ import {
   requiredOpaqueId,
   requiredString,
 } from "./validation.mjs";
+import { normalizeAgentWorkspaceRelativePath } from "./reference-identity.mjs";
 
 export * from "./constants.mjs";
 export * from "./event-schema.mjs";
@@ -61,6 +62,12 @@ export function parseAgentIpcRequest(channel, value) {
         sessionId: optionalOpaqueId(input.sessionId, "sessionId"),
         runtimeId: optionalRuntimeId(input.runtimeId),
       });
+    case "agent:session-open":
+      return {
+        rootPath: requiredString(input.rootPath, "rootPath", MAX_PATH_LENGTH),
+        sessionId: requiredOpaqueId(input.sessionId, "sessionId"),
+        runtimeId: assertRuntimeId(input.runtimeId, "runtimeId"),
+      };
     case "agent:session-replay":
       return {
         rootPath: requiredString(input.rootPath, "rootPath", MAX_PATH_LENGTH),
@@ -74,6 +81,7 @@ export function parseAgentIpcRequest(channel, value) {
         includeArchived: optionalBoolean(input.includeArchived, "includeArchived"),
         discoverNative: optionalBoolean(input.discoverNative, "discoverNative"),
         cursor: optionalString(input.cursor, "cursor", 1_024),
+        scanId: optionalOpaqueId(input.scanId, "scanId"),
         limit: optionalPageSize(input.limit, "limit"),
       });
     case "agent:session-fork":
@@ -122,6 +130,7 @@ export function parseAgentIpcRequest(channel, value) {
         attachments: optionalReferences(input.attachments, "attachments"),
         contextReferences: optionalReferences(input.contextReferences, "contextReferences"),
         references: optionalDraftReferences(input.references, "references"),
+        promptMentions: optionalPromptMentions(input.promptMentions, "promptMentions"),
       });
     case "agent:turn-steer":
       return {
@@ -131,6 +140,7 @@ export function parseAgentIpcRequest(channel, value) {
         message: requiredString(input.message, "message", MAX_MESSAGE_LENGTH, { allowEmpty: true, preserveWhitespace: true }),
         referenceEpoch: optionalOpaqueId(input.referenceEpoch, "referenceEpoch"),
         references: optionalDraftReferences(input.references, "references"),
+        promptMentions: optionalPromptMentions(input.promptMentions, "promptMentions"),
       };
     case "agent:turn-interrupt":
     case "agent:session-compact":
@@ -180,6 +190,8 @@ export function assertAgentIpcResponse(channel, value) {
       return assertAgentSessionSnapshot(value);
     case "agent:session-resume":
       return value === null ? value : assertAgentSessionSnapshot(value);
+    case "agent:session-open":
+      return sanitizeAgentSessionOpenResult(value);
     case "agent:sessions-list":
       return sanitizeAgentSessionsListResponse(value);
     case "agent:session-archive":
@@ -244,10 +256,28 @@ function sanitizeAgentSessionsListResponse(value) {
         "not-requested", "unsupported", "partial", "complete", "failed",
       ]),
       nextCursor: optionalString(discovery.nextCursor, "session list.discovery.nextCursor", 1_024) ?? null,
+      scanId: optionalOpaqueId(discovery.scanId, "session list.discovery.scanId", { nullable: true }) ?? null,
       indexed: nonNegativeInteger(discovery.indexed, "session list.discovery.indexed"),
       warnings: safeWarnings(discovery.warnings, "session list.discovery.warnings"),
     },
     warnings: safeWarnings(response.warnings, "session list.warnings"),
+  };
+}
+
+function sanitizeAgentSessionOpenResult(value) {
+  const result = assertRecord(value, "Agent session open result");
+  const status = enumValue(result.status, "Agent session open result.status", ["opened", "failed"]);
+  if (status === "opened") {
+    return { status, snapshot: assertAgentSessionSnapshot(result.snapshot) };
+  }
+  const error = assertRecord(result.error, "Agent session open result.error");
+  return {
+    status,
+    error: {
+      code: enumValue(error.code, "Agent session open result.error.code", AGENT_SESSION_OPEN_ERROR_CODES),
+      message: requiredString(error.message, "Agent session open result.error.message", 1_000),
+      retryable: optionalBoolean(error.retryable, "Agent session open result.error.retryable") === true,
+    },
   };
 }
 
@@ -312,6 +342,20 @@ function optionalDraftReferences(value, label) {
   return references.map((entry, index) => sanitizeDraftReference(entry, `${label}[${index}]`, true));
 }
 
+function optionalPromptMentions(value, label) {
+  if (value === undefined || value === null) return undefined;
+  const mentions = assertArray(value, label);
+  if (mentions.length > MAX_REFERENCE_COUNT) throw contractError(label, `may contain at most ${MAX_REFERENCE_COUNT} entries`);
+  return mentions.map((entry, index) => {
+    const mention = assertRecord(entry, `${label}[${index}]`);
+    return {
+      referenceId: requiredOpaqueId(mention.referenceId, `${label}[${index}].referenceId`),
+      start: nonNegativeInteger(mention.start, `${label}[${index}].start`),
+      end: nonNegativeInteger(mention.end, `${label}[${index}].end`),
+    };
+  });
+}
+
 function sanitizeDraftReference(value, label, requireReady) {
   const reference = assertRecord(value, label);
   const kind = enumValue(reference.kind, `${label}.kind`, ["workspace-entry", "staged-attachment"]);
@@ -324,11 +368,12 @@ function sanitizeDraftReference(value, label, requireReady) {
     status,
   };
   if (kind === "workspace-entry") {
+    const relativePath = normalizeAgentWorkspaceRelativePath(reference.relativePath);
+    if (!relativePath) throw contractError(`${label}.relativePath`, "must remain workspace-relative");
     return {
       ...base,
       entryType: enumValue(reference.entryType, `${label}.entryType`, ["file", "directory"]),
-      path: requiredString(reference.path, `${label}.path`, MAX_PATH_LENGTH),
-      relativePath: requiredString(reference.relativePath, `${label}.relativePath`, MAX_PATH_LENGTH),
+      relativePath,
       ...(reference.mime === undefined ? {} : { mime: requiredString(reference.mime, `${label}.mime`, 160) }),
       ...(reference.size === undefined ? {} : { size: nonNegativeInteger(reference.size, `${label}.size`) }),
     };

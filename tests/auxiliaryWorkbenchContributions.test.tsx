@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   AuxiliaryWorkbenchContribution,
   AuxiliaryWorkbenchCreationRecipe,
+  AuxiliaryWorkbenchHistoryTarget,
   AuxiliaryWorkbenchPreparationContext,
 } from "../src/features/app-shell/auxiliary-workbench/types";
 import { useAuxiliaryWorkbenchContributions } from "../src/features/app-shell/auxiliary-workbench/useAuxiliaryWorkbenchContributions";
@@ -59,8 +60,14 @@ describe("Auxiliary Workbench contribution admission", () => {
       ready.resolve();
       await expect(first!).resolves.toBe("chat-1");
     });
-    expect(prepare).toHaveBeenCalledWith({ item: reservedItem, recipe });
-    expect(onCommit).toHaveBeenCalledWith(contribution, reservedItem, "group-1", recipe);
+    expect(prepare).toHaveBeenCalledWith({ item: reservedItem, recipe, historyTarget: null });
+    expect(onCommit).toHaveBeenCalledWith(
+      contribution,
+      reservedItem,
+      "group-1",
+      recipe,
+      null,
+    );
   });
 
   it("reports preparation failure, disposes prepared state, and leaves topology empty", async () => {
@@ -76,8 +83,18 @@ describe("Auxiliary Workbench contribution admission", () => {
       await expect(current().create(contribution, null)).resolves.toBeNull();
     });
     expect(onCommit).not.toHaveBeenCalled();
-    expect(discardPreparedItem).toHaveBeenCalledWith({ item: reservedItem, recipe: null });
-    expect(current().creationFailure).toEqual({ kind: "agent-chat", label: "Agent Chat" });
+    expect(discardPreparedItem).toHaveBeenCalledWith({
+      item: reservedItem,
+      recipe: null,
+      historyTarget: null,
+    });
+    expect(current().creationFailure).toEqual({
+      kind: "agent-chat",
+      label: "Agent Chat",
+      code: null,
+      detail: "chunk unavailable",
+      retryable: false,
+    });
     expect(current().canCreate(contribution)).toBe(true);
 
     await act(async () => {
@@ -126,6 +143,59 @@ describe("Auxiliary Workbench contribution admission", () => {
     await expect(current().create(contribution, null, puppyone)).resolves.toBeNull();
     expect(onReserve).not.toHaveBeenCalled();
   });
+
+  it("admits an opaque history target through the same transactional preparation boundary", async () => {
+    const prepare = vi.fn(async () => undefined);
+    const base = createContribution(prepare, [availableRecipe("codex")]);
+    const contribution: AuxiliaryWorkbenchContribution = Object.freeze({
+      ...base,
+      history: Object.freeze({
+        label: "Chat history",
+        iconKey: null,
+        renderBrowser: () => null,
+      }),
+    });
+    const target: AuxiliaryWorkbenchHistoryTarget = Object.freeze({
+      id: "saved-chat",
+      title: "Saved chat",
+      iconKey: "codex",
+      payload: Object.freeze({ runtimeId: "codex" }),
+    });
+    const onCommit = vi.fn(() => "chat-1");
+    renderRegistry([contribution], () => reservedItem, onCommit);
+
+    expect(current().canCreate(contribution, null, target)).toBe(true);
+    await act(async () => {
+      await expect(current().create(contribution, null, null, target)).resolves.toBe("chat-1");
+    });
+    expect(prepare).toHaveBeenCalledWith({
+      item: reservedItem,
+      recipe: null,
+      historyTarget: target,
+    });
+    expect(onCommit).toHaveBeenCalledWith(contribution, reservedItem, null, null, target);
+  });
+
+  it("preserves structured History open failures through Workbench admission", async () => {
+    const failure = Object.assign(new Error("This saved chat is no longer available."), {
+      code: "SESSION_NOT_FOUND",
+      retryable: false,
+    });
+    const prepare = vi.fn(async () => { throw failure; });
+    const contribution = createContribution(prepare);
+    renderRegistry([contribution], () => reservedItem, vi.fn(() => "chat-1"));
+
+    await act(async () => {
+      await expect(current().create(contribution, null)).resolves.toBeNull();
+    });
+    expect(current().creationFailure).toEqual({
+      kind: "agent-chat",
+      label: "Agent Chat",
+      code: "SESSION_NOT_FOUND",
+      detail: "This saved chat is no longer available.",
+      retryable: false,
+    });
+  });
 });
 
 function renderRegistry(
@@ -136,6 +206,7 @@ function renderRegistry(
     item: AuxiliaryWorkbenchItem,
     groupId: string | null,
     recipe: AuxiliaryWorkbenchCreationRecipe | null,
+    historyTarget: AuxiliaryWorkbenchHistoryTarget | null,
   ) => string,
 ) {
   const container = document.createElement("div");
@@ -166,6 +237,7 @@ function Harness({
     item: AuxiliaryWorkbenchItem,
     groupId: string | null,
     recipe: AuxiliaryWorkbenchCreationRecipe | null,
+    historyTarget: AuxiliaryWorkbenchHistoryTarget | null,
   ) => string;
 }>) {
   latest = useAuxiliaryWorkbenchContributions({
@@ -206,7 +278,10 @@ function createContribution(
     prepare,
     discardPreparedItem,
     renderItem: () => null,
-    requestClose: async () => true,
+    close: Object.freeze({
+      decide: () => Object.freeze({ kind: "close" as const }),
+      commit: async () => true,
+    }),
   });
 }
 

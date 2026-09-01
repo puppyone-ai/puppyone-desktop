@@ -10,6 +10,8 @@
   "action.copy": "Copiar",
   "action.clear": "Borrar",
   "action.copied": "Copiado",
+  "renderFailure.title": "PuppyOne no puede mostrar esta ventana",
+  "renderFailure.description": "Tus archivos están seguros. Actualiza la ventana para restaurar la interfaz.",
   "action.change": "Cambiar",
   "action.save": "Guardar",
   "status.loading": "Cargando…"

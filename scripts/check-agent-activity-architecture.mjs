@@ -144,8 +144,10 @@ if (!localAgentHooksSettings.includes("getAgentActivityEnrollment")
     || !localAgentHooksSettings.includes("setAgentActivityEnrollment")
     || !localAgentHooksSettings.includes("selectableProviders.map")
     || !localAgentHooksSettings.includes("provider.configurable")
-    || !localAgentHooksSettings.includes("<details")) {
-  errors.push("Local Agent Hooks must expose opt-in controls only for selectable detected providers");
+    || !localAgentHooksSettings.includes("detected.has(provider.providerId)")
+    || !localAgentHooksSettings.includes('provider.enrollment === "enabled"')
+    || !localAgentHooksSettings.includes('provider.enrollment === "needs-repair"')) {
+  errors.push("Local Agent Hooks must expose opt-in controls only for configurable detected or already-enrolled providers");
 }
 if (enrollmentSetIndex < 0 || activityPreferenceIndex < enrollmentSetIndex) {
   errors.push("Agent activity visibility must update only after native Hook enrollment succeeds");

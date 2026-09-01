@@ -10,6 +10,7 @@ const manifestPath = path.join(
   "src/features/appearance/interface-style-manifest.json",
 );
 const THEME_MODES = new Set(["system", "light", "dark"]);
+const SUB_THEME_TARGETS = new Set(["application", "markdown", "csv"]);
 const STYLE_COMPONENT_KEYS = [
   "shell",
   "titlebar",
@@ -26,6 +27,7 @@ const STYLE_POLICY_KEYS = [
 ];
 const STYLE_PROFILE_KEYS = ["family", "variant", "palette"];
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SUB_THEME_ID_PATTERN = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/;
 const checkOnly = process.argv.includes("--check");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 
@@ -40,10 +42,6 @@ const outputs = new Map([
   [
     path.join(repoRoot, "public/interface-style-bootstrap.js"),
     renderBootstrapManifest(manifest),
-  ],
-  [
-    path.join(repoRoot, "electron/main/interface-style-first-paint.generated.mjs"),
-    renderNativeFirstPaint(manifest),
   ],
   [
     path.join(repoRoot, "src/styles/interface-styles.generated.css"),
@@ -72,10 +70,14 @@ if (staleOutputs.length > 0) {
 if (checkOnly) console.log("Interface style manifest and generated files are in sync.");
 
 function validateManifest(value) {
-  if (value?.version !== 3) fail("manifest version must be 3");
+  if (value?.version !== 4) fail("manifest version must be 4");
   if (!isNonEmptyString(value?.defaultStyle)) fail("defaultStyle must be a non-empty string");
+  if (!isNonEmptyString(value?.fallbackSubThemeId) || !SUB_THEME_ID_PATTERN.test(value.fallbackSubThemeId)) {
+    fail("fallbackSubThemeId must be a namespaced Sub Theme id");
+  }
   if (!isNonEmptyString(value?.storage?.interfaceStyle)) fail("storage.interfaceStyle is required");
   if (!isNonEmptyString(value?.storage?.appearancePreferences)) fail("storage.appearancePreferences is required");
+  if (!isNonEmptyString(value?.storage?.legacyAppearancePreferences)) fail("storage.legacyAppearancePreferences is required");
   if (!isNonEmptyString(value?.storage?.themeMode)) fail("storage.themeMode is required");
   if (!isNonEmptyString(value?.storage?.lightThemePreset)) fail("storage.lightThemePreset is required");
   if (!isNonEmptyString(value?.storage?.darkThemePreset)) fail("storage.darkThemePreset is required");
@@ -118,13 +120,16 @@ function validateManifest(value) {
       if (typeof palette.presetControls?.light !== "boolean" || typeof palette.presetControls?.dark !== "boolean") {
         fail(`${style.id}.palette.presetControls must declare light and dark booleans`);
       }
-      validateFirstPaint(style, modes.has("system") ? ["light", "dark"] : [...modes]);
-      for (const mode of ["light", "dark"]) {
-        if (palette.presetControls[mode]) validatePresetFirstPaint(style, mode);
+      if (style.firstPaint !== undefined) {
+        fail(`${style.id}.firstPaint belongs to its Sub Theme unless the Root Theme is fixed`);
+      }
+      if (style.presetFirstPaint !== undefined) {
+        fail(`${style.id}.presetFirstPaint is forbidden; first paint is compiled from Sub Theme CSS`);
       }
     } else {
       fail(`${style.id}.palette.kind must be adaptive or fixed`);
     }
+    validateSubThemes(style);
 
     if (style.stylesheet !== null) {
       if (!isNonEmptyString(style.stylesheet) || !/^[a-z0-9-]+(?:\/[a-z0-9-]+)*\.css$/.test(style.stylesheet)) {
@@ -138,6 +143,47 @@ function validateManifest(value) {
   if (!ids.has(value.defaultStyle)) fail("defaultStyle must reference a registered style");
   const defaultStyle = value.styles.find((style) => style.id === value.defaultStyle);
   if (defaultStyle?.stylesheet !== null) fail("The Default style must be a no-op baseline with stylesheet: null");
+}
+
+function validateSubThemes(style) {
+  const definition = style.subThemes;
+  if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
+    fail(`${style.id}.subThemes is required`);
+  }
+  if (
+    !definition.defaultSubThemeIds
+    || typeof definition.defaultSubThemeIds !== "object"
+    || Array.isArray(definition.defaultSubThemeIds)
+  ) {
+    fail(`${style.id}.subThemes.defaultSubThemeIds is required`);
+  }
+  const requiredModes = style.palette.kind === "fixed"
+    ? [style.palette.mode]
+    : style.palette.modes.includes("system")
+      ? ["light", "dark"]
+      : style.palette.modes;
+  const defaultModes = Object.keys(definition.defaultSubThemeIds);
+  if (
+    defaultModes.length !== requiredModes.length
+    || requiredModes.some((mode) => !defaultModes.includes(mode))
+    || defaultModes.some((mode) => !requiredModes.includes(mode))
+  ) {
+    fail(`${style.id}.subThemes.defaultSubThemeIds must match its effective Color Modes`);
+  }
+  for (const mode of requiredModes) {
+    const id = definition.defaultSubThemeIds[mode];
+    if (!isNonEmptyString(id) || !SUB_THEME_ID_PATTERN.test(id)) {
+      fail(`${style.id}.subThemes.defaultSubThemeIds.${mode} must be a namespaced id`);
+    }
+  }
+  if (
+    !Array.isArray(definition.allowedTargets)
+    || definition.allowedTargets.length === 0
+    || definition.allowedTargets.some((target) => !SUB_THEME_TARGETS.has(target))
+    || new Set(definition.allowedTargets).size !== definition.allowedTargets.length
+  ) {
+    fail(`${style.id}.subThemes.allowedTargets must contain unique supported targets`);
+  }
 }
 
 function validateProfile(style) {
@@ -210,38 +256,6 @@ function validatePolicies(style) {
   }
 }
 
-function validatePresetFirstPaint(style, mode) {
-  const definition = style.presetFirstPaint?.[mode];
-  if (!isNonEmptyString(definition?.defaultPreset)) {
-    fail(`${style.id}.presetFirstPaint.${mode}.defaultPreset is required`);
-  }
-  if (!definition?.values || typeof definition.values !== "object" || Array.isArray(definition.values)) {
-    fail(`${style.id}.presetFirstPaint.${mode}.values is required`);
-  }
-  if (!Object.hasOwn(definition.values, definition.defaultPreset)) {
-    fail(`${style.id}.presetFirstPaint.${mode}.defaultPreset must reference a registered value`);
-  }
-  for (const [preset, paint] of Object.entries(definition.values)) {
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(preset)) {
-      fail(`${style.id}.presetFirstPaint.${mode} contains an invalid preset id: ${preset}`);
-    }
-    if (!isNonEmptyString(paint?.background)) {
-      fail(`${style.id}.presetFirstPaint.${mode}.${preset}.background is required`);
-    }
-    if (paint?.colorScheme !== mode) {
-      fail(`${style.id}.presetFirstPaint.${mode}.${preset}.colorScheme must be ${mode}`);
-    }
-  }
-  const basePaint = style.firstPaint?.[mode];
-  const defaultPaint = definition.values[definition.defaultPreset];
-  if (
-    basePaint?.background !== defaultPaint.background ||
-    basePaint?.colorScheme !== defaultPaint.colorScheme
-  ) {
-    fail(`${style.id}.firstPaint.${mode} must match its default preset first paint`);
-  }
-}
-
 function validateFirstPaint(style, requiredModes) {
   for (const mode of requiredModes) {
     if (mode === "system") continue;
@@ -297,24 +311,6 @@ function renderTypeScriptManifest(value) {
 
 function renderBootstrapManifest(value) {
   return `/* This file is generated by scripts/generate-interface-styles.mjs. */\nwindow.__PUPPYONE_INTERFACE_STYLE_MANIFEST__ = ${JSON.stringify(value)};\n`;
-}
-
-function renderNativeFirstPaint(value) {
-  const defaultStyle = value.styles.find((style) => style.id === value.defaultStyle);
-  const light = defaultStyle.firstPaint.light ?? defaultStyle.firstPaint.dark;
-  const dark = defaultStyle.firstPaint.dark ?? defaultStyle.firstPaint.light;
-  const backgrounds = [...new Set(value.styles.flatMap((style) => [
-    ...Object.values(style.firstPaint).map((paint) => paint.background),
-    ...Object.values(style.presetFirstPaint ?? {}).flatMap((definition) => (
-      Object.values(definition.values).map((paint) => paint.background)
-    )),
-  ]))].sort();
-  return [
-    "/* This file is generated by scripts/generate-interface-styles.mjs. */",
-    `export const DEFAULT_INTERFACE_STYLE_FIRST_PAINT = Object.freeze(${JSON.stringify({ light, dark }, null, 2)});`,
-    `export const INTERFACE_STYLE_FIRST_PAINT_BACKGROUNDS = Object.freeze(${JSON.stringify(backgrounds, null, 2)});`,
-    "",
-  ].join("\n");
 }
 
 function renderStylesheetEntry(value) {

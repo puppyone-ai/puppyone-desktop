@@ -333,7 +333,7 @@
   color: #c15f3f;
 }
 
-.puppyflow-agent-select.tone-orange .puppyflow-agent-logo svg {
+.puppyflow-agent-select.tone-orange .puppyflow-agent-logo img {
   transform: scale(0.84);
   transform-origin: center;
 }
@@ -346,15 +346,6 @@
 .puppyflow-agent-select.tone-blue .puppyflow-agent-logo {
   background: color-mix(in srgb, var(--po-accent) 12%, var(--po-panel));
   color: var(--po-accent);
-}
-
-.puppyflow-agent-logo svg {
-  box-sizing: border-box;
-  padding: 3px;
-}
-
-.dark .puppyflow-agent-logo img.is-codex {
-  content: url("/assets/icons/agents/codex-dark.png");
 }
 
 .puppyflow-agent-select select {

@@ -40,15 +40,16 @@ describe("Interface style settings", () => {
     expect(onChange).toHaveBeenCalledWith("windows-xp");
   });
 
-  it("shows color controls only when the selected style declares an adaptive palette", () => {
+  it("shows only the color mode control for an adaptive palette", () => {
     const host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
 
     renderPalette(host, "default");
     expect(host.querySelectorAll(".desktop-theme-choice")).toHaveLength(3);
-    expect(host.textContent).toContain("Light theme");
-    expect(host.textContent).toContain("Dark theme");
+    expect(host.textContent).not.toContain("Light theme");
+    expect(host.textContent).not.toContain("Dark theme");
+    expect(host.querySelector(".desktop-theme-preset-list")).toBeNull();
 
     for (const style of INTERFACE_STYLES.filter(({ palette }) => palette.kind === "fixed")) {
       renderPalette(host, style.id);
@@ -78,12 +79,11 @@ function renderPalette(host: HTMLElement, interfaceStyle: InterfaceStyle) {
   act(() => root?.render(withTestLocalization(
     <InterfacePaletteSettings
       interfaceStyle={interfaceStyle}
+      subThemeId="default.neutral"
       decision={decision}
       lightThemePreset="neutral"
       darkThemePreset="default"
       onThemeModeChange={() => undefined}
-      onLightThemePresetChange={() => undefined}
-      onDarkThemePresetChange={() => undefined}
     />,
   )));
   return host;

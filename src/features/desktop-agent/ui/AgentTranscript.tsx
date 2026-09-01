@@ -1,14 +1,26 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useScrollEdgeState } from "@puppyone/shared-ui";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { ArrowDown, CircleAlert, LoaderCircle } from "lucide-react";
 import { PageLoading } from "../../../components/loading";
 import type { AgentSubmissionStage } from "../application/agent-controller-state";
-import type { AgentDraftReference, AgentReferenceDisplay } from "../domain/agent-contract";
-import type { AgentPart, AgentProjection, TimelineRow } from "../domain/agent-projection-types";
+import type { AgentDraftReference, AgentPromptReferenceMention, AgentReferenceDisplay } from "../domain/agent-contract";
+import type { AgentPart, AgentProjection } from "../domain/agent-projection-types";
+import { AgentConnectionStatus } from "./AgentConnectionStatus";
 import { AgentMessagePart } from "./AgentMessagePart";
 import { AgentPartRenderer } from "./AgentPartRenderer";
+import {
+  agentTimelineLimits,
+  buildAgentTimelineLayout,
+  visibleAgentTimelineRange,
+} from "./agent-timeline-layout";
+import {
+  captureAgentTimelineScrollAnchor,
+  resolveAgentTimelineScrollAnchor,
+  type AgentTimelineScrollAnchor,
+} from "./agent-timeline-viewport";
+import { buildAgentTimeline } from "./agent-timeline-presentation";
 import {
   agentTranscriptFadeGeometry,
   agentVirtualCanvasGeometry,
@@ -19,10 +31,12 @@ type AgentTranscriptProps = {
   projection: AgentProjection;
   loading: boolean;
   pendingPrompt?: string | null;
+  pendingPromptMentions?: AgentPromptReferenceMention[];
   pendingReferences?: AgentDraftReference[];
   submissionStage?: AgentSubmissionStage;
   working?: boolean;
   runtimeLabel?: string;
+  emptyState?: ReactNode;
   initialScrollTop?: number;
   initialMeasurements?: Record<string, number>;
   initialPinned?: boolean;
@@ -30,18 +44,18 @@ type AgentTranscriptProps = {
   onOpenFile?: (path: string) => void;
 };
 
-const OVERSCAN_ROWS = 14;
-const MAX_MOUNTED_ROWS = 120;
 const DEFAULT_VIEWPORT_HEIGHT = 640;
 
 function AgentTranscriptView({
   projection,
   loading,
   pendingPrompt = null,
+  pendingPromptMentions = [],
   pendingReferences = [],
   submissionStage = null,
   working = false,
   runtimeLabel: runtimeLabelProp,
+  emptyState = null,
   initialScrollTop = 0,
   initialMeasurements = {},
   initialPinned = true,
@@ -51,29 +65,53 @@ function AgentTranscriptView({
   const { t } = useLocalization();
   const runtimeLabel = runtimeLabelProp || t("agent.name");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const measurementsRef = useRef<Record<string, number>>({ ...initialMeasurements });
+  const [measurements, setMeasurements] = useState<Record<string, number>>(() => ({ ...initialMeasurements }));
+  const measurementsRef = useRef(measurements);
   const scrollTopRef = useRef(initialScrollTop);
   const pinnedRef = useRef(initialPinned);
   const seenPartIdsRef = useRef(new Set<string>());
   const seededPartIdsRef = useRef(false);
   const previousTimelineRef = useRef({ rows: 0, sequence: 0 });
-  const offsetsRef = useRef<number[]>([]);
   const rowMetaRef = useRef(new Map<string, { index: number; estimatedHeight: number }>());
+  const rowIndexRef = useRef(new Map<string, number>());
   const onViewportChangeRef = useRef(onViewportChange);
-  const [measurementRevision, setMeasurementRevision] = useState(0);
   const [scrollTop, setScrollTop] = useState(initialScrollTop);
   const [viewportHeight, setViewportHeight] = useState(DEFAULT_VIEWPORT_HEIGHT);
   const [pinned, setPinned] = useState(initialPinned);
   const [unreadCount, setUnreadCount] = useState(0);
-  const timeline = useMemo(() => buildTimeline(projection), [projection]);
-  const layout = useMemo(() => buildLayout(timeline.rows, measurementsRef.current, measurementRevision), [measurementRevision, timeline.rows]);
-  const range = useMemo(() => visibleRange(layout.offsets, timeline.rows.length, scrollTop, viewportHeight), [layout.offsets, scrollTop, timeline.rows.length, viewportHeight]);
+  const timeline = useMemo(() => buildAgentTimeline(projection), [projection]);
+  const layout = useMemo(
+    () => buildAgentTimelineLayout(timeline.rows, measurements),
+    [measurements, timeline.rows],
+  );
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const layoutRef = useRef(layout);
+  const timelineRowsRef = useRef(timeline.rows);
+  const rowElementsRef = useRef(new Map<string, HTMLDivElement>());
+  const rowObserverRef = useRef<ResizeObserver | null>(null);
+  const pendingMeasurementsRef = useRef(new Map<string, number>());
+  const measurementFrameRef = useRef<number | null>(null);
+  const pendingScrollAnchorRef = useRef<AgentTimelineScrollAnchor | null>(null);
+  const range = useMemo(
+    () => visibleAgentTimelineRange(layout.offsets, timeline.rows.length, scrollTop, viewportHeight),
+    [layout.offsets, scrollTop, timeline.rows.length, viewportHeight],
+  );
   const visibleRows = timeline.rows.slice(range.start, range.end);
   const latestSequence = timeline.rows.at(-1)?.sequence ?? 0;
   const submissionStatus = agentSubmissionStatusLabel(submissionStage, runtimeLabel, t);
-  const showThinking = !submissionStatus && shouldShowAgentThinking(projection, working);
-  const workingStatus = submissionStatus || (showThinking ? t("agent.activity.thinking") : null);
-  const hasLiveTail = Boolean(pendingPrompt) || pendingReferences.length > 0 || Boolean(workingStatus);
+  const showThinking = !projection.connectionStatus && !submissionStatus && shouldShowAgentThinking(projection, working);
+  const workingStatus = projection.connectionStatus
+    ? null
+    : submissionStatus || (showThinking ? t("agent.activity.thinking") : null);
+  const hasLiveTail = Boolean(pendingPrompt)
+    || pendingReferences.length > 0
+    || Boolean(projection.connectionStatus)
+    || Boolean(workingStatus);
+  const showEmptyState = Boolean(emptyState)
+    && !loading
+    && timeline.rows.length === 0
+    && !hasLiveTail
+    && !projection.partialHistory;
   const scrollEdgeState = useScrollEdgeState(scrollRef, {
     revision: `${timeline.rows.length}:${layout.totalHeight}:${hasLiveTail ? "live" : "settled"}`,
   });
@@ -82,11 +120,62 @@ function AgentTranscriptView({
     seededPartIdsRef.current = true;
     previousTimelineRef.current = { rows: timeline.rows.length, sequence: latestSequence };
   }
-  offsetsRef.current = layout.offsets;
+  layoutRef.current = layout;
+  timelineRowsRef.current = timeline.rows;
   rowMetaRef.current = new Map(timeline.rows.map((row, index) => [row.id, { index, estimatedHeight: row.estimatedHeight }]));
+  rowIndexRef.current = new Map(timeline.rows.map((row, index) => [row.id, index]));
   onViewportChangeRef.current = onViewportChange;
 
-  useEffect(() => {
+  const flushMeasurements = useCallback(() => {
+    measurementFrameRef.current = null;
+    const pending = pendingMeasurementsRef.current;
+    pendingMeasurementsRef.current = new Map();
+    let nextMeasurements: Record<string, number> | null = null;
+
+    for (const [rowId, height] of pending) {
+      const meta = rowMetaRef.current.get(rowId);
+      if (!meta) continue;
+      const previousHeight = measurementsRef.current[rowId] ?? meta.estimatedHeight;
+      if (!Number.isFinite(height) || height <= 0 || Math.abs(previousHeight - height) < 1) continue;
+      nextMeasurements ??= { ...measurementsRef.current };
+      nextMeasurements[rowId] = height;
+    }
+
+    if (!nextMeasurements) return;
+    const element = scrollRef.current;
+    if (element && !pinnedRef.current) {
+      pendingScrollAnchorRef.current = captureAgentTimelineScrollAnchor(
+        timelineRowsRef.current,
+        layoutRef.current,
+        scrollTopRef.current,
+        canvasRef.current?.offsetTop ?? 0,
+      );
+    }
+    measurementsRef.current = nextMeasurements;
+    setMeasurements(nextMeasurements);
+  }, []);
+
+  const queueMeasurement = useCallback((rowId: string, height: number) => {
+    pendingMeasurementsRef.current.set(rowId, height);
+    if (measurementFrameRef.current !== null) return;
+    measurementFrameRef.current = window.requestAnimationFrame(flushMeasurements);
+  }, [flushMeasurements]);
+
+  const observeMeasuredRow = useCallback((rowId: string, element: HTMLDivElement | null) => {
+    const previous = rowElementsRef.current.get(rowId);
+    if (previous === element) return;
+    if (previous) rowObserverRef.current?.unobserve(previous);
+    if (!element) {
+      rowElementsRef.current.delete(rowId);
+      pendingMeasurementsRef.current.delete(rowId);
+      return;
+    }
+    rowElementsRef.current.set(rowId, element);
+    rowObserverRef.current?.observe(element, { box: "border-box" });
+    queueMeasurement(rowId, element.getBoundingClientRect().height);
+  }, [queueMeasurement]);
+
+  useLayoutEffect(() => {
     const element = scrollRef.current;
     if (!element) return undefined;
     element.scrollTop = initialScrollTop;
@@ -102,15 +191,64 @@ function AgentTranscriptView({
   }, [initialPinned, initialScrollTop]);
 
   useEffect(() => {
-    if (!pinned) return;
+    if (typeof ResizeObserver !== "function") return undefined;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const rowId = (entry.target as HTMLElement).dataset.rowId;
+        if (rowId) queueMeasurement(rowId, resizeObserverBorderBoxHeight(entry));
+      }
+    });
+    rowObserverRef.current = observer;
+    for (const element of rowElementsRef.current.values()) {
+      observer.observe(element, { box: "border-box" });
+    }
+    return () => {
+      observer.disconnect();
+      if (rowObserverRef.current === observer) rowObserverRef.current = null;
+    };
+  }, [queueMeasurement]);
+
+  useEffect(() => () => {
+    if (measurementFrameRef.current !== null) {
+      window.cancelAnimationFrame(measurementFrameRef.current);
+      measurementFrameRef.current = null;
+    }
+    pendingMeasurementsRef.current.clear();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (pendingMeasurementsRef.current.size === 0) return;
+    // A newly committed row replaces the optimistic live-tail message. Resolve
+    // its real geometry before paint so the virtual canvas never exposes its
+    // coarse estimate for one frame and moves the working indicator afterward.
+    if (measurementFrameRef.current !== null) {
+      window.cancelAnimationFrame(measurementFrameRef.current);
+      measurementFrameRef.current = null;
+    }
+    flushMeasurements();
+  }, [flushMeasurements, timeline.rows.length]);
+
+  useLayoutEffect(() => {
     const element = scrollRef.current;
     if (!element) return;
-    element.scrollTop = element.scrollHeight;
+    if (pinnedRef.current) {
+      element.scrollTop = element.scrollHeight;
+    } else if (pendingScrollAnchorRef.current) {
+      const nextScrollTop = resolveAgentTimelineScrollAnchor(
+        pendingScrollAnchorRef.current,
+        layout,
+        rowIndexRef.current,
+        canvasRef.current?.offsetTop ?? 0,
+      );
+      pendingScrollAnchorRef.current = null;
+      if (nextScrollTop !== null) element.scrollTop = nextScrollTop;
+    } else {
+      return;
+    }
     scrollTopRef.current = element.scrollTop;
-    pinnedRef.current = true;
     setScrollTop(element.scrollTop);
-    onViewportChangeRef.current?.(element.scrollTop, measurementsRef.current, true);
-  }, [layout.totalHeight, pendingPrompt, pinned, projection.approvals.length, projection.questions.length, workingStatus]);
+    onViewportChangeRef.current?.(element.scrollTop, measurementsRef.current, pinnedRef.current);
+  }, [layout, pendingPrompt, projection.approvals.length, projection.questions.length, workingStatus]);
 
   useEffect(() => {
     const previous = previousTimelineRef.current;
@@ -135,28 +273,6 @@ function AgentTranscriptView({
     if (nextPinned) setUnreadCount(0);
     onViewportChangeRef.current?.(nextScrollTop, measurementsRef.current, nextPinned);
   };
-
-  const measure = useCallback((rowId: string, height: number) => {
-    const meta = rowMetaRef.current.get(rowId);
-    const previousHeight = measurementsRef.current[rowId] ?? meta?.estimatedHeight ?? 0;
-    if (!Number.isFinite(height) || height <= 0 || Math.abs(previousHeight - height) < 1) return;
-    measurementsRef.current[rowId] = height;
-    if (
-      !pinnedRef.current
-      && meta
-      && (offsetsRef.current[meta.index] ?? Number.POSITIVE_INFINITY) < scrollTopRef.current
-    ) {
-      const element = scrollRef.current;
-      if (element) {
-        const anchoredScrollTop = Math.max(0, scrollTopRef.current + height - previousHeight);
-        element.scrollTop = anchoredScrollTop;
-        scrollTopRef.current = anchoredScrollTop;
-        setScrollTop(anchoredScrollTop);
-        onViewportChangeRef.current?.(anchoredScrollTop, measurementsRef.current, false);
-      }
-    }
-    setMeasurementRevision((value) => value + 1);
-  }, []);
 
   return (
     <div
@@ -185,16 +301,28 @@ function AgentTranscriptView({
             className="desktop-agent-startup-loading"
           />
         )}
+        {showEmptyState && emptyState}
         {timeline.rows.length > 0 && (
-          <div className="desktop-agent-virtual-canvas" style={agentVirtualCanvasGeometry(layout.totalHeight)}>
+          <div ref={canvasRef} className="desktop-agent-virtual-canvas" style={agentVirtualCanvasGeometry(layout.totalHeight)}>
             {visibleRows.map((row, relativeIndex) => {
               const index = range.start + relativeIndex;
               const part = timeline.parts.get(row.partId);
               if (!part) return null;
-              const animate = !seenPartIdsRef.current.has(part.id);
-              if (animate) seenPartIdsRef.current.add(part.id);
+              // User prompts are already shown optimistically. Animating their
+              // committed replacement makes the same message visibly enter
+              // twice during the first-turn handoff.
+              const animate = part.kind !== "user" && !seenPartIdsRef.current.has(part.id);
+              seenPartIdsRef.current.add(part.id);
               return (
-                <MeasuredRow key={row.id} rowId={row.id} kind={part.kind} top={layout.offsets[index]} animate={animate} onMeasure={measure}>
+                <MeasuredRow
+                  key={row.id}
+                  rowId={row.id}
+                  kind={part.kind}
+                  top={layout.offsets[index]}
+                  gapAfter={layout.gaps[index]}
+                  animate={animate}
+                  onMeasureElement={observeMeasuredRow}
+                >
                   <MemoAgentPartRenderer part={part} runtimeLabel={runtimeLabel} onOpenFile={onOpenFile} />
                 </MeasuredRow>
               );
@@ -210,10 +338,12 @@ function AgentTranscriptView({
               itemId: null,
               text: pendingPrompt || "",
               references: pendingReferences.map(draftReferenceDisplay),
+              promptMentions: pendingPromptMentions,
               streaming: false,
               terminalState: null,
               sequence: Number.MAX_SAFE_INTEGER,
             }} runtimeLabel={runtimeLabel} />}
+            {projection.connectionStatus && <AgentConnectionStatus status={projection.connectionStatus} />}
             {workingStatus && (
               <div
                 className="desktop-agent-working-indicator"
@@ -269,122 +399,36 @@ AgentTranscript.displayName = "AgentTranscript";
 
 const MemoAgentPartRenderer = memo(AgentPartRenderer);
 
-function MeasuredRow({ rowId, kind, top, animate, onMeasure, children }: {
+function MeasuredRow({ rowId, kind, top, gapAfter, animate, onMeasureElement, children }: {
   rowId: string;
   kind: AgentPart["kind"];
   top: number;
+  gapAfter: number;
   animate: boolean;
-  onMeasure: (rowId: string, height: number) => void;
+  onMeasureElement: (rowId: string, element: HTMLDivElement | null) => void;
   children: React.ReactNode;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
   const [entering, setEntering] = useState(animate);
+  const registerElement = useCallback((element: HTMLDivElement | null) => {
+    onMeasureElement(rowId, element);
+  }, [onMeasureElement, rowId]);
   useEffect(() => setEntering(animate), [animate, rowId]);
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return undefined;
-    const commit = () => onMeasure(rowId, element.getBoundingClientRect().height);
-    commit();
-    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(commit) : null;
-    observer?.observe(element);
-    return () => observer?.disconnect();
-  }, [onMeasure, rowId]);
   return <div
-    ref={ref}
+    ref={registerElement}
     className={`desktop-agent-virtual-row${entering ? " is-new" : ""}`}
+    data-row-id={rowId}
     data-kind={kind}
+    data-gap-after={gapAfter}
     style={agentVirtualRowGeometry(top)}
     onAnimationEnd={() => setEntering(false)}
   >{children}</div>;
 }
 
-function buildTimeline(projection: AgentProjection) {
-  let parts: AgentPart[];
-  let rows: TimelineRow[];
-  if (projection.rows.length > 0 && projection.parts.length > 0) {
-    parts = [...projection.parts];
-    rows = [...projection.rows];
-  } else {
-    // Compatibility for consumers constructing the original projection shape.
-    parts = [
-      ...projection.messages.map((message): AgentPart => ({ ...message, kind: message.role })),
-      ...projection.activities.map((activity): AgentPart => ({ ...activity })),
-    ].sort((left, right) => left.sequence - right.sequence);
-    rows = parts.map((part) => ({
-      id: `row:${part.id}`,
-      partId: part.id,
-      turnId: part.turnId,
-      kind: part.kind,
-      sequence: part.sequence,
-      estimatedHeight: part.kind === "assistant"
-        ? Math.min(640, 50 + Math.ceil(part.text.length / 64) * 20)
-        : part.kind === "user"
-          ? 64
-          : 34,
-    }));
-  }
-  return appendTurnSummaries(rows, parts, projection.turns);
-}
-
-function appendTurnSummaries(rows: TimelineRow[], parts: AgentPart[], turns: AgentProjection["turns"]) {
-  const nextRows = [...rows];
-  const partMap = new Map(parts.map((part) => [part.id, part]));
-  for (const turn of turns) {
-    if (turn.status === "running" || turn.durationMs === null || turn.completedAtSequence === null) continue;
-    const id = `turn-summary:${turn.id}`;
-    const lastTurnSequence = nextRows.reduce((latest, row) => (
-      row.turnId === turn.id ? Math.max(latest, row.sequence) : latest
-    ), turn.completedAtSequence);
-    const sequence = lastTurnSequence + 0.5;
-    const part: AgentPart = {
-      id,
-      kind: "turn-summary",
-      turnId: turn.id,
-      itemId: null,
-      durationMs: turn.durationMs,
-      status: turn.status,
-      sequence,
-    };
-    partMap.set(id, part);
-    nextRows.push({
-      id: `row:${id}`,
-      partId: id,
-      turnId: turn.id,
-      kind: "turn-summary",
-      sequence,
-      estimatedHeight: 30,
-    });
-  }
-  return {
-    rows: nextRows.sort((left, right) => left.sequence - right.sequence),
-    parts: partMap,
-  };
-}
-
-function buildLayout(rows: TimelineRow[], measurements: Record<string, number>, _measurementRevision: number) {
-  const offsets = new Array<number>(rows.length + 1);
-  offsets[0] = 0;
-  for (let index = 0; index < rows.length; index += 1) {
-    offsets[index + 1] = offsets[index] + (measurements[rows[index].id] || rows[index].estimatedHeight);
-  }
-  return { offsets, totalHeight: offsets.at(-1) ?? 0 };
-}
-
-function visibleRange(offsets: number[], count: number, scrollTop: number, viewportHeight: number) {
-  const first = Math.max(0, lowerBound(offsets, Math.max(0, scrollTop)) - 1 - OVERSCAN_ROWS);
-  const last = Math.min(count, lowerBound(offsets, scrollTop + viewportHeight) + OVERSCAN_ROWS);
-  return { start: first, end: Math.min(last, first + MAX_MOUNTED_ROWS) };
-}
-
-function lowerBound(values: number[], target: number) {
-  let low = 0;
-  let high = values.length;
-  while (low < high) {
-    const middle = (low + high) >>> 1;
-    if (values[middle] < target) low = middle + 1;
-    else high = middle;
-  }
-  return low;
+function resizeObserverBorderBoxHeight(entry: ResizeObserverEntry) {
+  const borderBox = Array.isArray(entry.borderBoxSize)
+    ? entry.borderBoxSize[0]
+    : entry.borderBoxSize;
+  return borderBox?.blockSize || entry.target.getBoundingClientRect().height;
 }
 
 /** Presentation-only working state; never fabricates or persists model text. */
@@ -428,4 +472,4 @@ export function agentSubmissionStatusLabel(
   return null;
 }
 
-export const agentTimelineLimits = Object.freeze({ maxMountedRows: MAX_MOUNTED_ROWS, streamBatchMs: 16 });
+export { agentTimelineLimits } from "./agent-timeline-layout";

@@ -17,6 +17,7 @@ import { AgentFileChangeActivity } from "../../src/features/desktop-agent/ui/act
 import { applyAgentEvent, applyAgentEvents, createAgentProjection } from "../../src/features/desktop-agent/agentProjection";
 import type { AgentEvent } from "../../src/features/desktop-agent/agentTypes";
 import type { AgentActivity } from "../../src/features/desktop-agent/domain/agent-projection-types";
+import { agentToolEvidenceLimits } from "../../src/features/desktop-agent/domain/agent-tool-evidence";
 import { withBenchmarkLocalization } from "./localizationHarness";
 
 // Long enough to make this product-critical signal useful in CI while keeping
@@ -88,9 +89,12 @@ describe("Desktop Agent composer isolation", () => {
             stopping: false,
             submitting: false,
             placeholder: "Ask anything",
-            models: composerModels,
-            selectedModel: composerModels[0].model,
-            onSelectModel: noop,
+            sessionControls: [{
+              id: "model",
+              value: composerModels[0].model,
+              options: composerModels.map((model) => ({ value: model.model, label: model.displayName })),
+            }],
+            onSelectSessionControl: noop,
             onSubmit: submit,
             onStop: noop,
           }),
@@ -117,7 +121,11 @@ describe("Desktop Agent bounded heavy content", () => {
     ), (parent) => {
       const rows = parent.querySelectorAll<HTMLButtonElement>(".desktop-agent-tool-row");
       flushSync(() => rows.forEach((row) => row.click()));
-      if (!parent.querySelector(".desktop-agent-command-output")) throw new Error("Command output did not expand.");
+      const commandOutput = parent.querySelector(".desktop-agent-command-output");
+      if (!commandOutput) throw new Error("Command output did not expand.");
+      if ((commandOutput.textContent?.length ?? 0) > agentToolEvidenceLimits.maxChars + 256) {
+        throw new Error("Command output DOM budget regressed.");
+      }
       if (parent.querySelectorAll(".desktop-agent-diff-line").length !== 240) throw new Error("Diff rendering bound regressed.");
     });
   }, HEAVY_UI_OPTIONS);

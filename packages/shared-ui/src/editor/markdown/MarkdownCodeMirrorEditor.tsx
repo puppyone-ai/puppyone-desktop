@@ -40,6 +40,7 @@ import {
 import { bindMarkdownFormatHotkeys } from "./core/commands/markdownFormatHotkeys";
 import { CodeMirrorFindAdapter } from "../find/codeMirrorFindAdapter";
 import { useRegisterEditorFindAdapter } from "../find/editorFind";
+import { useEditorAppearanceRevision } from "../../core/appearance/EditorAppearanceContext";
 
 const rendererPerformance = getRendererPerformanceTracker();
 
@@ -96,6 +97,7 @@ export function MarkdownCodeMirrorEditor({
   onPreviewReady,
   onPreviewError,
 }: MarkdownCodeMirrorEditorProps) {
+  const appearanceRevision = useEditorAppearanceRevision();
   const { direction, formatNumber, locale, t } = useLocalization();
   const localization = useMemo(
     () => ({ direction, formatNumber, locale, t }),
@@ -564,6 +566,10 @@ export function MarkdownCodeMirrorEditor({
     });
   }, [value]);
 
+  useLayoutEffect(() => {
+    viewRef.current?.requestMeasure();
+  }, [appearanceRevision]);
+
   const previewMessage = previewState === "error"
     ? t("editor.markdown.previewUnavailable")
     : previewState === "pending" && showPendingMessage
@@ -577,6 +583,7 @@ export function MarkdownCodeMirrorEditor({
         dir="auto"
         lang={contentLanguage.language}
         className="markdown-codemirror-editor"
+        data-editor-appearance-revision={appearanceRevision}
         data-po-typography-role="content"
         data-po-content-language-source={contentLanguage.source}
         data-live-preview={livePreview ? "true" : "false"}

@@ -19,13 +19,20 @@ export function agentVirtualRowGeometry(offset: number): AgentRuntimeGeometryVar
   return variables({ "--agent-virtual-row-offset": pixels(offset) });
 }
 
-export function agentPickerOverlayGeometry(position: AnchoredOverlayPosition | null): AgentRuntimeGeometryVariables | undefined {
-  if (!position) return undefined;
+export function agentEmptyLogoGeometry(turns: number): AgentRuntimeGeometryVariables {
+  return variables({ "--agent-empty-logo-turns": integer(turns) });
+}
+
+export function agentPickerOverlayGeometry(
+  position: AnchoredOverlayPosition | null,
+  measurementWidth: number,
+  measurementMaxHeight: number,
+): AgentRuntimeGeometryVariables {
   return variables({
-    "--agent-overlay-left": pixels(position.left),
-    "--agent-overlay-top": pixels(position.top),
-    "--agent-overlay-width": pixels(position.width),
-    "--agent-overlay-max-height": pixels(position.maxHeight),
+    "--agent-overlay-left": pixels(position?.left ?? 0),
+    "--agent-overlay-top": pixels(position?.top ?? 0),
+    "--agent-overlay-width": pixels(position?.width ?? measurementWidth),
+    "--agent-overlay-max-height": pixels(position?.maxHeight ?? measurementMaxHeight),
   });
 }
 
@@ -35,6 +42,10 @@ function variables<T extends Record<`--agent-${string}`, string | number>>(value
 
 function pixels(value: number) {
   return `${Math.max(0, Number.isFinite(value) ? value : 0)}px`;
+}
+
+function integer(value: number) {
+  return Math.max(0, Math.trunc(Number.isFinite(value) ? value : 0));
 }
 
 function clamp(value: number, minimum: number, maximum: number) {

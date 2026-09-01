@@ -135,6 +135,37 @@ describe("workspace content watch re-arm", () => {
     service.closeAll();
   });
 
+  it("does not report recovery when re-arming fails", () => {
+    const { fsModule, watchers } = createFakeFsWatch();
+    const initialWatch = fsModule.watch;
+    fsModule.watch = vi.fn((...args) => {
+      if (watchers.length > 0) throw new Error("root is unavailable");
+      return initialWatch(...args);
+    });
+    const queued = [];
+    globalThis.setTimeout = ((callback, ms, ...args) => {
+      const entry = { callback, ms, args };
+      queued.push(entry);
+      const handle = realSetTimeout(() => {}, 0);
+      timers.push(handle);
+      return handle;
+    });
+    globalThis.clearTimeout = (handle) => realClearTimeout(handle);
+    const service = createWorkspaceWatchService({
+      logger: { warn: () => {}, info: () => {} },
+      fsModule,
+    });
+    const { events, sender } = createSender(9);
+    service.start(sender, "/tmp");
+
+    watchers[0].emit("error", new Error("watch failed"));
+    queued.find((entry) => entry.ms === WORKSPACE_WATCH_REARM_MIN_DELAY_MS)?.callback();
+
+    expect(events.some((event) => event.payload?.recovered === true)).toBe(false);
+    expect(queued.filter((entry) => entry.ms >= WORKSPACE_WATCH_REARM_MIN_DELAY_MS)).toHaveLength(2);
+    service.closeAll();
+  });
+
   it("does not echo an internal save to its writer but still notifies other windows", async () => {
     const { fsModule, watchers } = createFakeFsWatch();
     const queued = [];

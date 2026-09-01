@@ -10,6 +10,8 @@
   "action.copy": "복사",
   "action.clear": "지우기",
   "action.copied": "복사됨",
+  "renderFailure.title": "PuppyOne에서 이 창을 표시할 수 없습니다",
+  "renderFailure.description": "파일은 안전합니다. 창을 새로 고쳐 인터페이스를 복원하세요.",
   "action.change": "변경",
   "action.save": "저장",
   "status.loading": "불러오는 중…"

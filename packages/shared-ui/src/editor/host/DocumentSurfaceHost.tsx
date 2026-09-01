@@ -29,19 +29,28 @@ export type DocumentSurfaceRenderControls = Readonly<{
  * the committed surface on screen, so pending renderers must report their busy
  * state without introducing a second, viewer-specific loading page.
  */
-export function DocumentSurfacePending({ label }: { label: string }) {
+export function DocumentSurfacePending({
+  label,
+  children,
+}: {
+  label: string;
+  children?: ReactNode;
+}) {
   return (
     <div
       className="document-surface-pending"
       role="status"
       aria-busy="true"
       aria-label={label}
-    />
+    >
+      {children}
+    </div>
   );
 }
 
 export type DocumentSurfaceHostProps = {
   surfaceKey: string;
+  pendingIndicator?: ReactNode;
   /**
    * Hidden-safe surfaces preserve the previous document until ready. A
    * requires-visible surface becomes the committed layout slot immediately so
@@ -204,6 +213,11 @@ export class DocumentSurfaceHost extends Component<
 
   render() {
     const { committed, staging } = this.state;
+    const showPreparationPending = (
+      committed.preparation === "requires-visible"
+      && !this.state.committedReady
+      && this.props.pendingIndicator
+    );
     return (
       <div
         className="document-surface-host"
@@ -212,6 +226,11 @@ export class DocumentSurfaceHost extends Component<
       >
         {this.renderEntry(committed, false)}
         {staging ? this.renderEntry(staging, true) : null}
+        {showPreparationPending ? (
+          <div className="document-surface-preparation-pending">
+            {this.props.pendingIndicator}
+          </div>
+        ) : null}
       </div>
     );
   }

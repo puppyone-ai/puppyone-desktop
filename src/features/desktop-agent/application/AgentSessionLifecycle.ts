@@ -40,6 +40,7 @@ export class AgentSessionLifecycle {
         sessionPreparation: "preparing",
         submitting: false,
         references: [],
+        draftMentions: [],
       });
       const snapshot = await this.options.createSession();
       this.options.applySnapshot(snapshot);
@@ -78,6 +79,15 @@ export class AgentSessionLifecycle {
       this.options.patch({ error: formatAgentError(error) });
       return false;
     }
+  }
+
+  /**
+   * Releases a native session created while Workbench topology was only
+   * reserved. No committed tab owns this resource, so active-turn close
+   * policy does not apply to rollback.
+   */
+  async rollbackPreparation() {
+    await this.closeActiveSession(false);
   }
 
   private async closeActiveSession(removePersistence: boolean) {

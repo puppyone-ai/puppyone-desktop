@@ -1,9 +1,7 @@
 import { FileSearch, FolderSearch, Globe2, Search, Wrench } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
 import {
-  agentActivitySummary,
   agentActivityToolId,
-  formatAgentActivityLabel,
   formatAgentToolName,
   isContextCompactionActivity,
   outputForActivity,
@@ -11,6 +9,8 @@ import {
 } from "../../domain/agent-activity-presentation";
 import type { AgentActivity } from "../../domain/agent-projection-types";
 import { AgentActivityShell } from "./AgentActivityShell";
+import { AgentToolEvidenceNode, AgentToolEvidenceTree } from "./AgentToolEvidenceTree";
+import { AgentToolTextEvidence } from "./AgentToolTextEvidence";
 
 export function AgentGenericActivity({ activity }: { activity: AgentActivity }) {
   const { t } = useLocalization();
@@ -30,15 +30,23 @@ export function AgentGenericActivity({ activity }: { activity: AgentActivity }) 
   return (
     <AgentActivityShell
       title={formatAgentToolName(tool, t)}
-      summary={agentActivitySummary(activity) || formatAgentActivityLabel(activity, t)}
       status={activity.status}
       icon={iconFor(tool)}
       className="desktop-agent-generic-tool"
     >
       {detail && (
-        <pre className="desktop-agent-tool-output" data-po-scrollbar="content">
-          {detail}
-        </pre>
+        <AgentToolEvidenceTree>
+          {input && (
+            <AgentToolEvidenceNode kind="request">
+              <AgentToolTextEvidence text={input} />
+            </AgentToolEvidenceNode>
+          )}
+          {output && (
+            <AgentToolEvidenceNode kind="result">
+              <AgentToolTextEvidence text={output} />
+            </AgentToolEvidenceNode>
+          )}
+        </AgentToolEvidenceTree>
       )}
     </AgentActivityShell>
   );

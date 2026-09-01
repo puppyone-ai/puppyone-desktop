@@ -1,7 +1,11 @@
-import { Plus } from "lucide-react";
+import { Paperclip } from "lucide-react";
 import { useRef, type ChangeEvent } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentReferenceInputCapabilities } from "../../domain/agent-contract";
+import {
+  acceptedAgentAttachmentPickerTypes,
+  hasAgentAttachmentSupport,
+} from "../../domain/agent-reference-capabilities";
 
 type AgentAttachmentButtonProps = {
   capabilities?: AgentReferenceInputCapabilities;
@@ -19,10 +23,8 @@ export function AgentAttachmentButton({
 }: AgentAttachmentButtonProps) {
   const { t } = useLocalization();
   const inputRef = useRef<HTMLInputElement>(null);
-  const externalAvailable = Boolean(
-    capabilities && (capabilities.images !== "none" || capabilities.genericFiles !== "none"),
-  );
-  const workspaceAvailable = Boolean(capabilities?.workspaceFiles || capabilities?.workspaceDirectories);
+  const externalAvailable = hasAgentAttachmentSupport(capabilities);
+  const workspaceAvailable = Boolean(capabilities?.workspace.files || capabilities?.workspace.directories);
   const available = externalAvailable || workspaceAvailable;
   const label = externalAvailable ? t("agent.reference.addFromComputer") : t("agent.reference.addFromWorkspace");
 
@@ -46,7 +48,7 @@ export function AgentAttachmentButton({
         disabled={disabled || !available}
         onClick={choose}
       >
-        <Plus size={17} strokeWidth={1.6} aria-hidden="true" />
+        <Paperclip size={16} strokeWidth={1.7} aria-hidden="true" />
       </button>
       <input
         ref={inputRef}
@@ -54,7 +56,7 @@ export function AgentAttachmentButton({
         type="file"
         multiple
         tabIndex={-1}
-        accept={capabilities?.acceptedMimeTypes?.join(",")}
+        accept={acceptedAgentAttachmentPickerTypes(capabilities).join(",") || undefined}
         onChange={onFilesSelected}
       />
     </div>

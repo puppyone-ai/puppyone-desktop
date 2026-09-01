@@ -11,6 +11,7 @@ import { Plus } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
 import {
   DataWorkspace,
+  qualifyDataResourcePath,
   getFileSemanticKind,
   type AiEditRequest,
   type DataNode,
@@ -203,23 +204,37 @@ export function DesktopDataWorkspaceSurface({
   const confirmWorkspaceStarter = useCallback(async (selection: EmptyWorkspaceStarterSelection) => {
     if (selection.file) {
       if (!dataPort.createFile) throw new Error(t("workspace.emptyOnboarding.createUnavailable"));
-      await dataPort.createFile(selection.file.path, selection.file.content);
+      const folder = workspaceFolders.find((candidate) => candidate.uri === activeWorkspaceRootPath);
+      if (!folder || !activeWorkspaceRootPath) {
+        throw new Error("A Workspace Folder is required to create the starter document.");
+      }
+      const resourcePath = qualifyDataResourcePath(activeWorkspaceRootPath, selection.file.path);
+      await dataPort.createFile(resourcePath, selection.file.content);
       const node: DataNode = {
-        id: selection.file.path,
+        id: resourcePath,
         name: selection.file.path,
-        path: selection.file.path,
+        path: resourcePath,
         type: getFileSemanticKind(selection.file.path, "file"),
+        resourceUri: resourcePath,
+        workspaceFolderId: folder.id,
       };
       markFirstProjectStarterCompleted();
       setFirstProjectStarterCompleted(true);
-      onWorkspaceStarterCreated(selection.file.path);
-      await onActiveDataPathChange(selection.file.path, node);
+      onWorkspaceStarterCreated(resourcePath);
+      await onActiveDataPathChange(resourcePath, node);
       return;
     }
 
     markFirstProjectStarterCompleted();
     setFirstProjectStarterCompleted(true);
-  }, [dataPort, onActiveDataPathChange, onWorkspaceStarterCreated, t]);
+  }, [
+    activeWorkspaceRootPath,
+    dataPort,
+    onActiveDataPathChange,
+    onWorkspaceStarterCreated,
+    t,
+    workspaceFolders,
+  ]);
   const resolvedExplorerWidth = paneLayout?.explorer.width ?? preferences.explorerWidth;
   const resolvedExplorerMaxWidth = paneLayout?.explorer.maxWidth
     ?? MAX_EXPLORER_WIDTH;

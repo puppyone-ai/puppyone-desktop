@@ -198,6 +198,7 @@ export function DesktopCloudShell({
                 collapseThreshold={RIGHT_SIDEBAR_COLLAPSE_THRESHOLD}
                 open={paneLayout.rightSidebar.open}
                 width={paneLayout.rightSidebar.width}
+                expandedWidth={rightSidebarWidth}
                 minWidth={paneLayout.rightSidebar.minWidth}
                 maxWidth={paneLayout.rightSidebar.maxWidth}
                 resizable={resizableRightSidebar}

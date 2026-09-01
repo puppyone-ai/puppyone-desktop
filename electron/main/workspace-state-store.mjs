@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-const WORKSPACE_REGISTRY_VERSION = 5;
+const WORKSPACE_REGISTRY_VERSION = 6;
 const RECENT_WORKSPACE_LIMIT = 20;
 const HYDRATION_CONCURRENCY = 4;
 
@@ -20,17 +20,22 @@ export function createWorkspaceStateStore({
   let recoveryError = null;
 
   async function getLastWorkspaceResult() {
-    const folderPath = await readLastActiveWorkspacePath();
-    if (!folderPath) return { path: null, workspace: null, error: null };
+    const composition = await readLastActiveWorkspaceComposition();
+    const folderPath = composition.paths[0] ?? null;
+    if (!folderPath) {
+      return { workspaceId: null, path: null, workspace: null, workspaces: [], error: null };
+    }
 
     try {
       return {
+        workspaceId: composition.workspaceId,
         path: folderPath,
         workspace: await workspaceFromPath(folderPath),
         error: null,
       };
     } catch (error) {
       return {
+        workspaceId: composition.workspaceId,
         path: folderPath,
         workspace: null,
         error: `Unable to reopen last workspace (${folderPath}): ${error instanceof Error ? error.message : String(error)}`,
@@ -105,11 +110,29 @@ export function createWorkspaceStateStore({
   }
 
   async function readLastActiveWorkspacePaths() {
-    const state = normalizeWorkspaceState(await readWorkspaceState());
-    return state.lastActiveWorkspacePaths.map((folderPath) => path.resolve(folderPath));
+    return (await readLastActiveWorkspaceComposition()).paths;
   }
 
-  async function rememberRecentWorkspacePath(folderPath, knownWorkspace = null) {
+  function readLastActiveWorkspaceComposition() {
+    return enqueueMutation(async () => {
+      const state = normalizeWorkspaceState(await readWorkspaceState());
+      const paths = state.lastActiveWorkspacePaths.map((folderPath) => path.resolve(folderPath));
+      if (paths.length === 0) {
+        return Object.freeze({ workspaceId: null, paths: Object.freeze([]) });
+      }
+      const workspaceId = state.lastActiveWorkbenchWorkspaceId ?? createPersistedWorkbenchWorkspaceId();
+      if (!state.lastActiveWorkbenchWorkspaceId) {
+        await writeWorkspaceState(createPersistedState(
+          state.recentWorkspaceRecords,
+          paths,
+          workspaceId,
+        ));
+      }
+      return Object.freeze({ workspaceId, paths: Object.freeze(paths) });
+    });
+  }
+
+  async function rememberRecentWorkspacePath(folderPath, knownWorkspace = null, options = {}) {
     const canonicalPath = await canonicalizeWorkspacePath(folderPath);
     const identity = await resolveIdentity(canonicalPath, knownWorkspace);
     return enqueueMutation(async () => {
@@ -126,12 +149,16 @@ export function createWorkspaceStateStore({
         record,
         ...state.recentWorkspaceRecords.filter((item) => !isSameWorkspaceRecord(item, record)),
       ].slice(0, RECENT_WORKSPACE_LIMIT);
-      await writeWorkspaceState(createPersistedState(recentWorkspaceRecords, [canonicalPath]));
+      await writeWorkspaceState(createPersistedState(
+        recentWorkspaceRecords,
+        [canonicalPath],
+        normalizeOptionalString(options.workbenchWorkspaceId) ?? createPersistedWorkbenchWorkspaceId(),
+      ));
       return record;
     });
   }
 
-  async function rememberWorkspaceComposition(workspaces) {
+  async function rememberWorkspaceComposition(workspaces, options = {}) {
     if (!Array.isArray(workspaces) || workspaces.length === 0) {
       throw new TypeError("A Workspace composition requires at least one Folder.");
     }
@@ -161,6 +188,9 @@ export function createWorkspaceStateStore({
       await writeWorkspaceState(createPersistedState(
         recentWorkspaceRecords,
         compositionRecords.map((record) => record.path),
+        normalizeOptionalString(options.workbenchWorkspaceId)
+          ?? state.lastActiveWorkbenchWorkspaceId
+          ?? createPersistedWorkbenchWorkspaceId(),
       ));
       return compositionRecords;
     });
@@ -316,6 +346,7 @@ export function createWorkspaceStateStore({
     hydrateRecentWorkspacesResult,
     readLastActiveWorkspacePath,
     readLastActiveWorkspacePaths,
+    readLastActiveWorkspaceComposition,
     rememberWorkspaceComposition,
     rememberRecentWorkspacePath,
     requireRecentWorkspacePath,
@@ -352,6 +383,7 @@ function normalizeWorkspaceState(state) {
 
   return {
     version: WORKSPACE_REGISTRY_VERSION,
+    lastActiveWorkbenchWorkspaceId: normalizeOptionalString(state?.lastActiveWorkbenchWorkspaceId),
     lastActiveWorkspacePaths: normalizeActiveWorkspacePaths(state, records),
     lastActiveWorkspacePath: normalizeOptionalString(state?.lastActiveWorkspacePath)
       ?? records[0]?.path
@@ -386,13 +418,15 @@ function normalizeWorkspaceRecord(value, fallbackTimestamp = null) {
   };
 }
 
-function createPersistedState(records, activeWorkspacePaths = null) {
+function createPersistedState(records, activeWorkspacePaths = null, workbenchWorkspaceId = null) {
   const normalizedActivePaths = Array.isArray(activeWorkspacePaths)
     ? activeWorkspacePaths.map(normalizeOptionalString).filter(Boolean)
     : [records[0]?.path].filter(Boolean);
   const primaryRecord = records.find((record) => record.path === normalizedActivePaths[0]) ?? records[0];
   return {
     version: WORKSPACE_REGISTRY_VERSION,
+    lastActiveWorkbenchWorkspaceId: normalizeOptionalString(workbenchWorkspaceId)
+      ?? createPersistedWorkbenchWorkspaceId(),
     lastActiveWorkspaceInstanceId: primaryRecord?.workspaceInstanceId ?? null,
     lastActiveWorkspacePath: normalizedActivePaths[0] ?? null,
     lastActiveWorkspacePaths: normalizedActivePaths,
@@ -400,6 +434,10 @@ function createPersistedState(records, activeWorkspacePaths = null) {
     recentWorkspacePaths: records.map((record) => record.path),
     recentWorkspaces: records,
   };
+}
+
+function createPersistedWorkbenchWorkspaceId() {
+  return `workbench:${crypto.randomUUID()}`;
 }
 
 function normalizeActiveWorkspacePaths(state, records) {

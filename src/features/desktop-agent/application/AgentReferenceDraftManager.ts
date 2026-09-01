@@ -2,6 +2,10 @@ import type {
   AgentDraftReference,
   AgentReferenceInputCapabilities,
 } from "../domain/agent-contract";
+import {
+  acceptsAgentAttachment,
+  classifyAgentAttachment,
+} from "../domain/agent-reference-capabilities";
 import type { AgentClientPort, AgentClientProvider } from "./AgentClientPort";
 import type { AgentControllerState } from "./agent-controller-state";
 import { AgentKnownError, formatAgentError } from "./agent-error";
@@ -23,6 +27,7 @@ type AgentReferenceDraftManagerOptions = {
 /** Owns draft reference acquisition, validation, retry material and grant release. */
 export class AgentReferenceDraftManager {
   private retryFiles = new Map<string, File>();
+  private retryWorkspacePaths = new Map<string, string>();
   private readonly previews = new AgentReferencePreviewStore();
   private epoch = createReferenceEpoch();
 
@@ -64,6 +69,7 @@ export class AgentReferenceDraftManager {
         return references.map((reference) => this.withCapabilityStatus(reference));
       } catch (error) {
         const reference = workspaceReferenceError(path, error);
+        this.retryWorkspacePaths.set(reference.id, path);
         this.previews.set(reference.id, visualPreviews.get(path));
         return [reference];
       }
@@ -168,6 +174,7 @@ export class AgentReferenceDraftManager {
     const reference = state.references.find((entry) => entry.id === id);
     if (!reference) return;
     this.retryFiles.delete(id);
+    this.retryWorkspacePaths.delete(id);
     this.options.patch({ references: state.references.filter((entry) => entry.id !== id) });
     void this.revoke([reference]);
   }
@@ -177,12 +184,14 @@ export class AgentReferenceDraftManager {
     const reference = state.references.find((entry) => entry.id === id);
     if (!reference || reference.status !== "error") return;
     const file = this.retryFiles.get(id);
+    const workspacePath = this.retryWorkspacePaths.get(id);
     this.retryFiles.delete(id);
+    this.retryWorkspacePaths.delete(id);
     this.options.patch({ references: state.references.filter((entry) => entry.id !== id) });
     void (async () => {
       await this.revoke([reference]);
       if (file) await this.stageExternalFiles([file]);
-      else if (reference.kind === "workspace-entry") await this.addWorkspacePaths([reference.path]);
+      else if (reference.kind === "workspace-entry") await this.addWorkspacePaths([workspacePath ?? reference.relativePath]);
     })();
   }
 
@@ -196,10 +205,10 @@ export class AgentReferenceDraftManager {
       if (reference.status !== "ready" || !capabilities) return reference;
       count += 1;
       bytes += reference.size ?? 0;
-      if (count > capabilities.maxReferences) {
+      if (count > capabilities.limits.maxCount) {
         return referenceCapabilityError(reference, "reference-limit", "This Agent's reference count limit was reached.");
       }
-      if (bytes > capabilities.maxTotalReferenceBytes) {
+      if (bytes > capabilities.limits.maxTotalBytes) {
         return referenceCapabilityError(reference, "reference-total-size", "This Agent's total reference size limit was reached.");
       }
       return reference;
@@ -220,13 +229,14 @@ export class AgentReferenceDraftManager {
   async rotate(references: AgentDraftReference[]) {
     await this.revoke(references);
     this.retryFiles.clear();
+    this.retryWorkspacePaths.clear();
     this.previews.clear();
     this.epoch = createReferenceEpoch();
   }
 
   async reset(references: AgentDraftReference[]) {
     await this.rotate(references);
-    this.options.patch({ references: [], pendingIntent: null });
+    this.options.patch({ references: [], draftMentions: [], pendingIntent: null });
   }
 
   releasePreviews(references: AgentDraftReference[]) {
@@ -235,6 +245,7 @@ export class AgentReferenceDraftManager {
 
   disposeRendererResources() {
     this.retryFiles.clear();
+    this.retryWorkspacePaths.clear();
     this.previews.clear();
   }
 
@@ -288,7 +299,6 @@ function workspaceReferenceError(referencePath: string, error: unknown): AgentDr
     id: `error-${createReferenceEpoch()}`,
     kind: "workspace-entry",
     entryType: "file",
-    path: referencePath.slice(0, 4_096),
     relativePath: displayName,
     displayName,
     status: "error",
@@ -301,26 +311,28 @@ function unsupportedReferenceFailure(
   capabilities: AgentReferenceInputCapabilities | undefined,
 ): { code: string; message: string } | null {
   if (!capabilities) return referenceFailure("capability-unreported", "The selected Agent has not reported reference input support.");
-  if ((reference.size ?? 0) > capabilities.maxReferenceBytes) {
+  if ((reference.size ?? 0) > capabilities.limits.maxBytesPerReference) {
     return referenceFailure("reference-size", "This reference exceeds the selected Agent's size limit.");
   }
   if (reference.kind === "workspace-entry") {
-    if (reference.entryType === "directory" && !capabilities.workspaceDirectories) {
+    if (reference.entryType === "directory" && !capabilities.workspace.directories) {
       return referenceFailure("workspace-directory-unsupported", "The selected Agent does not accept workspace directories.");
     }
-    if (reference.entryType === "file" && !capabilities.workspaceFiles) {
+    if (reference.entryType === "file" && !capabilities.workspace.files) {
       return referenceFailure("workspace-file-unsupported", "The selected Agent does not accept workspace files.");
     }
     return null;
   }
-  const image = reference.mime.startsWith("image/");
-  if ((image ? capabilities.images : capabilities.genericFiles) === "none") {
-    return image
+  const attachment = { mime: reference.mime, name: reference.displayName };
+  const kind = classifyAgentAttachment(attachment);
+  const kindLimit = capabilities.attachments[kind].maxBytes;
+  if (kindLimit && (reference.size ?? 0) > kindLimit) {
+    return referenceFailure("reference-size", "This reference exceeds the selected Agent's size limit.");
+  }
+  if (!acceptsAgentAttachment(capabilities, attachment)) {
+    return kind === "image"
       ? referenceFailure("image-unsupported", "The selected Agent does not accept image attachments.")
       : referenceFailure("file-unsupported", "The selected Agent does not accept this file type.");
-  }
-  if (capabilities.acceptedMimeTypes?.length && !capabilities.acceptedMimeTypes.includes(reference.mime)) {
-    return referenceFailure("mime-unsupported", "The selected Agent does not accept this attachment MIME type.");
   }
   return null;
 }

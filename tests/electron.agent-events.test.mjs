@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  agentRendererValueLimits,
+  boundRendererValue,
   createAgentEventEnvelope,
   isAgentEventEnvelope,
   redactSecretText,
@@ -42,6 +44,31 @@ describe("normalized AgentEvent envelopes", () => {
     });
     expect(event.payload).toEqual({ safe: "ok" });
     expect({}.polluted).toBeUndefined();
+  });
+
+  it("applies one aggregate text and node budget across nested renderer payloads", () => {
+    const chunk = "x".repeat(32 * 1024);
+    const payload = Object.fromEntries(Array.from({ length: 200 }, (_, index) => [
+      `branch-${index}`,
+      Array.from({ length: 200 }, () => chunk),
+    ]));
+    const bounded = boundRendererValue(payload);
+    const serialized = JSON.stringify(bounded);
+
+    expect(serialized.length).toBeLessThan(agentRendererValueLimits.maxTotalText + 40_000);
+    expect(serialized).toContain("truncated");
+  });
+
+  it("terminates cyclic provider payloads before IPC delivery", () => {
+    const payload = { label: "safe" };
+    payload.self = payload;
+    payload.children = [payload];
+
+    expect(boundRendererValue(payload)).toEqual({
+      label: "safe",
+      self: "[circular]",
+      children: ["[circular]"],
+    });
   });
 
   it("redacts common credential shapes recursively before renderer delivery", () => {

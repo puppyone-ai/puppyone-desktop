@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { dispatchTypographyChange } from "@puppyone/shared-ui";
 import {
   BUILTIN_FONT_CATALOG,
+  createCatalogFontFamily,
   resolveTypography,
   type FontCatalogEntry,
   type ResolvedTypography,
@@ -13,6 +14,7 @@ type TypographyCustomProperties = CSSProperties & {
   "--po-font-content-primary": string;
   "--po-font-code-primary": string;
   "--po-font-terminal-primary": string;
+  "--po-font-editor-content-user"?: string;
 };
 
 export type TypographyRootProps = {
@@ -20,6 +22,7 @@ export type TypographyRootProps = {
   "data-font-ui-category": FontCatalogEntry["category"];
   "data-font-content": string;
   "data-font-content-category": FontCatalogEntry["category"];
+  "data-font-editor-content": string;
   "data-font-code": string;
   "data-font-code-category": FontCatalogEntry["category"];
   "data-font-terminal": string;
@@ -52,9 +55,12 @@ export function useTypographyRuntime(
       resolved.content.family,
       resolved.code.family,
       resolved.terminal.family,
+      resolved.editorContentOverride?.family,
     ]);
     const fontsReady = document.fonts
-      ? Promise.allSettled([...families].map((family) => document.fonts.load(`16px ${family}`)))
+      ? Promise.allSettled([...families]
+        .filter((family): family is string => Boolean(family))
+        .map((family) => document.fonts.load(`16px ${family}`)))
         .then(() => document.fonts.ready)
       : Promise.resolve();
     void fontsReady.then(() => {
@@ -75,6 +81,9 @@ export function useTypographyRuntime(
     resolved.content.family,
     resolved.content.category,
     resolved.content.id,
+    resolved.editorContentOverride?.family,
+    resolved.editorContentOverride?.category,
+    resolved.editorContentOverride?.id,
     resolved.ui.family,
     resolved.ui.category,
     resolved.ui.id,
@@ -93,6 +102,7 @@ export function createTypographyRootProps(resolved: ResolvedTypography): Typogra
     "data-font-ui-category": resolved.ui.category,
     "data-font-content": resolved.content.id,
     "data-font-content-category": resolved.content.category,
+    "data-font-editor-content": resolved.editorContentOverride?.id ?? "theme",
     "data-font-code": resolved.code.id,
     "data-font-code-category": resolved.code.category,
     "data-font-terminal": resolved.terminal.id,
@@ -102,6 +112,9 @@ export function createTypographyRootProps(resolved: ResolvedTypography): Typogra
       "--po-font-content-primary": resolved.content.family,
       "--po-font-code-primary": resolved.code.family,
       "--po-font-terminal-primary": resolved.terminal.family,
+      ...(resolved.editorContentOverride
+        ? { "--po-font-editor-content-user": createCatalogFontFamily(resolved.editorContentOverride) }
+        : {}),
     },
   };
 }
@@ -111,6 +124,7 @@ export function applyTypographyToElement(element: HTMLElement, resolved: Resolve
   element.dataset.fontUiCategory = resolved.ui.category;
   element.dataset.fontContent = resolved.content.id;
   element.dataset.fontContentCategory = resolved.content.category;
+  element.dataset.fontEditorContent = resolved.editorContentOverride?.id ?? "theme";
   element.dataset.fontCode = resolved.code.id;
   element.dataset.fontCodeCategory = resolved.code.category;
   element.dataset.fontTerminal = resolved.terminal.id;
@@ -119,8 +133,15 @@ export function applyTypographyToElement(element: HTMLElement, resolved: Resolve
   element.style.removeProperty("--po-font-content");
   element.style.removeProperty("--po-font-code");
   element.style.removeProperty("--po-font-terminal");
+  element.style.removeProperty("--po-font-editor-content-user");
   element.style.setProperty("--po-font-ui-primary", resolved.ui.family);
   element.style.setProperty("--po-font-content-primary", resolved.content.family);
   element.style.setProperty("--po-font-code-primary", resolved.code.family);
   element.style.setProperty("--po-font-terminal-primary", resolved.terminal.family);
+  if (resolved.editorContentOverride) {
+    element.style.setProperty(
+      "--po-font-editor-content-user",
+      createCatalogFontFamily(resolved.editorContentOverride),
+    );
+  }
 }

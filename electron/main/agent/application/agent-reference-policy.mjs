@@ -1,17 +1,25 @@
 import {
   normalizeAuthorizedReferences,
+  bindPromptReferenceMentionDelivery,
+  compileAgentPromptReferenceMentions,
   normalizePrompt,
+  normalizePromptReferenceMentions,
   normalizeReferenceDisplays,
   requireSupportedAgentReferences,
 } from "./agent-input-policy.mjs";
 
-export function prepareAgentTurnReferenceInput(request, capabilities) {
-  const references = normalizeAuthorizedReferences([
+export function prepareAgentTurnReferenceInput(request, capabilities, deliveryForReference) {
+  const authorizedReferences = normalizeAuthorizedReferences([
     ...(Array.isArray(request?.references) ? request.references : []),
     ...(Array.isArray(request?.contextReferences) ? request.contextReferences : []),
     ...(Array.isArray(request?.attachments) ? request.attachments : []),
   ]);
-  requireSupportedAgentReferences(capabilities, references);
+  requireSupportedAgentReferences(capabilities, authorizedReferences);
+  const displayPrompt = normalizePrompt(request?.prompt, {
+    allowEmpty: authorizedReferences.length > 0 && capabilities?.referenceInputs?.attachmentOnly === true,
+  });
+  const promptMentions = normalizePromptReferenceMentions(request?.promptMentions, displayPrompt, authorizedReferences);
+  const references = bindPromptReferenceMentionDelivery(authorizedReferences, promptMentions, deliveryForReference);
   return {
     references,
     referenceDisplays: normalizeReferenceDisplays(references),
@@ -21,15 +29,19 @@ export function prepareAgentTurnReferenceInput(request, capabilities) {
           ...(typeof reference.snapshotUrl === "string" ? [[reference.snapshotUrl, reference.displayName]] : []),
         ]
       : [])),
-    prompt: normalizePrompt(request?.prompt, {
-      allowEmpty: references.length > 0 && capabilities?.referenceInputs?.attachmentOnly === true,
-    }),
+    displayPrompt,
+    promptMentions,
+    prompt: compileAgentPromptReferenceMentions(displayPrompt, promptMentions, references),
   };
 }
 
 export function beginAgentTurnReferences(session, request) {
-  const input = prepareAgentTurnReferenceInput(request, session.capabilities);
-  session.pendingPrompt = input.prompt;
+  const deliveryForReference = typeof session.adapter?.referenceMentionDelivery === "function"
+    ? (reference) => session.adapter.referenceMentionDelivery(reference)
+    : undefined;
+  const input = prepareAgentTurnReferenceInput(request, session.capabilities, deliveryForReference);
+  session.pendingPrompt = input.displayPrompt;
+  session.pendingPromptMentions = input.promptMentions;
   session.pendingReferenceDisplays = input.referenceDisplays;
   session.privateReferencePaths = input.privateReferencePaths;
   session.activeReferenceTokens = privateReferenceLeaseTokens(request);
@@ -38,22 +50,27 @@ export function beginAgentTurnReferences(session, request) {
 
 export function abandonAgentTurnReferences(session) {
   session.pendingPrompt = null;
+  session.pendingPromptMentions = [];
   session.pendingReferenceDisplays = [];
   session.privateReferencePaths.clear();
   session.activeReferenceTokens = [];
 }
 
-export function prepareAgentSteerReferenceInput(request, capabilities) {
-  const references = normalizeAuthorizedReferences(request?.references);
-  if (references.length > 0 && capabilities?.referenceInputs?.steer !== true) {
+export function prepareAgentSteerReferenceInput(request, capabilities, deliveryForReference) {
+  const authorizedReferences = normalizeAuthorizedReferences(request?.references);
+  if (authorizedReferences.length > 0 && capabilities?.referenceInputs?.steer !== true) {
     throw new Error("The active Agent runtime does not support references while steering.");
   }
-  requireSupportedAgentReferences(capabilities, references);
+  requireSupportedAgentReferences(capabilities, authorizedReferences);
+  const displayMessage = normalizePrompt(request?.message, {
+    allowEmpty: authorizedReferences.length > 0 && capabilities?.referenceInputs?.attachmentOnly === true,
+  });
+  const promptMentions = normalizePromptReferenceMentions(request?.promptMentions, displayMessage, authorizedReferences);
+  const references = bindPromptReferenceMentionDelivery(authorizedReferences, promptMentions, deliveryForReference);
   return {
     references,
-    message: normalizePrompt(request?.message, {
-      allowEmpty: references.length > 0 && capabilities?.referenceInputs?.attachmentOnly === true,
-    }),
+    promptMentions,
+    message: compileAgentPromptReferenceMentions(displayMessage, promptMentions, references),
   };
 }
 

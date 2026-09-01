@@ -12,7 +12,6 @@ import {
 } from "../src/preferences";
 import {
   APPEARANCE_PREFERENCES_SCHEMA_VERSION,
-  createAppearancePreferencesV2,
   readAppearancePreferences,
   serializeAppearancePreferences,
   type LegacyAppearanceSnapshot,
@@ -24,6 +23,8 @@ import {
   resolveSetting,
 } from "../src/features/appearance/resolveAppearance";
 import { INTERFACE_STYLES } from "../src/features/appearance/interfaceStyles";
+import { BUILTIN_SUB_THEMES } from "../src/features/themes/builtinSubThemes";
+import type { SubThemeDefinition } from "../src/features/themes/themeTypes";
 import {
   PRESET_VIEWER_MANIFEST,
 } from "../packages/shared-ui/src/editor/registry/presetViewerManifest";
@@ -111,30 +112,165 @@ describe("appearance profile architecture", () => {
     expect(xp).not.toHaveProperty("surfaceAdapters");
   });
 
-  it("migrates legacy intent, preserves scoped options, and round-trips V2", () => {
+  it("migrates legacy intent, preserves per-root and per-mode intent, and round-trips V4", () => {
     const legacy = legacySnapshot();
     const result = readAppearancePreferences(JSON.stringify({
-      schemaVersion: 1,
-      style: "windows-xp",
-      navigationLayout: "left-vertical",
-      themeMode: "dark",
-      byStyle: { "windows-xp": { fidelity: "authentic" } },
-      bySurface: { code: { fontLigatures: false } },
+      schemaVersion: 2,
+      activeStyle: "windows-xp",
+      shared: {
+        sidebarNavigationLayout: "left-vertical",
+        themeMode: "dark",
+      },
+      byStyle: {
+        default: { subThemeId: "builtin.pack.github", themeMode: "dark" },
+        "windows-xp": { subThemeId: "windows-xp.luna-blue", themeMode: "light" },
+      },
+      bySurface: { markdown: { headingScale: "large" } },
     }), legacy);
 
     expect(result.source).toBe("migrated");
     expect(result.writable).toBe(true);
     expect(result.preferences.schemaVersion).toBe(APPEARANCE_PREFERENCES_SCHEMA_VERSION);
-    expect(result.preferences.activeStyle).toBe("windows-xp");
+    expect(result.preferences.activeRootThemeId).toBe("windows-xp");
     expect(result.preferences.shared.sidebarNavigationLayout).toBe("left-vertical");
     expect(result.preferences.shared).not.toHaveProperty("editorPresentation");
-    expect(result.preferences.byStyle["windows-xp"]).toEqual({ fidelity: "authentic" });
-    expect(result.preferences.bySurface.code).toEqual({ fontLigatures: false });
+    expect(result.preferences.byRootTheme.default).toEqual({
+      requestedColorMode: "dark",
+      requestedSubThemeIds: {
+        light: "default.github",
+        dark: "default.github",
+      },
+    });
+    expect(result.preferences.byRootTheme["windows-xp"]).toEqual({
+      requestedColorMode: "light",
+      requestedSubThemeIds: {
+        light: "windows-xp.luna-blue",
+        dark: "windows-xp.luna-blue",
+      },
+    });
+    expect(result.preferences.bySurface.markdown.headingScale).toBe("large");
 
     const serialized = serializeAppearancePreferences(result.preferences);
     const roundTrip = readAppearancePreferences(serialized, legacy);
-    expect(roundTrip.source).toBe("v2");
+    expect(roundTrip.source).toBe("v4");
     expect(roundTrip.preferences).toEqual(result.preferences);
+  });
+
+  it("preserves the version 1 navigation-layout field during migration", () => {
+    const result = readAppearancePreferences(JSON.stringify({
+      schemaVersion: 1,
+      style: "default",
+      navigationLayout: "left-vertical",
+      themeMode: "light",
+    }), legacySnapshot());
+
+    expect(result.preferences.shared.sidebarNavigationLayout).toBe("left-vertical");
+  });
+
+  it("migrates legacy Light and Dark presets into independent Sub Theme memories", () => {
+    const result = readAppearancePreferences(null, {
+      ...legacySnapshot(),
+      lightThemePreset: "warm",
+      darkThemePreset: "graphite",
+    });
+
+    expect(result.preferences.byRootTheme.default.requestedSubThemeIds).toEqual({
+      light: "default.warm",
+      dark: "default.graphite",
+    });
+  });
+
+  it("resolves the remembered Sub Theme after resolving the effective Color Mode", () => {
+    const requestedSubThemeIds = {
+      light: "default.github",
+      dark: "default.newspaper",
+    } as const;
+    const shared = {
+      interfaceStyle: "default" as const,
+      requestedSubThemeIds,
+      sidebarNavigationLayout: "bottom-horizontal" as const,
+      textSize: "medium" as const,
+      fileIconTheme: "default" as const,
+    };
+
+    expect(resolveAppearance({ ...shared, themeMode: "light" }).subThemeId)
+      .toBe("default.github");
+    expect(resolveAppearance({ ...shared, themeMode: "dark" }).subThemeId)
+      .toBe("default.newspaper");
+    expect(resolveAppearance({
+      ...shared,
+      themeMode: "system",
+      systemColorMode: "dark",
+    }).subThemeId).toBe("default.newspaper");
+  });
+
+  it("resolves requested and effective Sub Themes without leaking identity into editors", () => {
+    const incompatible = subTheme({
+      id: "external.xp-only",
+      compatibleRootThemeIds: ["windows-xp"],
+      variants: { light: { compiledCss: {} } },
+      targets: ["markdown", "csv"],
+    });
+    const result = resolveAppearance({
+      interfaceStyle: "default",
+      themeMode: "dark",
+      requestedSubThemeIds: { light: incompatible.id, dark: incompatible.id },
+      subThemeCatalog: {
+        subThemes: [...BUILTIN_SUB_THEMES, incompatible],
+        diagnostics: [],
+      },
+      sidebarNavigationLayout: "bottom-horizontal",
+      textSize: "medium",
+      fileIconTheme: "default",
+    });
+
+    expect(result.decisions.subTheme).toMatchObject({
+      requestedValue: incompatible.id,
+      effectiveValue: "default.neutral",
+      status: "constrained",
+    });
+    expect(result.diagnostics[0]?.code).toBe("sub-theme-incompatible");
+    expect(result.appearanceRevision).toBe("default:default.neutral:dark");
+
+    const editorContext = source("packages/shared-ui/src/core/appearance/EditorAppearanceContext.tsx");
+    expect(editorContext).toContain("EditorAppearanceRevisionContext");
+    expect(editorContext).toContain("revision: string");
+    expect(editorContext).not.toMatch(/ThemeCatalog|SubThemeDefinition|rootThemeId|subThemeId/);
+  });
+
+  it("resolves system Color Mode before checking Sub Theme mode compatibility", () => {
+    const lightOnly = subTheme({
+      id: "external.light-reader",
+      compatibleRootThemeIds: ["default"],
+      variants: { light: { compiledCss: {} } },
+    });
+    const result = resolveAppearance({
+      interfaceStyle: "default",
+      themeMode: "system",
+      systemColorMode: "dark",
+      requestedSubThemeIds: { light: lightOnly.id, dark: lightOnly.id },
+      subThemeCatalog: {
+        subThemes: [...BUILTIN_SUB_THEMES, lightOnly],
+        diagnostics: [],
+      },
+      sidebarNavigationLayout: "bottom-horizontal",
+      textSize: "medium",
+      fileIconTheme: "default",
+    });
+
+    expect(result.requestedColorMode).toBe("system");
+    expect(result.effectiveColorMode).toBe("dark");
+    expect(result.subThemeId).toBe("default.neutral");
+    expect(result.diagnostics[0]?.code).toBe("sub-theme-mode-unsupported");
+  });
+
+  it("renders appearance controls in Root Theme, Color Mode, Sub Theme order", () => {
+    const settings = source("src/features/settings/SettingsView.tsx");
+    expectInOrder(settings, [
+      "<InterfaceStyleSetting",
+      "<InterfacePaletteSettings",
+      "<SubThemeSettingsSection",
+    ]);
   });
 
   it("does not authorize overwriting a newer unsupported preference document", () => {
@@ -146,7 +282,7 @@ describe("appearance profile architecture", () => {
 
     expect(result.source).toBe("future");
     expect(result.writable).toBe(false);
-    expect(result.preferences.activeStyle).toBe("default");
+    expect(result.preferences.activeRootThemeId).toBe("default");
   });
 
   it("keeps Settings and Shell on the shared resolver rather than Style-ID branches", () => {
@@ -192,7 +328,9 @@ describe("appearance profile architecture", () => {
     const generated = source("src/styles/interface-styles.generated.css");
     const entry = source("src/styles/interfaces/windows-xp/index.css");
 
-    expect(cascade).toContain("features, interface-style, accessibility, overrides");
+    expect(cascade).toContain(
+      "features, interface-style, sub-theme, appearance-overrides, accessibility, overrides",
+    );
     expect(generated).toContain(
       '@import "./interfaces/windows-xp/index.css" layer(interface-style);',
     );
@@ -257,4 +395,31 @@ function legacySnapshot(): LegacyAppearanceSnapshot {
 
 function source(relativePath: string) {
   return readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
+}
+
+function expectInOrder(sourceText: string, needles: readonly string[]) {
+  let cursor = -1;
+  for (const needle of needles) {
+    const next = sourceText.indexOf(needle, cursor + 1);
+    expect(next, needle).toBeGreaterThan(cursor);
+    cursor = next;
+  }
+}
+
+function subTheme(overrides: Partial<SubThemeDefinition>): SubThemeDefinition {
+  return {
+    id: "external.reader",
+    family: "external",
+    name: "Reader",
+    version: "1.0.0",
+    contractVersion: 1,
+    compatibleRootThemeIds: ["default"],
+    targets: ["application", "markdown", "csv"],
+    source: "local-package",
+    variants: {
+      light: { compiledCss: {} },
+      dark: { compiledCss: {} },
+    },
+    ...overrides,
+  };
 }

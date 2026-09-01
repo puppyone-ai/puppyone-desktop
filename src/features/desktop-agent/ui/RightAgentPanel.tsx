@@ -30,7 +30,7 @@ type RightAgentPanelProps = {
   preferredModel?: string | null;
   /** @deprecated Use onPreferredRouteChange. */
   onPreferredModelChange?: (model: string) => void;
-  enabledRuntimeIds?: readonly string[] | null;
+  hiddenRuntimeIds?: readonly string[];
 };
 
 export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanelProps>(function RightAgentPanel({
@@ -45,7 +45,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   onPreferredRouteChange,
   preferredModel = null,
   onPreferredModelChange,
-  enabledRuntimeIds = null,
+  hiddenRuntimeIds = [],
 }, ref) {
   const { t } = useLocalization();
   const closeController = useCallback((tabId: string) => (
@@ -95,10 +95,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
               onPreferredRouteChange={onPreferredRouteChange}
               preferredModel={preferredModel}
               onPreferredModelChange={onPreferredModelChange}
-              enabledRuntimeIds={enabledRuntimeIds}
-              openSessionIds={tabs.tabs.flatMap((candidate) => (
-                candidate.id !== tab.id && candidate.sessionId ? [candidate.sessionId] : []
-              ))}
+              hiddenRuntimeIds={hiddenRuntimeIds}
             />
           </div>
         ))}
@@ -109,7 +106,6 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
 
 type AgentTabHostProps = Omit<RightAgentPanelProps, "onRunningChange"> & {
   tabId: string;
-  openSessionIds: readonly string[];
   onPresentationChange: (tabId: string, presentation: AgentChatTabPresentation) => void;
 };
 
@@ -118,7 +114,6 @@ function AgentTabHost({
   active,
   workspace,
   onPresentationChange,
-  openSessionIds,
   ...panelProps
 }: AgentTabHostProps) {
   const controller = useMemo(
@@ -138,7 +133,6 @@ function AgentTabHost({
     preferredRuntimeId={panelProps.preferredRuntimeId ?? null}
     preferredRoute={panelProps.preferredRoute ?? {}}
     preferredModel={panelProps.preferredModel ?? null}
-    enabledRuntimeIds={panelProps.enabledRuntimeIds ?? null}
-    openSessionIds={openSessionIds}
+    hiddenRuntimeIds={panelProps.hiddenRuntimeIds ?? []}
   />;
 }

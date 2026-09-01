@@ -10,6 +10,7 @@ import {
   isSameDataResource,
   joinDataResourcePath,
   normalizeDataResourcePath,
+  qualifyDataResourcePath,
   rebaseDataResourcePath,
 } from "../packages/shared-ui/src";
 
@@ -77,5 +78,18 @@ describe("data Resource path operations", () => {
     expect(() => canonicalizeResourcePath(
       "puppyone-local:/workspace/folder-a/docs/guanqun.md",
     )).toThrow(/provider-relative paths/i);
+  });
+
+  it("refuses to encode host absolute paths as provider-relative resources", () => {
+    const root = createWorkspaceRootUri("folder-a");
+
+    expect(() => qualifyDataResourcePath(
+      root,
+      "/Users/example/project/README.md",
+    )).toThrow(/provider-relative paths/i);
+    expect(() => createWorkspaceResourceUri(
+      root,
+      "/Users/example/project/README.md",
+    )).toThrow(/provider paths/i);
   });
 });

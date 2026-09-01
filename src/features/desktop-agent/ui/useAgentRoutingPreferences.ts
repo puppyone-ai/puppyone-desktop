@@ -3,6 +3,7 @@ import type { AgentSessionController } from "../application/AgentSessionControll
 import type { AgentControllerState } from "../application/agent-controller-state";
 import type { AgentModel } from "../domain/agent-contract";
 import type { AgentRoutePreference } from "../domain/agent-route-preference";
+import type { AgentSessionControlId } from "../domain/agent-session-controls";
 
 type Options = {
   active: boolean;
@@ -148,6 +149,23 @@ export function useAgentRoutingPreferences({
     });
   }, [controller, onPreferredRouteChange, preferredRoute, state.selectedModel, state.selectedProviderId]);
 
+  const selectMode = useCallback((mode: string) => {
+    controller.selectMode(mode);
+    onPreferredRouteChange?.({
+      ...preferredRoute,
+      providerId: state.selectedProviderId ?? undefined,
+      modelId: state.selectedModel ?? undefined,
+      effort: state.selectedEffort ?? undefined,
+      mode,
+    });
+  }, [controller, onPreferredRouteChange, preferredRoute, state.selectedEffort, state.selectedModel, state.selectedProviderId]);
+
+  const selectSessionControl = useCallback((id: AgentSessionControlId, value: string) => {
+    if (id === "model") selectModel(value);
+    else if (id === "effort") selectEffort(value);
+    else selectMode(value);
+  }, [selectEffort, selectMode, selectModel]);
+
   const selectRuntime = useCallback((runtimeId: string) => {
     void controller.selectRuntime(runtimeId).then((switched) => {
       if (switched) onPreferredRuntimeChange?.(runtimeId);
@@ -157,6 +175,8 @@ export function useAgentRoutingPreferences({
   return {
     selectModel,
     selectEffort,
+    selectMode,
+    selectSessionControl,
     selectRuntime,
     preferencesReady: !modelPreferencePending && !effortPreferencePending && !modePreferencePending,
   };

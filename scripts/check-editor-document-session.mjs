@@ -347,6 +347,37 @@ const workbenchDataPortSource = readFileSync(workbenchDataPortPath, "utf8");
 if (!/if\s*\(!resourceIsUri\)\s*assertValidDataResourceReference\(path\)/.test(workbenchDataPortSource)) {
   errors.push(`${relative(workbenchDataPortPath)} can route a malformed Resource URI through the legacy first-Folder fallback`);
 }
+if (
+  !/workbench\.folders\.length\s*!==\s*1[\s\S]*?provider-relative path is ambiguous[\s\S]*?Use a Resource URI/.test(
+    workbenchDataPortSource,
+  )
+) {
+  errors.push(`${relative(workbenchDataPortPath)} does not fail closed on an unqualified multi-Folder path`);
+}
+
+const workbenchWorkspacePath = path.join(
+  repoRoot,
+  "packages/shared-ui/src/core/workbenchWorkspace.ts",
+);
+const workbenchWorkspaceSource = readFileSync(workbenchWorkspacePath, "utf8");
+if (
+  /id:\s*`single:\$\{[^}]+\}`/.test(workbenchWorkspaceSource)
+  || !/options\.id\s*\?\?\s*createTransientWorkbenchWorkspaceId\(\)/.test(workbenchWorkspaceSource)
+) {
+  errors.push(`${relative(workbenchWorkspacePath)} derives Workbench identity from an ordered Folder`);
+}
+
+const workspaceLifecyclePath = path.join(
+  repoRoot,
+  "src/features/app-shell/useWorkspaceLifecycle.ts",
+);
+const workspaceLifecycleSource = readFileSync(workspaceLifecyclePath, "utf8");
+if (
+  /context\.getWorkspace\(\)\.folders\[0\].*nextFolders\[0\]/s.test(workspaceLifecycleSource)
+  || !/context\.getWorkspace\(\)\.id\s*!==\s*workbenchWorkspaceId/.test(workspaceLifecycleSource)
+) {
+  errors.push(`${relative(workspaceLifecyclePath)} recreates a Workbench when the primary Folder changes`);
+}
 
 // The multi-Folder experiment is a shell affordance gate, never a data-model or
 // persistence-kernel selector. Keep flag-state branches out of every identity,
@@ -376,6 +407,7 @@ const workspaceFeatureMatrixTestSource = readFileSync(workspaceFeatureMatrixTest
 for (const requiredContract of [
   "runs the P0 save kernel identically with the multi-project experiment",
   "preserves the active Workbench composition while the experiment toggles at runtime",
+  "preserves Workbench identity when the primary Folder is detached",
   "getOrCreateDocumentWorkingCopy",
   "legacy notes/README.md",
   "docs with space/群群.md",
@@ -411,6 +443,7 @@ const multiRootPersistenceTestPath = path.join(
 );
 const multiRootPersistenceTestSource = readFileSync(multiRootPersistenceTestPath, "utf8");
 for (const requiredContract of [
+  "retains one dirty Working Copy when the primary Folder is detached",
   "persists and reopens same-named documents in two real Workspace roots without crossing providers",
   "docs with space/群群.md",
   "getOrCreateDocumentWorkingCopy",
@@ -427,6 +460,9 @@ if (!/rejects a malformed Resource URI before any Folder provider can write/.tes
   readFileSync(workbenchDataPortTestPath, "utf8"),
 )) {
   errors.push(`${relative(workbenchDataPortTestPath)} does not cover fail-closed malformed URI routing`);
+}
+if (!/rejects ambiguous provider paths/.test(readFileSync(workbenchDataPortTestPath, "utf8"))) {
+  errors.push(`${relative(workbenchDataPortTestPath)} does not cover fail-closed multi-Folder relative paths`);
 }
 const localFilesPath = path.join(repoRoot, "src/lib/localFiles.ts");
 const localFilesSource = readFileSync(localFilesPath, "utf8");

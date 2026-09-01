@@ -67,5 +67,6 @@ function isTestSource(relativePath) {
     || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(normalized)
     || normalized.endsWith(".snap")
     || normalized === "scripts/native-agent-roundtrip-runner.mjs"
+    || /^scripts\/native-agent-(?:reference-smoke-(?:fixtures|runner)|smoke-runtime-selection)\.mjs$/.test(normalized)
     || /^scripts\/(?:smoke|audit|run-.*(?:test|smoke)|.*(?:test|e2e))[^/]*\.[cm]?js$/.test(normalized);
 }

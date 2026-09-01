@@ -6,7 +6,7 @@ import type {
 } from "../../app-shell/auxiliary-workbench/types";
 import {
   closeAgentSessionController,
-  discardAgentSessionController,
+  discardPreparedAgentSessionController,
   getAgentSessionController,
 } from "../application/controllerRegistry";
 import type { AgentChatTabPresentation } from "../domain/agent-chat-tabs";
@@ -18,7 +18,7 @@ import type { AgentWorkspaceReferenceResolver } from "../ui/useAgentReferenceIng
 import "../ui/desktop-agent.css";
 
 export type AgentChatWorkbenchItemProps = AuxiliaryWorkbenchItemRenderContext & Readonly<{
-  enabledRuntimeIds: readonly string[] | null;
+  hiddenRuntimeIds: readonly string[];
   onOpenFile?: (path: string) => void;
   onPreferredModelChange?: (model: string) => void;
   onPreferredRouteChange?: (route: AgentRoutePreference) => void;
@@ -31,7 +31,7 @@ export type AgentChatWorkbenchItemProps = AuxiliaryWorkbenchItemRenderContext & 
 }>;
 
 export function AgentChatWorkbenchItem({
-  enabledRuntimeIds,
+  hiddenRuntimeIds,
   item,
   onOpenFile,
   onPreferredModelChange,
@@ -39,7 +39,6 @@ export function AgentChatWorkbenchItem({
   onPreferredRuntimeChange,
   onPresentationChange,
   onViewChanges,
-  peerSnapshots,
   preferredModel,
   preferredRoute,
   preferredRuntimeId,
@@ -54,12 +53,6 @@ export function AgentChatWorkbenchItem({
   const present = useCallback((agent: AgentChatTabPresentation) => {
     onPresentationChange(presentAgentChatWorkbenchItem(agent, t("agent.name")));
   }, [onPresentationChange, t]);
-  const openSessionIds = useMemo(() => Array.from(peerSnapshots.entries()).flatMap(
-    ([itemId, snapshot]) => itemId !== item.id && snapshot.resourceId
-      ? [snapshot.resourceId]
-      : [],
-  ), [item.id, peerSnapshots]);
-
   return <AgentChatTabPanel
     commandTarget={presentation.commandTarget}
     presented={presentation.presented}
@@ -74,8 +67,7 @@ export function AgentChatWorkbenchItem({
     onPreferredRouteChange={onPreferredRouteChange}
     preferredModel={preferredModel}
     onPreferredModelChange={onPreferredModelChange}
-    enabledRuntimeIds={enabledRuntimeIds}
-    openSessionIds={openSessionIds}
+    hiddenRuntimeIds={hiddenRuntimeIds}
     resolveWorkspaceReference={resolveWorkspaceReference}
   />;
 }
@@ -94,8 +86,23 @@ export function prepareAgentChatWorkbenchItem(
   controller.beginInitializeForRuntime(runtimeId);
 }
 
-export function discardPreparedAgentChatWorkbenchItem(rootId: string, itemId: string) {
-  discardAgentSessionController(rootId, itemId);
+export async function restoreAgentChatWorkbenchItem(
+  rootId: string,
+  itemId: string,
+  sessionId: string,
+  runtimeId: string,
+) {
+  const controller = getAgentSessionController(
+    rootId,
+    getElectronAgentClient,
+    itemId,
+    scheduleAgentStreamFrame,
+  );
+  await controller.openSavedSession(sessionId, runtimeId);
+}
+
+export async function discardPreparedAgentChatWorkbenchItem(rootId: string, itemId: string) {
+  await discardPreparedAgentSessionController(rootId, itemId);
 }
 
 export function presentAgentChatWorkbenchItem(

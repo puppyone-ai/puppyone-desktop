@@ -1,5 +1,10 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
-import type { ViewerPackSnapshot, Workspace } from "@puppyone/shared-ui";
+import {
+  qualifyDataResourcePath,
+  type ResourceUri,
+  type ViewerPackSnapshot,
+  type Workspace,
+} from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import type { DesktopView } from "../../../components/DesktopCloudShell";
 import type { DesktopUpdatesController } from "../../updates";
@@ -31,6 +36,7 @@ import {
   type PluginsSection,
 } from "../../plugins";
 import type { DesktopPreferencesController } from "../useDesktopPreferences";
+import type { SubThemeCatalogController } from "../../themes/useSubThemeCatalog";
 import {
   getAvailableWorkspaceSurfaces,
   resolveWorkspaceSurface,
@@ -95,9 +101,11 @@ export function useWorkspaceSurfaceContent({
   puppyoneConfigLoading,
   puppyoneConfigSaving,
   settingsSection,
+  subThemeCatalog,
   viewerPacks,
   viewerPluginsEnabled,
   workspace,
+  workspaceRootUri,
 }: {
   activeView: DesktopView;
   cloud: DesktopWorkspaceCloudSurfaceController;
@@ -115,6 +123,7 @@ export function useWorkspaceSurfaceContent({
   puppyoneConfigLoading: boolean;
   puppyoneConfigSaving: boolean;
   settingsSection: SettingsSection;
+  subThemeCatalog: SubThemeCatalogController;
   viewerPacks: {
     hostAvailable: boolean;
     refresh: () => Promise<void>;
@@ -122,6 +131,7 @@ export function useWorkspaceSurfaceContent({
   };
   viewerPluginsEnabled: boolean;
   workspace: Workspace;
+  workspaceRootUri: ResourceUri | null;
 }): WorkspaceSurfaceContentResult {
   const { t } = useLocalization();
   const pluginsNavigationVisible = isPluginsNavigationVisible({
@@ -170,9 +180,10 @@ export function useWorkspaceSurfaceContent({
     : null;
 
   const handleOpenGitFile = useCallback((path: string) => {
-    onActiveDataPathChange(path);
+    if (!workspaceRootUri) return;
+    onActiveDataPathChange(qualifyDataResourcePath(workspaceRootUri, path));
     onNavigate("data");
-  }, [onActiveDataPathChange, onNavigate]);
+  }, [onActiveDataPathChange, onNavigate, workspaceRootUri]);
   const sourceControlSurface = createSourceControlWorkspaceSurface({
     controller: git,
     workspace,
@@ -193,6 +204,7 @@ export function useWorkspaceSurfaceContent({
     activeSection: settingsSection,
     onSelectSection: onSelectSettingsSection,
     preferences,
+    subThemeCatalog,
     onFilesVisibilitySettingsChange,
     git: {
       status: git.activeGitStatus,

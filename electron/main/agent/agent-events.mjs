@@ -111,22 +111,58 @@ export function redactSecretText(value) {
 }
 
 export function boundRendererValue(value, maxStringLength = 32 * 1024, depth = 0) {
-  if (depth > 12) return "[truncated]";
+  const state = {
+    remainingText: agentRendererValueLimits.maxTotalText,
+    remainingNodes: agentRendererValueLimits.maxNodes,
+    seen: new WeakSet(),
+  };
+  return boundRendererValueWithState(value, maxStringLength, depth, state);
+}
+
+function boundRendererValueWithState(value, maxStringLength, depth, state) {
+  if (depth > agentRendererValueLimits.maxDepth) return "[truncated]";
+  if (state.remainingNodes <= 0) return "[truncated]";
+  state.remainingNodes -= 1;
   if (typeof value === "string") {
-    if (value.length <= maxStringLength) return value;
-    return `${value.slice(0, maxStringLength)}\n… output truncated`;
+    const visibleLength = Math.max(0, Math.min(value.length, maxStringLength, state.remainingText));
+    state.remainingText -= visibleLength;
+    if (visibleLength === value.length) return value;
+    return `${value.slice(0, visibleLength)}${visibleLength > 0 ? "\n" : ""}… output truncated`;
   }
   if (Array.isArray(value)) {
-    return value.slice(0, 200).map((entry) => boundRendererValue(entry, maxStringLength, depth + 1));
+    if (state.seen.has(value)) return "[circular]";
+    state.seen.add(value);
+    const next = [];
+    for (const entry of value.slice(0, agentRendererValueLimits.maxCollectionEntries)) {
+      if (state.remainingNodes <= 0 || state.remainingText <= 0) {
+        next.push("[truncated]");
+        break;
+      }
+      next.push(boundRendererValueWithState(entry, maxStringLength, depth + 1, state));
+    }
+    return next;
   }
   if (!value || typeof value !== "object") return value;
+  if (state.seen.has(value)) return "[circular]";
+  state.seen.add(value);
   const next = {};
-  for (const [key, entry] of Object.entries(value).slice(0, 200)) {
+  for (const [key, entry] of Object.entries(value).slice(0, agentRendererValueLimits.maxCollectionEntries)) {
     if (isUnsafeObjectKey(key)) continue;
-    next[key] = boundRendererValue(entry, maxStringLength, depth + 1);
+    if (state.remainingNodes <= 0 || state.remainingText <= 0) {
+      next["…"] = "[truncated]";
+      break;
+    }
+    next[key] = boundRendererValueWithState(entry, maxStringLength, depth + 1, state);
   }
   return next;
 }
+
+export const agentRendererValueLimits = Object.freeze({
+  maxDepth: 12,
+  maxCollectionEntries: 200,
+  maxNodes: 4_096,
+  maxTotalText: 256 * 1024,
+});
 
 function isUnsafeObjectKey(key) {
   return key === "__proto__" || key === "prototype" || key === "constructor";

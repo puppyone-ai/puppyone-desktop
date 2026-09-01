@@ -8,7 +8,7 @@ import {
 
 describe("renderer public asset URLs", () => {
   it("keeps assets relative to Electron's packaged renderer document", () => {
-    const source = resolveRendererPublicAssetUrl(RENDERER_ASSET_PATHS.icons.agents.codexLight, "./");
+    const source = resolveRendererPublicAssetUrl(RENDERER_ASSET_PATHS.icons.agents.codex.light, "./");
 
     expect(source).toBe("./assets/icons/agents/codex-light.png");
     expect(new URL(

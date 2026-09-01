@@ -26,6 +26,7 @@ import type {
 import { SettingsView } from "./SettingsView";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
 import type { MarkdownPresentationSettings } from "../markdown/markdownPresentation";
+import type { SubThemeCatalogController } from "../themes/useSubThemeCatalog";
 import { SettingsSidebar } from "./sidebar";
 import type { SettingsSection } from "./types";
 
@@ -41,6 +42,7 @@ export type SettingsPreferencesPort = {
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
   markdownPresentation: MarkdownPresentationSettings;
+  requestedSubThemeId: string;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
   sidebarNavigationVisibilitySettings: SidebarNavigationVisibilitySettings;
@@ -52,8 +54,6 @@ export type SettingsPreferencesPort = {
   gitSidebarLayout: GitSidebarLayout;
   setThemeMode: (value: ThemeMode) => void;
   setInterfaceStyle: (value: InterfaceStyle) => void;
-  setLightThemePreset: (value: LightThemePreset) => void;
-  setDarkThemePreset: (value: DarkThemePreset) => void;
   setLoadingAnimationPreset: (value: LoadingAnimationPreset) => void;
   setLocalAgentsSettings: (value: LocalAgentsSettings) => void;
   setAgentFileActivityIndicatorsEnabled: (value: boolean) => void;
@@ -61,6 +61,7 @@ export type SettingsPreferencesPort = {
   setTypographyPreferences: (value: TypographyPreferences) => void;
   setPointerCursors: (value: boolean) => void;
   setMarkdownPresentation: (value: MarkdownPresentationSettings) => void;
+  setSubThemeId: (subThemeId: string) => void;
   setFileIconTheme: (value: FileIconThemeId) => void;
   setSidebarNavigationLayout: (value: SidebarNavigationLayout) => void;
   setSidebarNavigationVisibilitySettings: (value: SidebarNavigationVisibilitySettings) => void;
@@ -76,6 +77,7 @@ export type SettingsWorkspaceSurfaceProps = {
   activeSection: SettingsSection;
   onSelectSection: (section: SettingsSection) => void;
   preferences: SettingsPreferencesPort;
+  subThemeCatalog: SubThemeCatalogController;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
   git: {
     status: GitStatusSnapshot | null;
@@ -112,6 +114,7 @@ export function createSettingsWorkspaceSurface({
   onFilesVisibilitySettingsChange,
   onSelectSection,
   preferences,
+  subThemeCatalog,
   updates,
   workspace,
   workspaceConfig,
@@ -141,7 +144,8 @@ export function createSettingsWorkspaceSurface({
         textSize={preferences.textSize}
         typographyPreferences={preferences.typographyPreferences}
         pointerCursors={preferences.pointerCursors}
-        markdownPresentation={preferences.markdownPresentation}
+        requestedSubThemeId={preferences.requestedSubThemeId}
+        subThemeCatalog={subThemeCatalog}
         fileIconTheme={preferences.fileIconTheme}
         sidebarNavigationLayout={preferences.sidebarNavigationLayout}
         sidebarNavigationVisibilitySettings={preferences.sidebarNavigationVisibilitySettings}
@@ -162,15 +166,13 @@ export function createSettingsWorkspaceSurface({
         updateState={updates.state}
         onThemeModeChange={preferences.setThemeMode}
         onInterfaceStyleChange={preferences.setInterfaceStyle}
-        onLightThemePresetChange={preferences.setLightThemePreset}
-        onDarkThemePresetChange={preferences.setDarkThemePreset}
         onLoadingAnimationPresetChange={preferences.setLoadingAnimationPreset}
         onLocalAgentsSettingsChange={preferences.setLocalAgentsSettings}
         onAgentFileActivityIndicatorsEnabledChange={preferences.setAgentFileActivityIndicatorsEnabled}
         onTextSizeChange={preferences.setTextSize}
         onTypographyPreferencesChange={preferences.setTypographyPreferences}
         onPointerCursorsChange={preferences.setPointerCursors}
-        onMarkdownPresentationChange={preferences.setMarkdownPresentation}
+        onSubThemeChange={preferences.setSubThemeId}
         onFileIconThemeChange={preferences.setFileIconTheme}
         onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
         onSidebarNavigationVisibilitySettingsChange={preferences.setSidebarNavigationVisibilitySettings}

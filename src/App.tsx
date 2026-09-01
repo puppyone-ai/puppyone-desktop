@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   closeAllDocumentWorkingCopies,
   closeDocumentWorkingCopy,
@@ -7,6 +7,8 @@ import {
   flushActiveDocumentSessions,
   isDataResourceUri,
   isDocumentDataNode,
+  qualifyDataResourcePath,
+  EditorAppearanceProvider,
   type DataNode,
   type WorkspaceContentChange,
   type WorkspaceFolder,
@@ -23,8 +25,10 @@ import {
   closeAgentChatWorkbenchItem,
   discardPreparedAgentChatWorkbenchItem,
   isDesktopAgentChatEnabled,
+  loadAgentChatHistoryBrowser,
   loadAgentChatWorkbenchItem,
   prepareAgentChatWorkbenchItem,
+  resolveAgentWorkspaceProviderPath,
 } from "./features/desktop-agent/lazy";
 import {
   isDesktopTerminalEnabled,
@@ -62,7 +66,6 @@ import { DesktopOverlayPortal } from "./features/app-shell/DesktopOverlayPortal"
 import { DesktopHelpLauncher } from "./features/app-shell/DesktopHelpLauncher";
 import { RestoringWorkspaceScreen } from "./features/app-shell/RestoringWorkspaceScreen";
 import { useDesktopPreferences } from "./features/app-shell/useDesktopPreferences";
-import { resolveMarkdownPresentationStyle } from "./features/markdown/markdownPresentation";
 import { isAssetLibraryHomeEnabled } from "./features/app-shell/homeFeatureGate";
 import { useWorkspaceLifecycle } from "./features/app-shell/useWorkspaceLifecycle";
 import { usePuppyoneConfig } from "./features/app-shell/usePuppyoneConfig";
@@ -99,10 +102,20 @@ import {
   useTypographyRuntime,
 } from "./features/typography";
 import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
-import type { AuxiliaryWorkbenchContribution } from "./features/app-shell/auxiliary-workbench/types";
-import { AGENT_CHAT_CREATION_RECIPES } from "./features/app-shell/auxiliary-workbench/agentChatCreationRecipes";
+import type {
+  AuxiliaryWorkbenchCloseAdapter,
+  AuxiliaryWorkbenchContribution,
+  AuxiliaryWorkbenchHistoryBrowserContext,
+} from "./features/app-shell/auxiliary-workbench/types";
+import {
+  AGENT_CHAT_CREATION_RECIPES,
+  localAgentIdForAgentChatRuntime,
+} from "./features/app-shell/auxiliary-workbench/agentChatCreationRecipes";
+import { SubThemeStyleHost } from "./features/themes/SubThemeStyleHost";
+import { useSubThemeCatalog, useSubThemeNativeMenu } from "./features/themes/useSubThemeCatalog";
 
 const AgentChatWorkbenchItem = lazy(loadAgentChatWorkbenchItem);
+const AgentChatHistoryBrowser = lazy(loadAgentChatHistoryBrowser);
 const EMPTY_WORKSPACE_FOLDERS: readonly WorkspaceFolder[] = Object.freeze([]);
 
 export function App() {
@@ -113,8 +126,16 @@ function AppContent() {
   const { locale, t } = useLocalization();
   const desktopUpdates = useDesktopUpdates();
   const [activeView, setActiveView] = useState<DesktopView>("data");
-  const preferences = useDesktopPreferences();
+  const subThemeCatalog = useSubThemeCatalog();
+  const preferences = useDesktopPreferences(subThemeCatalog.snapshot);
   const multiRootWorkspacesEnabled = preferences.experimentalSettings.enableMultiRootWorkspaces;
+  useSubThemeNativeMenu({
+    snapshot: subThemeCatalog.snapshot,
+    rootThemeId: preferences.interfaceStyle,
+    colorMode: preferences.resolvedAppearance.effectiveColorMode,
+    selectedSubThemeId: preferences.resolvedAppearance.subThemeId,
+    onSubThemeChange: preferences.setSubThemeId,
+  });
   const { setRightSidebarOpen } = preferences;
   const fontCatalog = useTypographyCatalog();
   const typography = useTypographyRuntime(
@@ -216,6 +237,7 @@ function AppContent() {
     setAgentPreferredRuntime,
     setAgentPreferredRoute,
     setAgentPreferredModel,
+    setLocalAgentsSettings,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
     setThemeMode,
@@ -224,10 +246,18 @@ function AppContent() {
     () => resolveVisibleCreateNewMenuItems(createNewMenuSettings, experimentalSettings),
     [createNewMenuSettings, experimentalSettings],
   );
-  const markdownPresentationStyle = useMemo(
-    () => resolveMarkdownPresentationStyle(markdownPresentation),
-    [markdownPresentation],
-  );
+  const agentChatRuntimeVisibility = useMemo(() => {
+    const hiddenLocalAgentIds = new Set(localAgentsSettings.hiddenTerminalAgentIds);
+    const activeRecipes = AGENT_CHAT_CREATION_RECIPES.filter(
+      (recipe) => !hiddenLocalAgentIds.has(localAgentIdForAgentChatRuntime(recipe.id)),
+    );
+    const hiddenRuntimeIds: string[] = AGENT_CHAT_CREATION_RECIPES.flatMap(
+      (recipe) => hiddenLocalAgentIds.has(localAgentIdForAgentChatRuntime(recipe.id))
+        ? [recipe.id]
+        : [],
+    );
+    return Object.freeze({ activeRecipes, hiddenRuntimeIds });
+  }, [localAgentsSettings.hiddenTerminalAgentIds]);
   const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
     available: assetLibraryHomeAvailable,
     optedIn: experimentalSettings.enableAssetLibraryHome,
@@ -259,9 +289,10 @@ function AppContent() {
       hostPath: path,
     };
   }, [workbenchDataService]);
-  const resolveWorkspaceResource = useCallback((path: string | null) => (
-    workbenchDataService?.resolveResource(path) ?? null
-  ), [workbenchDataService]);
+  const resolveWorkspaceResource = useCallback((path: string | null) => {
+    if (!path || !workbenchDataService) return null;
+    return workbenchDataService.resolveResource(path);
+  }, [workbenchDataService]);
   const resolveAgentWorkspaceReference = useCallback(async (resource: string) => {
     if (!workbenchDataService || !isDataResourceUri(resource)) return null;
     try {
@@ -308,9 +339,13 @@ function AppContent() {
     editorWorkbench.closeUnderResource(path);
   }, [documentStorageIdentity, editorWorkbench]);
   const [activeExplorerNode, setActiveExplorerNode] = useState<DataNode | null>(null);
-  const focusedWorkspace = resolveWorkspaceResource(
+  const focusedWorkspaceResource = resolveWorkspaceResource(
     activeDocumentPath ?? activeExplorerNode?.path ?? null,
-  )?.folder.workspace ?? workspace;
+  );
+  const focusedWorkspaceFolder = focusedWorkspaceResource?.folder
+    ?? workbenchWorkspace?.folders[0]
+    ?? null;
+  const focusedWorkspace = focusedWorkspaceFolder?.workspace ?? workspace;
   const handleRemoveProject = useCallback(async (folder: WorkspaceFolder) => {
     if (documentStorageIdentity) {
       await closeDocumentWorkingCopiesUnderResource(documentStorageIdentity, folder.uri);
@@ -464,6 +499,7 @@ function AppContent() {
     aiEditAssistEnabled,
     onWorkspaceContentChanged: refreshWorkspaceContent,
     workspace: focusedWorkspace,
+    workspaceRootUri: focusedWorkspaceFolder?.uri ?? null,
   });
   const activeAiEditRequest = aiEditAssistEnabled ? latestAiEditRequest : null;
   const enterDataView = useCallback(() => {
@@ -923,10 +959,19 @@ function AppContent() {
     setActiveView("git");
     setSidebarCollapsed(false);
   }, [setSidebarCollapsed]);
-  const handleAgentOpenFile = useCallback((path: string) => {
-    handleActiveDataPathChange(path);
+  const handleAgentOpenFile = useCallback((workspaceRootPath: string, path: string) => {
+    const folder = workbenchWorkspace?.folders.find(
+      (candidate) => candidate.workspace.path === workspaceRootPath,
+    );
+    if (!folder) return;
+    const providerPath = isDataResourceUri(path)
+      ? path
+      : resolveAgentWorkspaceProviderPath(workspaceRootPath, path);
+    if (!providerPath) return;
+    const resource = qualifyDataResourcePath(folder.uri, providerPath);
+    handleActiveDataPathChange(resource);
     navigateDesktopView("data");
-  }, [handleActiveDataPathChange, navigateDesktopView]);
+  }, [handleActiveDataPathChange, navigateDesktopView, workbenchWorkspace?.folders]);
   const agentChatContribution = useMemo<AuxiliaryWorkbenchContribution | null>(() => {
     if (!desktopAgentChatEnabled) return null;
     return Object.freeze({
@@ -944,39 +989,73 @@ function AppContent() {
       }),
       maximumItems: 8,
       minimumSize: Object.freeze({ width: 280, height: 260 }),
-      creationRecipes: AGENT_CHAT_CREATION_RECIPES,
+      creationRecipes: agentChatRuntimeVisibility.activeRecipes,
+      history: Object.freeze({
+        label: t("agent.history.title"),
+        iconKey: null,
+        renderBrowser: (context: AuxiliaryWorkbenchHistoryBrowserContext) => (
+          <Suspense fallback={null}>
+            <AgentChatHistoryBrowser
+              {...context}
+              historyDiscoveryEnabled={localAgentsSettings.chatHistoryDiscoveryEnabled}
+              onHistoryDiscoveryEnabledChange={(enabled) => setLocalAgentsSettings({
+                ...localAgentsSettings,
+                chatHistoryDiscoveryEnabled: enabled,
+              })}
+            />
+          </Suspense>
+        ),
+      }),
       prepare: prepareAgentChatWorkbenchItem,
       discardPreparedItem: discardPreparedAgentChatWorkbenchItem,
       renderItem: (context) => (
         <Suspense fallback={null}>
           <AgentChatWorkbenchItem
             {...context}
-            enabledRuntimeIds={null}
-            preferredRuntimeId={agentPreferredRuntime}
+            hiddenRuntimeIds={agentChatRuntimeVisibility.hiddenRuntimeIds}
+            preferredRuntimeId={agentPreferredRuntime
+              && !agentChatRuntimeVisibility.hiddenRuntimeIds.includes(agentPreferredRuntime)
+              ? agentPreferredRuntime
+              : null}
             onPreferredRuntimeChange={setAgentPreferredRuntime}
             preferredRoute={agentPreferredRoute}
             onPreferredRouteChange={setAgentPreferredRoute}
             preferredModel={agentPreferredModel}
             onPreferredModelChange={setAgentPreferredModel}
             onViewChanges={handleAgentViewChanges}
-            onOpenFile={handleAgentOpenFile}
+            onOpenFile={(path) => handleAgentOpenFile(context.item.rootId, path)}
             resolveWorkspaceReference={resolveAgentWorkspaceReference}
           />
         </Suspense>
       ),
-      requestClose: (item) => closeAgentChatWorkbenchItem(item.rootId, item.id),
+      close: Object.freeze<AuxiliaryWorkbenchCloseAdapter>({
+        decide: ({ snapshot }) => snapshot.running
+          ? Object.freeze({
+              kind: "blocked" as const,
+              dialog: Object.freeze({
+                title: t("agent.closeDialog.activeTitle", { title: snapshot.title }),
+                detail: t("agent.closeDialog.activeDetail"),
+                actionLabel: t("agent.closeDialog.keepOpen"),
+              }),
+            })
+          : Object.freeze({ kind: "close" as const }),
+        commit: ({ item }) => closeAgentChatWorkbenchItem(item.rootId, item.id),
+      }),
     });
   }, [
     agentPreferredModel,
     agentPreferredRoute,
     agentPreferredRuntime,
+    agentChatRuntimeVisibility,
     desktopAgentChatEnabled,
     handleAgentOpenFile,
     handleAgentViewChanges,
+    localAgentsSettings,
     resolveAgentWorkspaceReference,
     setAgentPreferredModel,
     setAgentPreferredRoute,
     setAgentPreferredRuntime,
+    setLocalAgentsSettings,
     t,
   ]);
   const auxiliaryWorkbenchContributions = useMemo(
@@ -984,8 +1063,26 @@ function AppContent() {
     [agentChatContribution],
   );
 
+  const themeRuntime = (content: ReactNode) => (
+    <EditorAppearanceProvider revision={resolvedAppearance.appearanceRevision}>
+      <SubThemeStyleHost
+        subTheme={resolvedAppearance.subTheme}
+        colorMode={resolvedAppearance.effectiveColorMode}
+        markdownPresentation={markdownPresentation}
+      />
+      <div
+        className={`desktop-theme-bootstrap-surface ${resolvedTheme === "dark" ? "dark" : ""}`}
+        data-po-appearance-root="true"
+        data-root-theme-id={interfaceStyle}
+        data-sub-theme-id={resolvedAppearance.subThemeId}
+      >
+        {content}
+      </div>
+    </EditorAppearanceProvider>
+  );
+
   if (restoringWorkspace && !workspace) {
-    return (
+    return themeRuntime(
       <RestoringWorkspaceScreen
         themeMode={activeThemeMode}
         lightThemePreset={lightThemePreset}
@@ -995,12 +1092,13 @@ function AppContent() {
         pointerCursors={pointerCursors}
         diffMarkers={diffMarkers}
         resolvedTheme={resolvedTheme}
-      />
+        subThemeId={resolvedAppearance.subThemeId}
+      />,
     );
   }
 
   if (!workspace) {
-    return (
+    return themeRuntime(
       <Homepage
         onChooseWorkspace={openFolder}
         onChooseProjectLocation={chooseProjectLocation}
@@ -1019,7 +1117,8 @@ function AppContent() {
         pointerCursors={pointerCursors}
         diffMarkers={diffMarkers}
         resolvedTheme={resolvedTheme}
-      />
+        subThemeId={resolvedAppearance.subThemeId}
+      />,
     );
   }
 
@@ -1079,6 +1178,7 @@ function AppContent() {
   const feedbackLauncher = (
     <DesktopHelpLauncher
       theme={resolvedTheme}
+      subThemeId={resolvedAppearance.subThemeId}
       lightThemePreset={lightThemePreset}
       darkThemePreset={darkThemePreset}
       textSize={textSize}
@@ -1104,8 +1204,17 @@ function AppContent() {
     ) : undefined;
 
   return (
-    <div
+    <EditorAppearanceProvider revision={resolvedAppearance.appearanceRevision}>
+      <SubThemeStyleHost
+        subTheme={resolvedAppearance.subTheme}
+        colorMode={resolvedAppearance.effectiveColorMode}
+        markdownPresentation={markdownPresentation}
+      />
+      <div
       className={`app-shell cloud-runtime ${resolvedTheme === "dark" ? "dark" : ""}`}
+      data-po-appearance-root="true"
+      data-root-theme-id={interfaceStyle}
+      data-sub-theme-id={resolvedAppearance.subThemeId}
       data-theme-mode={activeThemeMode}
       data-interface-style={interfaceStyle}
       data-interface-style-family={resolvedAppearance.profile.family}
@@ -1120,14 +1229,11 @@ function AppContent() {
       data-icon-pack={resolvedAppearance.composition.iconPack}
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}
-      data-text-size={textSize}
-      data-interface-text-size={textSize}
       data-content-text-size={textSize}
-      data-terminal-text-size={textSize}
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
       {...typographyRootProps}
-      style={{ ...typographyRootProps.style, ...markdownPresentationStyle }}
+      style={typographyRootProps.style}
     >
       <DesktopCloudShell
           leftSidebarCollapsed={sidebarCollapsed}
@@ -1222,6 +1328,7 @@ function AppContent() {
           puppyoneConfigLoading={puppyoneConfigLoading}
           puppyoneConfigSaving={puppyoneConfigSaving}
           settingsSection={activeSettingsSection}
+          subThemeCatalog={subThemeCatalog}
           workspace={focusedWorkspace ?? workspace}
           workspaceFolders={workbenchWorkspace?.folders ?? []}
           resolveWorkspaceResource={resolveWorkspaceResource}
@@ -1238,6 +1345,7 @@ function AppContent() {
       </DesktopCloudShell>
       <DesktopOverlayPortal
         theme={resolvedTheme}
+        subThemeId={resolvedAppearance.subThemeId}
         lightThemePreset={lightThemePreset}
         darkThemePreset={darkThemePreset}
         textSize={textSize}
@@ -1325,7 +1433,8 @@ function AppContent() {
           )}
         </>
       </DesktopOverlayPortal>
-    </div>
+      </div>
+    </EditorAppearanceProvider>
   );
 }
 

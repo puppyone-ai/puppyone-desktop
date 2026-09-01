@@ -13,8 +13,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  WorkbenchWorkspaceContext,
   createWorkbenchWorkspace,
   createWorkspaceResourceUri,
+  type DataPort,
 } from "../packages/shared-ui/src";
 import {
   closeAllDocumentWorkingCopies,
@@ -35,6 +37,62 @@ afterEach(async () => {
 });
 
 describe("multi-root document persistence", () => {
+  it("retains one dirty Working Copy when the primary Folder is detached", async () => {
+    const initial = createWorkbenchWorkspace([
+      {
+        id: "alpha",
+        workspaceInstanceId: "instance-alpha",
+        name: "Alpha",
+        path: "/alpha",
+        status: "recording",
+      },
+      {
+        id: "beta",
+        workspaceInstanceId: "instance-beta",
+        name: "Beta",
+        path: "/beta",
+        status: "recording",
+      },
+    ], { id: "workbench:stable-window" });
+    const context = new WorkbenchWorkspaceContext(initial);
+    const createProvider = (): DataPort => ({
+      listChildren: vi.fn(async () => []),
+      documentPersistence: {
+        kind: "local-fs",
+        storageIdentity: "provider-local",
+        persist: vi.fn(async () => ({ ok: true as const, version: "v2" })),
+      },
+    });
+    const beforeService = createWorkbenchDataService(initial, { createProvider });
+    const retainedResource = createWorkspaceResourceUri(initial.folders[1]!.uri, "notes.md");
+    const before = getOrCreateDocumentWorkingCopy({
+      documentId: retainedResource,
+      initialContent: "before",
+      initialVersion: "v1",
+      saveMode: "manual",
+      persistence: beforeService.dataPort.documentPersistence!,
+    });
+    const source = bindSource(before.session, "before", "dirty local edit");
+    source.edit();
+
+    const next = await context.detachFolder(initial.folders[0]!.id);
+    const afterService = createWorkbenchDataService(next, { createProvider });
+    const after = getOrCreateDocumentWorkingCopy({
+      documentId: retainedResource,
+      initialContent: "stale reload must not replace dirty content",
+      initialVersion: "v1",
+      saveMode: "manual",
+      persistence: afterService.dataPort.documentPersistence!,
+    });
+
+    expect(next.id).toBe("workbench:stable-window");
+    expect(afterService.dataPort.documentPersistence?.storageIdentity)
+      .toBe(beforeService.dataPort.documentPersistence?.storageIdentity);
+    expect(after.session).toBe(before.session);
+
+    source.detach();
+  });
+
   it("persists and reopens same-named documents in two real Workspace roots without crossing providers", async () => {
     temporaryRoot = await mkdtemp(join(tmpdir(), "puppyone-multi-root-save-"));
     const firstRoot = join(temporaryRoot, "Alpha Project");

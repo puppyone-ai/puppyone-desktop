@@ -1,4 +1,5 @@
 import { createAgentEventEnvelope, countTextBytes, redactSecretText } from "../agent-events.mjs";
+import { normalizeAgentEventWorkspacePaths } from "../domain/agent-event-workspace-paths.mjs";
 
 const MAX_REPLAY_EVENTS = 1_000;
 const MAX_REPLAY_BYTES = 2 * 1024 * 1024;
@@ -16,15 +17,16 @@ export function createAgentEventJournal({ sessionCache, logger = console }) {
   }
 
   function emit(session, adapterEvent, { deliver = true } = {}) {
+    const normalizedEvent = normalizeAgentEventWorkspacePaths(adapterEvent, session.workspaceRoot);
     const envelope = createAgentEventEnvelope({
       sequence: ++session.sequence,
       sessionId: session.id,
       runtimeId: session.runtimeId,
-      providerSessionId: adapterEvent.providerSessionId ?? session.providerSessionId,
-      turnId: adapterEvent.turnId ?? null,
-      itemId: adapterEvent.itemId ?? null,
-      type: adapterEvent.type,
-      payload: adapterEvent.payload ?? {},
+      providerSessionId: normalizedEvent.providerSessionId ?? session.providerSessionId,
+      turnId: normalizedEvent.turnId ?? null,
+      itemId: normalizedEvent.itemId ?? null,
+      type: normalizedEvent.type,
+      payload: normalizedEvent.payload ?? {},
     });
     session.events.push(envelope);
     session.replayBytes += countTextBytes(envelope);
@@ -58,7 +60,7 @@ export function createAgentEventJournal({ sessionCache, logger = console }) {
 
   function persistNow(session) {
     if (!session.providerSessionId) return Promise.resolve();
-    return Promise.resolve(sessionCache.save({
+    const record = {
       sessionId: session.id,
       workspaceRoot: session.workspaceRoot,
       runtimeId: session.runtimeId,
@@ -74,12 +76,23 @@ export function createAgentEventJournal({ sessionCache, logger = console }) {
       capabilityRevision: session.capabilities?.revision ?? null,
       lastSequence: session.sequence,
       events: session.events,
+    };
+    return Promise.resolve(sessionCache.save(record, {
+      // Allocation is process-local. A real turn or native resume is the
+      // durable-history checkpoint that promotes this locator to the catalog.
+      promoteCatalog: hasDurableConversationEvidence(session.events),
     })).catch((error) => {
       logger.warn?.("Unable to update the Agent conversation metadata catalog:", redactSecretText(error?.message || String(error)));
     });
   }
 
   return { emit, persistNow, persistSoon, sendSessionExit };
+}
+
+function hasDurableConversationEvidence(events) {
+  return Array.isArray(events) && events.some((event) => (
+    event?.type === "turn.started" || event?.type === "session.resumed"
+  ));
 }
 
 export const agentEventJournalLimits = Object.freeze({

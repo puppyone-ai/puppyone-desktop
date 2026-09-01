@@ -1,0 +1,16 @@
+.po-agent-brand-image {
+  transform: scale(var(--po-agent-brand-image-scale, 1));
+  transform-origin: center;
+}
+
+.po-agent-brand-image[data-agent-brand-theme="dark"] {
+  display: none;
+}
+
+.dark .po-agent-brand-image[data-agent-brand-theme="light"] {
+  display: none;
+}
+
+.dark .po-agent-brand-image[data-agent-brand-theme="dark"] {
+  display: block;
+}

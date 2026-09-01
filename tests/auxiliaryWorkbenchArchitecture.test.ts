@@ -29,6 +29,10 @@ describe("Unified Terminal Workbench architecture", () => {
 
   it("preserves Item views across Tab reorder and keeps close feature-authoritative", () => {
     const panel = source("src/features/desktop-terminal/ui/RightTerminalPanel.tsx");
+    const closeContract = source("src/features/app-shell/auxiliary-workbench/types.ts");
+    const closeCoordinator = source(
+      "src/features/app-shell/auxiliary-workbench/useAuxiliaryWorkbenchCloseCoordinator.ts",
+    );
     const hostOwner = source(
       "src/features/desktop-terminal/layout/session-host/usePersistentTerminalSessionHosts.ts",
     );
@@ -36,9 +40,15 @@ describe("Unified Terminal Workbench architecture", () => {
       "src/features/desktop-terminal/workbench/TerminalWorkbenchItemHostSlot.tsx",
     );
     expect(panel).toContain("createPortal(");
-    expect(panel).toContain("await contribution.requestClose(item)");
-    expect(panel.indexOf("await contribution.requestClose(item)"))
-      .toBeLessThan(panel.indexOf("workbench.removeItem(itemId)", panel.indexOf("requestCloseItem")));
+    expect(panel).toContain("useAuxiliaryWorkbenchCloseCoordinator");
+    expect(panel).toContain("adapter: contribution.close");
+    expect(closeContract).toContain('kind: "close"');
+    expect(closeContract).toContain('kind: "confirm"');
+    expect(closeContract).toContain('kind: "blocked"');
+    expect(closeContract).toContain("decide:");
+    expect(closeContract).toContain("commit:");
+    expect(closeCoordinator.indexOf("target.adapter.commit(target.context)"))
+      .toBeLessThan(closeCoordinator.indexOf("onClosed(itemId)"));
     expect(hostOwner).toContain('document.createElement("div")');
     expect(hostSlot).toContain("slot.append(host)");
     expect(hostSlot).toContain("if (host.parentElement === slot) host.remove()");
@@ -60,11 +70,21 @@ describe("Unified Terminal Workbench architecture", () => {
     const status = source(
       "src/features/desktop-terminal/workbench/TerminalWorkbenchStatus.tsx",
     );
+    const workbenchIcon = source(
+      "src/features/desktop-terminal/ui/WorkbenchLauncherIcon.tsx",
+    );
+    const launcherIcon = source(
+      "src/features/desktop-terminal/ui/TerminalLauncherIcon.tsx",
+    );
     expect(contract).toContain("iconKey: string | null");
     expect(status).toContain(
       "<WorkbenchLauncherIcon compact iconKey={item.snapshot.iconKey}",
     );
     expect(status).not.toContain("MessageSquare");
+    expect(workbenchIcon).toContain('fallback="chat"');
+    expect(workbenchIcon).not.toContain("chatIconLauncherIds");
+    expect(launcherIcon).toContain("resolveAgentBrand({ id: launcherId, iconKey })");
+    expect(launcherIcon).toContain("<AgentBrandImage brandId={brand.id}");
   });
 
   it("keeps Tab Bar chrome outside the content split-drop coordinate space", () => {

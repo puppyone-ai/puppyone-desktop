@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { preloadPresetViewer, PresetViewerRenderer } from "./PresetViewerRenderer";
@@ -18,6 +18,7 @@ import type {
   MarkdownWorkspaceEnvironment,
   OfficeEditorActionResolver,
 } from "../registry/viewerTypes";
+import type { ViewerSurfacePreparation } from "../registry/viewerContract";
 import { DEFAULT_EDITOR_INTERACTION_PREFERENCES } from "../registry/viewerTypes";
 import type {
   ExternalViewerSurfaceRenderer,
@@ -45,6 +46,8 @@ export type { EditorDocument, EditorDocumentKind, EditorSaveMode, MarkdownHtmlTr
 export type EditorDocumentHostProps = {
   document: EditorDocument;
   loading?: boolean;
+  loadingIndicator?: ReactNode;
+  surfacePreparation?: ViewerSurfacePreparation;
   error?: string | null;
   fileUrlLoading?: boolean;
   fileUrlError?: string | null;
@@ -86,6 +89,8 @@ export function EditorDocumentHost(props: EditorDocumentHostProps) {
 function EditorDocumentSurface({
   document,
   loading = false,
+  loadingIndicator,
+  surfacePreparation = "hidden-safe",
   error = null,
   fileUrlLoading = false,
   fileUrlError = null,
@@ -171,7 +176,11 @@ function EditorDocumentSurface({
   const canEdit = editorAccess.kind === "editable";
 
   if (viewer.source !== "resource" && loading && !content) {
-    return <DocumentSurfacePending label={t("editor.loadingFile")} />;
+    return (
+      <DocumentSurfacePending label={t("editor.loadingFile")}>
+        {surfacePreparation === "hidden-safe" ? loadingIndicator : null}
+      </DocumentSurfacePending>
+    );
   }
 
   if (viewer.source !== "resource" && error && !content) {
@@ -189,6 +198,7 @@ function EditorDocumentSurface({
   const presetViewer = (
     <PresetViewerRenderer
       viewer={viewer}
+      loadingIndicator={surfacePreparation === "hidden-safe" ? loadingIndicator : null}
       context={{
         document,
         format,

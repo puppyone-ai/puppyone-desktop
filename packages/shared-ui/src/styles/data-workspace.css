@@ -38,7 +38,7 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--po-sidebar);
-  border-inline-end: 1px solid transparent;
+  border-inline-end: 1px solid var(--po-sidebar-divider, var(--po-divider));
   transition: background-color 260ms ease, border-color 260ms ease;
 }
 
@@ -142,7 +142,7 @@
 .data-explorer-resizer::after {
   inset-inline-start: 0;
   inset-inline-end: auto;
-  background: var(--po-shell-divider, var(--po-divider));
+  background: transparent;
   transition: background 120ms ease, box-shadow 120ms ease;
 }
 
@@ -243,6 +243,11 @@ body.data-sidebar-resizing .data-content:not([data-explorer-collapsed="true"]) {
   --tree-row-line-height: var(--po-tree-row-line-height, 18px);
   --tree-row-action-size: var(--po-tree-row-action-size, 24px);
   --tree-row-action-icon-size: var(--po-tree-row-action-icon-size, 15px);
+  --tree-workspace-group-color: var(--po-tree-workspace-group-color, var(--po-text-subtle));
+  --tree-workspace-group-font-size: var(--po-tree-workspace-group-font-size, var(--po-text-size-meta, 12px));
+  --tree-workspace-group-font-weight: var(--po-tree-workspace-group-font-weight, var(--po-text-weight-medium, 500));
+  --tree-workspace-group-line-height: var(--po-tree-workspace-group-line-height, 18px);
+  --tree-workspace-group-divider: var(--po-tree-workspace-group-divider, var(--po-sidebar-divider, var(--po-divider)));
   --tree-root-top-gap: var(--po-tree-root-top-gap, 5px);
   --tree-no-root-top-gap: var(--po-tree-no-root-top-gap, 12px);
   --tree-list-bottom-gap: var(--po-tree-list-bottom-gap, 6px);
@@ -488,6 +493,46 @@ body.data-sidebar-resizing .data-content:not([data-explorer-collapsed="true"]) {
 .tree-row.selected:hover,
 .tree-row.active:hover {
   background: var(--tree-row-selected-bg);
+}
+
+.tree-row.workspace-folder-root.workspace-group-header {
+  color: var(--tree-workspace-group-color);
+  font-size: var(--tree-workspace-group-font-size);
+  font-weight: var(--tree-workspace-group-font-weight);
+  line-height: var(--tree-workspace-group-line-height);
+}
+
+.tree-row.workspace-folder-root.workspace-group-header:hover:not(.drop-target):not(.drop-parent-target),
+.tree-row.workspace-folder-root.workspace-group-header.selected:not(.drop-target):not(.drop-parent-target),
+.tree-row.workspace-folder-root.workspace-group-header.active:not(.drop-target):not(.drop-parent-target) {
+  background: transparent;
+  color: var(--po-text-muted);
+}
+
+.tree-row.workspace-folder-root.workspace-group-header .tree-row-content {
+  gap: 6px;
+}
+
+.tree-row.workspace-folder-root.workspace-group-header .tree-icon-slot {
+  width: 14px;
+  height: 14px;
+}
+
+.tree-row.workspace-folder-root.workspace-group-header .tree-disclosure-marker {
+  opacity: 0.58;
+}
+
+.tree-row.workspace-folder-root.workspace-group-header .tree-label {
+  flex: 0 1 auto;
+}
+
+.tree-workspace-group-divider {
+  height: 1px;
+  min-width: 18px;
+  flex: 1 1 18px;
+  margin-inline-start: 2px;
+  background: var(--tree-workspace-group-divider);
+  pointer-events: none;
 }
 
 .tree-row.drop-target {
@@ -837,30 +882,24 @@ body.data-sidebar-resizing .data-content:not([data-explorer-collapsed="true"]) {
   pointer-events: none;
 }
 
-.document-surface-slot.is-committed[data-surface-preparation="requires-visible"][data-surface-ready="false"]::after {
+/* The host only owns geometry. Products provide their standard loading
+ * indicator through the pending slot. */
+.document-surface-pending {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.document-surface-preparation-pending {
   position: absolute;
   z-index: 10;
-  top: 50%;
-  left: 50%;
-  width: 18px;
-  height: 18px;
-  box-sizing: border-box;
-  border: 2px solid color-mix(in srgb, var(--po-text-subtle) 28%, transparent);
-  border-top-color: var(--po-text-muted);
-  border-radius: 999px;
-  content: "";
+  inset: 0;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
   pointer-events: none;
-  animation: po-document-surface-spin 700ms linear infinite;
-}
-
-@keyframes po-document-surface-spin {
-  to { transform: rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .document-surface-slot.is-committed[data-surface-preparation="requires-visible"][data-surface-ready="false"]::after {
-    animation: none;
-  }
 }
 
 .file-preview-shell.without-header {

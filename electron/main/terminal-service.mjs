@@ -83,6 +83,7 @@ export function createTerminalService({
       const terminalEnvironment = {
         ...buildTerminalEnvironment(environment, {
           appVersion,
+          defaultColors: request?.defaultColors,
           freshLoginShell: spawnConfig.loginShell,
           platform,
         }),
@@ -183,6 +184,16 @@ export function createTerminalService({
     return true;
   }
 
+  function appearance(sender, request) {
+    const session = getOwnedSession(sender, request?.id);
+    if (!session) return false;
+    if (session.defaultColorResponder?.updateColors(request?.defaultColors)) return true;
+    const responder = createTerminalDefaultColorResponder(request?.defaultColors);
+    if (!responder) return false;
+    session.defaultColorResponder = responder;
+    return true;
+  }
+
   function close(sender, id) {
     const session = getOwnedSession(sender, id);
     if (!session) return false;
@@ -246,6 +257,7 @@ export function createTerminalService({
     create,
     input,
     resize,
+    appearance,
     close,
     closeSessionsForWindow,
     closeSessionsForWorkspaceRoot,
@@ -255,7 +267,7 @@ export function createTerminalService({
 }
 
 export function createTerminalDefaultColorResponder(value) {
-  const colors = normalizeTerminalDefaultColors(value);
+  let colors = normalizeTerminalDefaultColors(value);
   if (!colors) return null;
   let carry = "";
 
@@ -287,6 +299,12 @@ export function createTerminalDefaultColorResponder(value) {
       const data = carry;
       carry = "";
       return data;
+    },
+    updateColors(nextValue) {
+      const nextColors = normalizeTerminalDefaultColors(nextValue);
+      if (!nextColors) return false;
+      colors = nextColors;
+      return true;
     },
   };
 }
@@ -448,6 +466,7 @@ const NPM_LIFECYCLE_KEYS = new Set([
 
 export function buildTerminalEnvironment(source, {
   appVersion,
+  defaultColors,
   platform = process.platform,
   freshLoginShell = platform !== "win32",
 } = {}) {
@@ -463,6 +482,7 @@ export function buildTerminalEnvironment(source, {
   for (const [key, value] of entries) {
     const canonicalKey = key.toUpperCase();
     if (canonicalKey === "NO_COLOR") continue;
+    if (canonicalKey === "COLORFGBG") continue;
     if (isNpmLifecycleKey(canonicalKey) || canonicalKey === "NPM_CONFIG_PREFIX") continue;
     if (canonicalKey === "PREFIX") continue;
     if (freshLoginShell && isCondaActivationKey(canonicalKey)) continue;
@@ -473,6 +493,7 @@ export function buildTerminalEnvironment(source, {
     env.PATH = removeCondaActivationPaths(env.PATH, condaPrefixes, platform);
   }
 
+  const colorFgBg = terminalColorFgBg(defaultColors);
   return {
     ...env,
     TERM: "xterm-256color",
@@ -481,7 +502,24 @@ export function buildTerminalEnvironment(source, {
     TERM_PROGRAM: "PuppyOne",
     TERM_PROGRAM_VERSION: appVersion,
     PUPPYONE_TERMINAL: "1",
+    ...(colorFgBg ? { COLORFGBG: colorFgBg } : {}),
   };
+}
+
+export function terminalColorFgBg(value) {
+  const colors = normalizeTerminalDefaultColors(value);
+  if (!colors) return null;
+  return relativeLuminance(colors.background) < 0.5 ? "15;0" : "0;15";
+}
+
+function relativeLuminance(color) {
+  const channels = color.map((channel) => {
+    const normalized = channel / 255;
+    return normalized <= 0.04045
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4;
+  });
+  return (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
 }
 
 function isNpmLifecycleKey(key) {

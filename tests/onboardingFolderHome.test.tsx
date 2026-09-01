@@ -44,6 +44,26 @@ afterEach(() => {
 });
 
 describe("project folder home", () => {
+  it("applies the effective Sub Theme on the real onboarding appearance root", () => {
+    const styles = document.createElement("style");
+    styles.textContent = `
+      .onboarding-shell.dark { --po-surface-canvas: #161413; }
+      [data-po-appearance-root][data-sub-theme-id="default.forest"].dark {
+        --po-surface-canvas: #092d30;
+      }
+    `;
+    document.head.append(styles);
+
+    const container = renderHome({ subThemeId: "default.forest" });
+    const surface = requireSurface(container);
+
+    expect(surface.dataset.poAppearanceRoot).toBe("true");
+    expect(surface.dataset.subThemeId).toBe("default.forest");
+    expect(getComputedStyle(surface).getPropertyValue("--po-surface-canvas").trim())
+      .toBe("#092d30");
+    styles.remove();
+  });
+
   it("plays the reveal whenever project home mounts empty", async () => {
     vi.useFakeTimers();
     const container = renderHome();
@@ -597,6 +617,7 @@ function renderHome(overrides: Partial<MinimalOnboardingProps> = {}) {
     pointerCursors: false,
     diffMarkers: "color",
     resolvedTheme: "dark",
+    subThemeId: "default.neutral",
     ...overrides,
   };
   act(() => renderWithTestLocalization(root, React.createElement(MinimalOnboarding, props)));

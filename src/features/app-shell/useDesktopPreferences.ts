@@ -1,16 +1,25 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { FileIconThemeId } from "@puppyone/shared-ui";
 import {
+  getDefaultSubThemeId,
   getInterfaceStyleFirstPaint,
+  LEGACY_APPEARANCE_PREFERENCES_STORAGE_KEY,
   supportsThemePreset,
 } from "../appearance/interfaceStyles";
 import {
   APPEARANCE_PREFERENCES_STORAGE_KEY,
-  createAppearancePreferencesV2,
+  createAppearancePreferencesV4,
   readAppearancePreferences,
   serializeAppearancePreferences,
+  type RootThemeAppearancePreferences,
 } from "../appearance/appearancePreferences";
 import { resolveAppearance } from "../appearance/resolveAppearance";
+import {
+  LEGACY_SURFACE_THEME_PREFERENCES_STORAGE_KEY,
+  readLegacySurfaceSubThemeId,
+} from "../themes/subThemePreferences";
+import { BUILTIN_SUB_THEMES } from "../themes/builtinSubThemes";
+import type { SubThemeCatalogSnapshot } from "../themes/themeTypes";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
   AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY,
@@ -87,10 +96,10 @@ import {
   readInitialSidebarNavigationLayout,
   readInitialSidebarNavigationVisibilitySettings,
   readInitialTitlebarActionsSettings,
-  readInitialDarkThemePreset,
   readInitialDiffMarkers,
-  readInitialMarkdownPresentationSettings,
+  readInitialDarkThemePreset,
   readInitialLightThemePreset,
+  readInitialMarkdownPresentationSettings,
   readInitialLoadingAnimationPreset,
   readInitialLocalAgentsSettings,
   readInitialPointerCursors,
@@ -107,14 +116,26 @@ import {
   type AgentRoutePreference,
 } from "./agentRoutingPreferences";
 
-export function useDesktopPreferences() {
+const BUILTIN_SUB_THEME_CATALOG: SubThemeCatalogSnapshot = Object.freeze({
+  subThemes: BUILTIN_SUB_THEMES,
+  diagnostics: Object.freeze([]),
+});
+
+export function useDesktopPreferences(
+  subThemeCatalog: SubThemeCatalogSnapshot = BUILTIN_SUB_THEME_CATALOG,
+) {
   const [initialAppearanceRead] = useState(() => readAppearancePreferences(
-    window.localStorage.getItem(APPEARANCE_PREFERENCES_STORAGE_KEY),
+    window.localStorage.getItem(APPEARANCE_PREFERENCES_STORAGE_KEY)
+      ?? window.localStorage.getItem(LEGACY_APPEARANCE_PREFERENCES_STORAGE_KEY),
     {
       activeStyle: readInitialInterfaceStyle(),
       themeMode: readInitialThemeMode(),
       lightThemePreset: readInitialLightThemePreset(),
       darkThemePreset: readInitialDarkThemePreset(),
+      legacySubThemeId: readLegacySurfaceSubThemeId(
+        window.localStorage.getItem(LEGACY_SURFACE_THEME_PREFERENCES_STORAGE_KEY),
+      ),
+      markdownPresentation: readInitialMarkdownPresentationSettings(),
       textSize: readInitialTextSize(),
       typography: readInitialTypographyPreferences(),
       pointerCursors: readInitialPointerCursors(),
@@ -124,10 +145,14 @@ export function useDesktopPreferences() {
     },
   ));
   const initialAppearance = initialAppearanceRead.preferences;
-  const [themeMode, setThemeMode] = useState<ThemeMode>(initialAppearance.shared.themeMode);
-  const [interfaceStyle, setInterfaceStyle] = useState<InterfaceStyle>(initialAppearance.activeStyle);
-  const [lightThemePreset, setLightThemePreset] = useState(initialAppearance.shared.lightThemePreset);
-  const [darkThemePreset, setDarkThemePreset] = useState(initialAppearance.shared.darkThemePreset);
+  const [interfaceStyle, setInterfaceStyle] = useState<InterfaceStyle>(
+    initialAppearance.activeRootThemeId,
+  );
+  const [byRootTheme, setByRootTheme] = useState(initialAppearance.byRootTheme);
+  const rootThemePreference = byRootTheme[interfaceStyle]
+    ?? createDefaultRootThemePreference(interfaceStyle);
+  const themeMode = rootThemePreference.requestedColorMode;
+  const requestedSubThemeIds = rootThemePreference.requestedSubThemeIds;
   const [textSize, setTextSize] = useState<TextSize>(initialAppearance.shared.textSize);
   const [typographyPreferences, setTypographyPreferences] = useState<TypographyPreferences>(
     initialAppearance.shared.typography,
@@ -138,7 +163,7 @@ export function useDesktopPreferences() {
   );
   const [diffMarkers, setDiffMarkers] = useState<DiffMarkers>(() => readInitialDiffMarkers());
   const [markdownPresentation, setMarkdownPresentation] = useState<MarkdownPresentationSettings>(
-    () => readInitialMarkdownPresentationSettings(),
+    initialAppearance.bySurface.markdown,
   );
   const [fileIconTheme, setFileIconTheme] = useState<FileIconThemeId>(initialAppearance.shared.fileIconTheme);
   const [sidebarNavigationLayout, setSidebarNavigationLayout] = useState<SidebarNavigationLayout>(
@@ -199,13 +224,49 @@ export function useDesktopPreferences() {
   const resolvedAppearance = useMemo(() => resolveAppearance({
     interfaceStyle,
     themeMode,
+    systemColorMode: systemDark ? "dark" : "light",
+    requestedSubThemeIds,
+    subThemeCatalog,
     sidebarNavigationLayout,
     textSize,
     fileIconTheme,
-  }), [fileIconTheme, interfaceStyle, sidebarNavigationLayout, textSize, themeMode]);
+  }), [
+    fileIconTheme,
+    interfaceStyle,
+    requestedSubThemeIds,
+    sidebarNavigationLayout,
+    subThemeCatalog,
+    systemDark,
+    textSize,
+    themeMode,
+  ]);
   const activeThemeMode = resolvedAppearance.themeMode;
-  const resolvedTheme = activeThemeMode === "system" ? (systemDark ? "dark" : "light") : activeThemeMode;
-  const activeThemePreset = resolvedTheme === "light" ? lightThemePreset : darkThemePreset;
+  const resolvedTheme = resolvedAppearance.effectiveColorMode;
+  const requestedSubThemeId = requestedSubThemeIds[resolvedTheme];
+  const lightSubTheme = subThemeCatalog.subThemes.find(
+    (subTheme) => subTheme.id === requestedSubThemeIds.light,
+  );
+  const darkSubTheme = subThemeCatalog.subThemes.find(
+    (subTheme) => subTheme.id === requestedSubThemeIds.dark,
+  );
+  const lightThemePreset = lightSubTheme?.legacyPresets?.light ?? "neutral";
+  const darkThemePreset = darkSubTheme?.legacyPresets?.dark ?? "default";
+  const activeThemePreset = resolvedAppearance.legacyThemePreset;
+  const setThemeMode = useCallback((requestedColorMode: ThemeMode) => {
+    setByRootTheme((current) => updateRootThemePreference(
+      current,
+      interfaceStyle,
+      { requestedColorMode },
+    ));
+  }, [interfaceStyle]);
+  const setSubThemeId = useCallback((subThemeId: string) => {
+    setByRootTheme((current) => updateRootThemeSubTheme(
+      current,
+      interfaceStyle,
+      resolvedAppearance.effectiveColorMode,
+      subThemeId,
+    ));
+  }, [interfaceStyle, resolvedAppearance.effectiveColorMode]);
 
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
@@ -214,7 +275,11 @@ export function useDesktopPreferences() {
   useLayoutEffect(() => {
     window.localStorage.setItem(INTERFACE_STYLE_STORAGE_KEY, interfaceStyle);
     const root = document.documentElement;
-    const firstPaint = getInterfaceStyleFirstPaint(interfaceStyle, resolvedTheme, activeThemePreset);
+    const firstPaint = getInterfaceStyleFirstPaint(
+      interfaceStyle,
+      resolvedTheme,
+      resolvedAppearance.subTheme,
+    );
     root.dataset.interfaceStyle = interfaceStyle;
     root.dataset.interfaceStyleFamily = resolvedAppearance.profile.family;
     root.dataset.interfaceStyleVariant = resolvedAppearance.profile.variant;
@@ -307,12 +372,9 @@ export function useDesktopPreferences() {
 
   useEffect(() => {
     if (!initialAppearanceRead.writable) return;
-    const preferences = createAppearancePreferencesV2({
-      activeStyle: interfaceStyle,
+    const preferences = createAppearancePreferencesV4({
+      activeRootThemeId: interfaceStyle,
       shared: {
-        themeMode,
-        lightThemePreset,
-        darkThemePreset,
         textSize,
         typography: typographyPreferences,
         pointerCursors,
@@ -320,23 +382,66 @@ export function useDesktopPreferences() {
         fileIconTheme,
         sidebarNavigationLayout,
       },
-      byStyle: initialAppearance.byStyle,
-      bySurface: initialAppearance.bySurface,
-      byStyleSurface: initialAppearance.byStyleSurface,
+      byRootTheme,
+      bySurface: { markdown: markdownPresentation },
     });
     window.localStorage.setItem(
       APPEARANCE_PREFERENCES_STORAGE_KEY,
       serializeAppearancePreferences(preferences),
     );
   }, [
+    byRootTheme,
+    fileIconTheme,
+    initialAppearanceRead.writable,
+    interfaceStyle,
+    loadingAnimationPreset,
+    markdownPresentation,
+    pointerCursors,
+    sidebarNavigationLayout,
+    textSize,
+    typographyPreferences,
+  ]);
+
+  useEffect(() => {
+    const syncAppearanceAcrossWindows = (event: StorageEvent) => {
+      if (event.key !== APPEARANCE_PREFERENCES_STORAGE_KEY || !event.newValue) return;
+      const result = readAppearancePreferences(event.newValue, {
+        activeStyle: interfaceStyle,
+        themeMode,
+        lightThemePreset,
+        darkThemePreset,
+        legacySubThemeId: requestedSubThemeId,
+        markdownPresentation,
+        textSize,
+        typography: typographyPreferences,
+        pointerCursors,
+        loadingAnimationPreset,
+        fileIconTheme,
+        sidebarNavigationLayout,
+      });
+      if (result.source === "future") return;
+      const next = result.preferences;
+      setInterfaceStyle(next.activeRootThemeId);
+      setByRootTheme(next.byRootTheme);
+      setTextSize(next.shared.textSize);
+      setTypographyPreferences(next.shared.typography);
+      setPointerCursors(next.shared.pointerCursors);
+      setLoadingAnimationPreset(next.shared.loadingAnimationPreset);
+      setFileIconTheme(next.shared.fileIconTheme);
+      setSidebarNavigationLayout(next.shared.sidebarNavigationLayout);
+      setMarkdownPresentation(next.bySurface.markdown);
+    };
+    window.addEventListener("storage", syncAppearanceAcrossWindows);
+    return () => window.removeEventListener("storage", syncAppearanceAcrossWindows);
+  }, [
     darkThemePreset,
     fileIconTheme,
-    initialAppearance,
-    initialAppearanceRead.writable,
     interfaceStyle,
     lightThemePreset,
     loadingAnimationPreset,
+    markdownPresentation,
     pointerCursors,
+    requestedSubThemeId,
     sidebarNavigationLayout,
     textSize,
     themeMode,
@@ -517,6 +622,8 @@ export function useDesktopPreferences() {
     sidebarNavigationOrientation,
     sidebarNavigationPlacement,
     sidebarNavigationVisibilitySettings,
+    requestedSubThemeId,
+    requestedSubThemeIds,
     terminalToolEnabled,
     titlebarActionsSettings,
     darkThemePreset,
@@ -528,7 +635,6 @@ export function useDesktopPreferences() {
     typographyPreferences,
     pointerCursors,
     setAiEditAssistEnabled,
-    setDarkThemePreset,
     setDiffMarkers,
     setMarkdownPresentation,
     setExplorerWidth,
@@ -550,8 +656,8 @@ export function useDesktopPreferences() {
     setSidebarCollapsed,
     setSidebarNavigationLayout,
     setSidebarNavigationVisibilitySettings,
+    setSubThemeId,
     setTitlebarActionsSettings,
-    setLightThemePreset,
     setLoadingAnimationPreset,
     setLocalAgentsSettings,
     setPointerCursors,
@@ -562,3 +668,42 @@ export function useDesktopPreferences() {
 }
 
 export type DesktopPreferencesController = ReturnType<typeof useDesktopPreferences>;
+
+function updateRootThemePreference(
+  current: Readonly<Record<string, RootThemeAppearancePreferences>>,
+  rootThemeId: InterfaceStyle,
+  patch: Partial<RootThemeAppearancePreferences>,
+): Readonly<Record<string, RootThemeAppearancePreferences>> {
+  const existing = current[rootThemeId] ?? createDefaultRootThemePreference(rootThemeId);
+  return Object.freeze({
+    ...current,
+    [rootThemeId]: Object.freeze({ ...existing, ...patch }),
+  });
+}
+
+function updateRootThemeSubTheme(
+  current: Readonly<Record<string, RootThemeAppearancePreferences>>,
+  rootThemeId: InterfaceStyle,
+  colorMode: "light" | "dark",
+  subThemeId: string,
+): Readonly<Record<string, RootThemeAppearancePreferences>> {
+  const existing = current[rootThemeId] ?? createDefaultRootThemePreference(rootThemeId);
+  return updateRootThemePreference(current, rootThemeId, {
+    requestedSubThemeIds: Object.freeze({
+      ...existing.requestedSubThemeIds,
+      [colorMode]: subThemeId,
+    }),
+  });
+}
+
+function createDefaultRootThemePreference(
+  rootThemeId: InterfaceStyle,
+): RootThemeAppearancePreferences {
+  return Object.freeze({
+    requestedColorMode: rootThemeId === "windows-xp" ? "light" : "system",
+    requestedSubThemeIds: Object.freeze({
+      light: getDefaultSubThemeId(rootThemeId, "light"),
+      dark: getDefaultSubThemeId(rootThemeId, "dark"),
+    }),
+  });
+}

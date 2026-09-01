@@ -52,22 +52,114 @@ describe("Codex app-server normalization", () => {
     adapter.dispose();
   });
 
-  it("maps workspace mentions and staged images to the exact app-server UserInput schema", () => {
-    expect(buildCodexTurnInput("Inspect", [
+  it("renders ordinary workspace references as text and sends only native images as media input", () => {
+    const input = buildCodexTurnInput("Inspect", [
       { id: "workspace-a", kind: "workspace-entry", entryType: "file", path: "/workspace/a.md", displayName: "a.md" },
+      { id: "workspace-image", kind: "workspace-entry", entryType: "file", path: "/workspace/diagram.png", displayName: "diagram.png", mime: "image/png" },
       { id: "image-b", kind: "staged-attachment", path: "/private/staging/b.snapshot", displayName: "b.png", mime: "image/png" },
-    ])).toEqual([
-      { type: "text", text: "Inspect", text_elements: [] },
-      { type: "mention", name: "a.md", path: "/workspace/a.md" },
+      { id: "workspace-pdf", kind: "workspace-entry", entryType: "file", path: "/workspace/report.pdf", displayName: "report.pdf", mime: "application/pdf" },
+      { id: "workspace-a-duplicate", kind: "workspace-entry", entryType: "file", path: "/workspace/a.md", displayName: "a.md" },
+    ], "/workspace");
+    expect(input).toEqual([
+      {
+        type: "text",
+        text: [
+          "Inspect",
+          "",
+          "Authorized context files for this turn:",
+          "- /workspace/a.md",
+          "- /workspace/report.pdf",
+        ].join("\n"),
+        text_elements: [],
+      },
+      { type: "localImage", path: "/workspace/diagram.png" },
       { type: "localImage", path: "/private/staging/b.snapshot" },
     ]);
+    expect(JSON.stringify(input)).not.toContain('"type":"mention"');
+    expect(buildCodexTurnInput("Review `/private/staging/report.pdf`", [{
+      authorized: true,
+      kind: "staged-attachment",
+      path: "/private/staging/report.pdf",
+      displayName: "report.pdf",
+      mime: "application/pdf",
+      inlineMentioned: true,
+      mentionDelivery: "path",
+    }], "/workspace")).toEqual([{
+      type: "text",
+      text: "Review `/private/staging/report.pdf`",
+      text_elements: [],
+    }]);
+    expect(buildCodexTurnInput("Review `/workspace/a.md`", [{
+      authorized: true,
+      kind: "workspace-entry",
+      entryType: "file",
+      path: "/workspace/a.md",
+      displayName: "a.md",
+      mime: "text/markdown",
+      inlineMentioned: true,
+      mentionDelivery: "path",
+    }], "/workspace")).toEqual([{
+      type: "text",
+      text: "Review `/workspace/a.md`",
+      text_elements: [],
+    }]);
     expect(() => buildCodexTurnInput("Inspect", [{
       kind: "staged-attachment",
       path: "/private/staging/report.pdf",
       mime: "application/pdf",
-    }])).toThrow(/does not support/i);
+    }], "/workspace")).toThrow(/does not support/i);
+    expect(() => buildCodexTurnInput("Inspect", [{
+      kind: "workspace-entry",
+      path: "/workspace/a.md",
+    }])).toThrow(/workspace root/i);
+    expect(() => buildCodexTurnInput("Inspect", [{
+      kind: "workspace-entry",
+      path: "/outside/a.md",
+      mime: "image/png",
+    }], "/workspace")).toThrow(/outside.*workspace root/i);
     expect(() => buildCodexTurnInput("Inspect", [{ kind: "workspace-entry" }]))
       .toThrow(/invalid reference/i);
+  });
+
+  it("delivers the minimal reference contract in the native turn/start request", async () => {
+    const connection = new FakeConnection();
+    connection.results.set("thread/start", {
+      thread: { id: "thread-1", preview: "Session", createdAt: 1, updatedAt: 1 },
+    });
+    connection.results.set("turn/start", { turn: { id: "turn-1" } });
+    const adapter = new CodexAppServerAdapter({
+      executablePath: "/usr/local/bin/codex",
+      environment: {},
+      workspaceRoot: "/workspace",
+      appVersion: "test",
+      connectionFactory: () => connection,
+    });
+
+    await adapter.createSession();
+    await adapter.startTurn({
+      prompt: "Review these",
+      references: [
+        { kind: "workspace-entry", entryType: "file", path: "/workspace/notes.md", mime: "text/markdown" },
+        { kind: "workspace-entry", entryType: "directory", path: "/workspace/src" },
+        { kind: "staged-attachment", path: "/private/staging/screenshot.webp", mime: "image/webp" },
+      ],
+    });
+
+    expect(connection.requests.find((request) => request.method === "turn/start")?.params.input).toEqual([
+      {
+        type: "text",
+        text: [
+          "Review these",
+          "",
+          "Authorized context files for this turn:",
+          "- /workspace/notes.md",
+          "- /workspace/src",
+        ].join("\n"),
+        text_elements: [],
+      },
+      { type: "localImage", path: "/private/staging/screenshot.webp" },
+    ]);
+    adapter.dispose();
   });
 
   it("keeps the tested Codex 0.144.1 generated-schema fixture compatible", () => {
@@ -172,6 +264,34 @@ describe("Codex app-server normalization", () => {
     expect(normalizeCodexNotification({
       method: "error",
       params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        error: { message: "Reconnecting… 2/5" },
+        willRetry: true,
+        attempt: 2,
+        maxAttempts: 5,
+      },
+    })[0]).toMatchObject({
+      type: "provider.connection.updated",
+      payload: { state: "reconnecting", message: "Reconnecting… 2/5", attempt: 2, maxAttempts: 5 },
+    });
+
+    expect(normalizeCodexNotification({
+      method: "warning",
+      params: { threadId: "thread-1", turnId: "turn-1", message: "Falling back to HTTPS transport." },
+    })[0]).toMatchObject({
+      type: "provider.connection.updated",
+      payload: { state: "fallback", message: "Falling back to HTTPS transport." },
+    });
+
+    expect(normalizeCodexNotification({
+      method: "deprecationNotice",
+      params: { message: "Full-history hydration is deprecated for paginated threads." },
+    })).toEqual([]);
+
+    expect(normalizeCodexNotification({
+      method: "error",
+      params: {
         error: {
           message: JSON.stringify({
             type: "error",
@@ -246,6 +366,72 @@ describe("Codex app-server normalization", () => {
 
     await expect(adapter.resumeSession({ threadId: "thread-stale", model: "gpt-5" }))
       .rejects.toBeInstanceOf(AgentProviderSessionUnavailableError);
+    adapter.dispose();
+  });
+
+  it("resumes metadata-only and restores paginated turns and items in transcript order", async () => {
+    const connection = new FakeConnection();
+    connection.results.set("thread/resume", {
+      thread: { id: "thread-history", preview: "Saved session", createdAt: 1, updatedAt: 4 },
+    });
+    connection.results.set("thread/turns/list", (params) => params.cursor === null
+      ? {
+          data: [{
+            id: "turn-new",
+            items: [],
+            itemsView: "summary",
+            status: "completed",
+          }],
+          nextCursor: "older-turns",
+        }
+      : {
+          data: [{
+            id: "turn-old",
+            itemsView: "full",
+            status: "completed",
+            items: [
+              { id: "old-user", type: "userMessage", content: [{ type: "text", text: "old prompt" }] },
+              { id: "old-answer", type: "agentMessage", text: "old answer" },
+            ],
+          }],
+          nextCursor: null,
+        });
+    connection.results.set("thread/items/list", (params) => params.cursor === null
+      ? {
+          data: [{ turnId: "turn-new", item: { id: "new-answer", type: "agentMessage", text: "new answer" } }],
+          nextCursor: "older-items",
+        }
+      : {
+          data: [{
+            turnId: "turn-new",
+            item: { id: "new-user", type: "userMessage", content: [{ type: "text", text: "new prompt" }] },
+          }],
+          nextCursor: null,
+        });
+    const adapter = new CodexAppServerAdapter({
+      executablePath: "/usr/local/bin/codex",
+      environment: {},
+      workspaceRoot: "/workspace",
+      appVersion: "test",
+      connectionFactory: () => connection,
+    });
+
+    await adapter.resumeSession({ threadId: "thread-history", model: "gpt-5" });
+    const events = await adapter.readHistory();
+
+    expect(connection.requests).toContainEqual({
+      method: "thread/resume",
+      params: expect.objectContaining({ threadId: "thread-history", excludeTurns: true }),
+    });
+    expect(connection.requests.filter((request) => request.method === "thread/turns/list"))
+      .toHaveLength(2);
+    expect(connection.requests.filter((request) => request.method === "thread/items/list"))
+      .toHaveLength(2);
+    expect(connection.requests.some((request) => request.method === "thread/read")).toBe(false);
+    expect(events.filter((event) => event.type === "turn.started").map((event) => event.payload.prompt))
+      .toEqual(["old prompt", "new prompt"]);
+    expect(events.filter((event) => event.type === "assistant.completed").map((event) => event.payload.text))
+      .toEqual(["old answer", "new answer"]);
     adapter.dispose();
   });
 
@@ -389,7 +575,7 @@ describe("Codex app-server normalization", () => {
     await adapter.compactSession();
     expect(connection.requests).toEqual(expect.arrayContaining([
       expect.objectContaining({ method: "turn/steer", params: expect.objectContaining({ threadId: "thread-1", turnId: "turn-1" }) }),
-      expect.objectContaining({ method: "thread/fork", params: { threadId: "thread-1", messageId: "message-1" } }),
+      expect.objectContaining({ method: "thread/fork", params: { threadId: "thread-1", messageId: "message-1", excludeTurns: true } }),
       expect.objectContaining({ method: "thread/compact/start", params: { threadId: "thread-1" } }),
     ]));
     expect(CODEX_CAPABILITIES).toMatchObject({
@@ -473,7 +659,12 @@ class FakeConnection extends EventEmitter {
   request(method, params) {
     this.requests.push({ method, params });
     if (this.failures.has(method)) return Promise.reject(this.failures.get(method));
-    return Promise.resolve(this.results.get(method) ?? {});
+    try {
+      const result = this.results.get(method);
+      return Promise.resolve(typeof result === "function" ? result(params) : result ?? {});
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 
   notify() {}

@@ -6,6 +6,7 @@ import type {
 } from "../../../registry/viewerTypes";
 import { findMarkdownLinkTokens, isExternalMarkdownHref } from "./markdownLinkModel";
 import { findWikiLinkTokens, splitWikiLinkTarget } from "./wikiLinkModel";
+import { normalizeDataResourcePath } from "../../../../core/dataResourcePath";
 
 export type MarkdownLinkGraphDocument = {
   path: string;
@@ -531,19 +532,7 @@ function getDisplayNameFromTarget(target: string): string {
 }
 
 function normalizeDataPath(path: string): string {
-  const normalized = path.replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+/g, "/").trim();
-  const parts: string[] = [];
-
-  for (const part of normalized.split("/")) {
-    if (!part || part === ".") continue;
-    if (part === "..") {
-      parts.pop();
-      continue;
-    }
-    parts.push(part);
-  }
-
-  return parts.join("/");
+  return normalizeDataResourcePath(path) ?? "";
 }
 
 function normalizeLookupKey(value: string): string {

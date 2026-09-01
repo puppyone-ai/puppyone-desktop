@@ -10,6 +10,8 @@
   "action.copy": "Copy",
   "action.clear": "Clear",
   "action.copied": "Copied",
+  "renderFailure.title": "PuppyOne could not display this window",
+  "renderFailure.description": "Your files are safe. Refresh the window to restore the interface.",
   "action.change": "Change",
   "action.save": "Save",
   "status.loading": "Loading…"

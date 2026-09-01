@@ -220,49 +220,49 @@ describe("Markdown HTML media layout", () => {
 
     expect(editorEntryCss).toContain('@import "./editor/markdown-content.css";');
     expect(profileRule).toContain("--po-md-presentation-version: 2;");
-    expect(profileRule).toContain("--po-md-content-size: var(--po-text-size-content, 14px);");
-    expect(profileRule).toContain("--po-md-content-weight: var(--po-content-reading-weight, 450);");
     expect(profileRule).toContain(
-      "--po-md-content-letter-spacing: var(--po-content-reading-letter-spacing, 0);",
+      "--po-md-content-size: var(--po-host-md-content-size, var(--po-text-size-content, 14px));",
     );
     expect(profileRule).toContain(
-      "--po-md-content-line-height: var(--po-content-reading-line-height, 1.7142857143);",
+      "--po-md-content-weight: var(--po-host-md-content-weight, var(--po-content-reading-weight, 450));",
     );
-    expect(profileRule).toContain("--po-md-content-color: var(--po-text);");
+    expect(profileRule).toContain(
+      "--po-md-content-letter-spacing: var(--po-host-md-content-letter-spacing, var(--po-content-reading-letter-spacing, 0));",
+    );
+    expect(profileRule).toContain(
+      "--po-md-content-line-height: var(--po-host-md-content-line-height, var(--po-content-reading-line-height, 1.7142857143));",
+    );
+    expect(profileRule).toContain("--po-md-content-color: var(--po-host-md-content-color, var(--po-text));");
     expect(darkProfileRule).toContain(
-      "--po-md-content-color: color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted));",
+      "--po-md-content-color: var(\n    --po-host-md-content-color,\n    color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted))",
     );
     expect(darkProfileRule).not.toContain("--po-md-content-weight:");
-    expect(profileRule).toContain("--po-md-block-gap: 16px;");
-    expect(profileRule).toContain("--po-md-heading-gap-before: 24px;");
-    expect(profileRule).toContain("--po-md-heading-gap-after: 16px;");
-    expect(editorTextRule).toContain("font-family: var(--po-md-content-font);");
+    expect(profileRule).toContain("--po-md-block-gap: var(--po-host-md-block-gap, 16px);");
+    expect(profileRule).toContain("--po-md-heading-gap-before: var(--po-host-md-heading-gap-before, 24px);");
+    expect(profileRule).toContain("--po-md-heading-gap-after: var(--po-host-md-heading-gap-after, 16px);");
+    expect(editorTextRule).toContain("font-family: var(--po-editor-content-font);");
     expect(editorTextRule).toContain("font-size: var(--po-md-content-size);");
     expect(editorTextRule).toContain("font-weight: var(--po-md-content-weight);");
     expect(editorTextRule).toContain("letter-spacing: var(--po-md-content-letter-spacing);");
     expect(htmlSurfaceRule).toContain("font-size: var(--po-md-content-size);");
     expect(htmlSurfaceRule).toContain("font-weight: var(--po-md-content-weight);");
     expect(htmlSurfaceRule).toContain("line-height: var(--po-md-content-line-height);");
-    expect(profileRule).toContain("--po-md-h1-weight: 650;");
-    expect(profileRule).toContain("--po-md-h2-weight: 625;");
-    expect(profileRule).toContain("--po-md-h3-weight: 600;");
-    expect(profileRule).toContain("--po-md-heading-line-height: 1.25;");
-    expect(profileRule).toContain("--po-md-h1-size: inherit;");
-    expect(profileRule).toContain("--po-md-strong-weight: inherit;");
-    expect(profileRule).toContain("--po-md-strong-color: inherit;");
-    const shellPresentationRule = readCssRule(
-      markdownContentCss,
-      ":where(.app-shell, .onboarding-shell, .desktop-overlay-root)",
-    );
-    expect(shellPresentationRule).toContain("--po-md-h1-size: 2em;");
-    expect(shellPresentationRule).toContain("--po-md-h2-size: 1.5em;");
-    expect(shellPresentationRule).toContain("--po-md-h3-size: 1.25em;");
-    expect(shellPresentationRule).toContain("--po-md-h4-size: 1em;");
-    expect(shellPresentationRule).toContain("--po-md-h5-size: 0.875em;");
-    expect(shellPresentationRule).toContain("--po-md-h6-size: 0.85em;");
-    expect(shellPresentationRule).toContain("--po-md-strong-weight: 600;");
+    expect(profileRule).toContain("--po-md-h1-weight: var(--po-host-md-h1-weight, 650);");
+    expect(profileRule).toContain("--po-md-h2-weight: var(--po-host-md-h2-weight, 625);");
+    expect(profileRule).toContain("--po-md-h3-weight: var(--po-host-md-h3-weight, 600);");
+    expect(profileRule).toContain("--po-md-heading-line-height: var(--po-host-md-heading-line-height, 1.25);");
     expect(profileRule).toContain(
-      "--po-md-rule-color: color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 4%);",
+      "--po-md-h1-size: var(--po-user-md-h1-size, var(--po-host-md-h1-size, 2em));",
+    );
+    expect(profileRule).toContain(
+      "--po-md-strong-weight: var(--po-user-md-strong-weight, var(--po-host-md-strong-weight, 600));",
+    );
+    expect(profileRule).toContain(
+      "--po-md-strong-color: var(--po-user-md-strong-color, var(--po-host-md-strong-color, var(--po-text)));",
+    );
+    expect(markdownContentCss).not.toMatch(/app-shell|onboarding-shell|desktop-overlay-root/);
+    expect(profileRule).toContain(
+      "--po-md-rule-color: var(--po-host-md-rule-color, color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 4%));",
     );
     expect(nativeHeadingRule).toContain("font-size: var(--po-md-h1-size);");
     expect(nativeHeadingRule).toContain(

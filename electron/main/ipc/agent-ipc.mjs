@@ -46,6 +46,9 @@ export function registerAgentIpcHandlers({
   register("agent:session-resume", async (event, request) => (
     agentService.resumeSession(event.sender, request, await authorizeRequiredRoot(event, request))
   ));
+  register("agent:session-open", async (event, request) => (
+    agentService.openSession(event.sender, request, await authorizeRequiredRoot(event, request))
+  ));
   register("agent:session-replay", async (event, request) => (
     agentService.replay(event.sender, request, await authorizeRequiredRoot(event, request))
   ));

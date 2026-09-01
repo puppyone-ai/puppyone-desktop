@@ -1,13 +1,22 @@
+import crypto from "node:crypto";
+import path from "node:path";
+
 /**
  * Main-process state for one native window's ordered Workspace Folder
- * composition. The current UI replaces this composition with one Folder, but
- * authorization and ownership no longer depend on scalar root fields.
+ * composition. Workbench identity belongs to the composition, never to its
+ * first Folder; Folder order is presentation state only.
  */
 export class WindowWorkspaceState {
   #initialWorkspacePaths;
+  #workspaceId;
   #workspaceFolders = Object.freeze([]);
 
-  constructor({ initialWorkspacePath = null, initialWorkspacePaths = null, focusedAt = Date.now() } = {}) {
+  constructor({
+    initialWorkspaceId = null,
+    initialWorkspacePath = null,
+    initialWorkspacePaths = null,
+    focusedAt = Date.now(),
+  } = {}) {
     const requestedPaths = Array.isArray(initialWorkspacePaths)
       ? initialWorkspacePaths
       : [initialWorkspacePath];
@@ -16,7 +25,12 @@ export class WindowWorkspaceState {
         .filter((folderPath) => typeof folderPath === "string" && folderPath.trim())
         .map((folderPath) => folderPath.trim()),
     );
+    this.#workspaceId = normalizeWorkspaceId(initialWorkspaceId) ?? createWorkbenchWorkspaceId();
     this.lastFocusedAt = focusedAt;
+  }
+
+  get workspaceId() {
+    return this.#workspaceId;
   }
 
   get initialRestorePath() {
@@ -45,6 +59,11 @@ export class WindowWorkspaceState {
     this.lastFocusedAt = focusedAt;
   }
 
+  beginNewWorkspace(workspaceId = null) {
+    this.#workspaceId = normalizeWorkspaceId(workspaceId) ?? createWorkbenchWorkspaceId();
+    return this.#workspaceId;
+  }
+
   replaceFolders(folders) {
     const nextFolders = normalizeFolders(folders);
     const previousPaths = new Set(this.#workspaceFolders.map((folder) => folder.path));
@@ -67,6 +86,14 @@ export class WindowWorkspaceState {
   }
 }
 
+export function createWorkbenchWorkspaceId() {
+  return `workbench:${crypto.randomUUID()}`;
+}
+
+function normalizeWorkspaceId(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 function normalizeFolders(value) {
   if (!Array.isArray(value)) throw new TypeError("Window Workspace Folders must be an array.");
   const paths = new Set();
@@ -75,6 +102,13 @@ function normalizeFolders(value) {
     const folderPath = typeof folder?.path === "string" ? folder.path.trim() : "";
     if (!folderPath) throw new TypeError("Window Workspace Folder path is required.");
     if (paths.has(folderPath)) throw new Error(`Duplicate Workspace Folder path: ${folderPath}.`);
+    for (const existingPath of paths) {
+      if (workspacePathsOverlap(existingPath, folderPath)) {
+        throw new Error(
+          `Overlapping Workspace Folder paths are not supported: ${existingPath} and ${folderPath}.`,
+        );
+      }
+    }
     paths.add(folderPath);
 
     const workspace = folder?.workspace;
@@ -86,4 +120,12 @@ function normalizeFolders(value) {
     identities.add(identity);
     return Object.freeze({ path: folderPath, workspace: Object.freeze({ ...workspace }) });
   }));
+}
+
+function workspacePathsOverlap(first, second) {
+  const relative = path.relative(first, second);
+  if (!relative) return true;
+  if (!relative.startsWith("..") && !path.isAbsolute(relative)) return true;
+  const reverse = path.relative(second, first);
+  return !reverse.startsWith("..") && !path.isAbsolute(reverse);
 }

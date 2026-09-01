@@ -13,7 +13,7 @@ describe("renderer style architecture", () => {
     const sourceControlStyles = source("src/features/source-control/source-control.css");
     const tailwindConfig = source("tailwind.config.cjs");
 
-    expect(cascade.trim()).toBe("@layer reset, tokens, primitives, patterns, features, interface-style, accessibility, overrides;");
+    expect(cascade.trim()).toBe("@layer reset, fallback, tokens, primitives, patterns, features, interface-style, sub-theme, appearance-overrides, accessibility, overrides;");
     expectInOrder(entry, [
       'import "./styles/cascade.css";',
       'import "./cloud-globals.css";',
@@ -31,6 +31,7 @@ describe("renderer style architecture", () => {
       '@import "./styles/sidebar-resources.css";',
     ]);
     expect(styles).toContain('@import "./styles/base.css" layer(reset);');
+    expect(styles).toContain('@import "./styles/fallback-theme.generated.css" layer(fallback);');
     expect(styles).toContain('@import "@puppyone/shared-ui/shared-ui-patterns.css" layer(patterns);');
     expect(styles).toContain('@import "@puppyone/shared-ui/editor.css";');
     expect(styles).not.toContain("viewer-product-default");

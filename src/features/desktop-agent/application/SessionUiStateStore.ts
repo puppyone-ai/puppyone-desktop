@@ -1,5 +1,8 @@
+import type { AgentPromptReferenceMention } from "../domain/agent-contract";
+
 export type SessionUiState = {
   draft: string;
+  draftMentions: AgentPromptReferenceMention[];
   scrollTop: number;
   measurements: Record<string, number>;
   pinned: boolean;
@@ -7,6 +10,7 @@ export type SessionUiState = {
 
 const EMPTY_SESSION_UI: Readonly<SessionUiState> = Object.freeze({
   draft: "",
+  draftMentions: [],
   scrollTop: 0,
   measurements: Object.freeze({}),
   pinned: true,
@@ -37,7 +41,11 @@ export class SessionUiStateStore {
       this.entries.set(key, stored);
     }
     const value = stored ?? EMPTY_SESSION_UI;
-    return { ...value, measurements: { ...value.measurements } };
+    return {
+      ...value,
+      draftMentions: value.draftMentions.map((mention) => ({ ...mention })),
+      measurements: { ...value.measurements },
+    };
   }
 
   patch(key: string, value: Partial<SessionUiState>) {
@@ -49,6 +57,9 @@ export class SessionUiStateStore {
     this.entries.set(key, {
       ...current,
       ...value,
+      draftMentions: value.draftMentions
+        ? value.draftMentions.map((mention) => ({ ...mention }))
+        : current.draftMentions,
       measurements,
     });
     while (this.entries.size > this.maxEntries) {

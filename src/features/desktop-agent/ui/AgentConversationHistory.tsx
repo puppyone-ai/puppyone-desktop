@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { ArrowLeft, History, LoaderCircle, RefreshCw, Search } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
 import type {
@@ -15,6 +15,7 @@ type Props = {
   loadingMore: boolean;
   hasMore: boolean;
   error: string | null;
+  openingSessionId?: string | null;
   onOpen: (session: AgentSessionListItem) => void;
   onRefresh: () => void;
   onLoadMore: () => void;
@@ -30,12 +31,14 @@ export function AgentConversationHistory({
   loadingMore,
   hasMore,
   error,
+  openingSessionId = null,
   onOpen,
   onRefresh,
   onLoadMore,
   onBack,
 }: Props) {
   const { t } = useLocalization();
+  const titleId = useId();
   const [query, setQuery] = useState("");
   const runtimeById = useMemo(
     () => new Map(runtimes.map((entry) => [entry.descriptor.id, entry])),
@@ -64,7 +67,10 @@ export function AgentConversationHistory({
   }, [onBack]);
 
   return (
-    <section className="desktop-agent-history-view">
+    <section
+      className="desktop-agent-history-view"
+      aria-labelledby={titleId}
+    >
       <header className="desktop-agent-history-toolbar">
         <button
           type="button"
@@ -75,13 +81,13 @@ export function AgentConversationHistory({
         >
           <ArrowLeft size={15} strokeWidth={1.7} aria-hidden="true" />
         </button>
-        <h2 id="desktop-agent-history-title">{t("agent.history.title")}</h2>
+        <h2 id={titleId}>{t("agent.history.title")}</h2>
         <button
           type="button"
           className="desktop-agent-history-toolbar-button"
           aria-label={t("agent.history.refresh")}
           title={t("agent.history.refresh")}
-          disabled={refreshing || loadingMore}
+          disabled={loading || refreshing || loadingMore}
           onClick={onRefresh}
         >
           <RefreshCw
@@ -110,6 +116,11 @@ export function AgentConversationHistory({
           <LoaderCircle className="is-spinning" size={13} aria-hidden="true" />
           <span>{t("agent.history.loading")}</span>
         </div>
+      ) : sessions.length === 0 && error ? (
+        <div className="desktop-agent-history-empty" role="alert">
+          <RefreshCw size={13} aria-hidden="true" />
+          <span>{t("agent.history.refreshFailed")}</span>
+        </div>
       ) : sessions.length === 0 ? (
         <div className="desktop-agent-history-empty" role="status">
           <History size={13} aria-hidden="true" />
@@ -121,11 +132,10 @@ export function AgentConversationHistory({
           <span>{t("agent.history.noMatches")}</span>
         </div>
       ) : (
-        <ul className="desktop-agent-history-list">
+        <ul className="desktop-agent-history-list" data-po-scrollbar="sidebar">
           {matchingSessions.map((session) => {
             const runtimeId = session.runtimeId || session.runtime?.id || "";
             const runtime = runtimeById.get(runtimeId);
-            const available = runtime?.readiness.status === "ready";
             const runtimeLabel = session.runtime?.displayName || runtime?.descriptor.displayName || runtimeId;
             return (
               <li key={session.id}>
@@ -133,21 +143,22 @@ export function AgentConversationHistory({
                   type="button"
                   className="desktop-agent-history-option"
                   aria-label={t("agent.history.open", { title: session.title })}
-                  title={available ? session.title : t("agent.history.unavailable", { agent: runtimeLabel })}
-                  disabled={!available}
+                  aria-busy={openingSessionId === session.id || undefined}
+                  title={session.title}
+                  disabled={openingSessionId !== null}
                   onClick={() => onOpen(session)}
                 >
                   <AgentBrandMark
+                    appearance="monochrome"
                     iconKey={session.runtime?.iconKey || runtime?.descriptor.iconKey || runtimeId}
                     label={runtimeLabel}
                   />
                   <span className="desktop-agent-history-copy">
                     <span className="desktop-agent-history-title">{session.title}</span>
-                    <span className="desktop-agent-history-meta">
-                      <span>{runtimeLabel}</span>
-                      <time dateTime={session.updatedAt}>{formatHistoryDate(session.updatedAt)}</time>
-                    </span>
                   </span>
+                  <time className="desktop-agent-history-time" dateTime={session.updatedAt}>
+                    {formatHistoryDate(session.updatedAt)}
+                  </time>
                 </button>
               </li>
             );
@@ -166,7 +177,9 @@ export function AgentConversationHistory({
             {loadingMore ? t("agent.history.loadingMore") : t("agent.history.loadMore")}
           </button>
         )}
-        {error && <p className="desktop-agent-history-error" role="status">{t("agent.history.refreshFailed")}</p>}
+        {error && sessions.length > 0 && (
+          <p className="desktop-agent-history-error" role="status">{t("agent.history.refreshFailed")}</p>
+        )}
       </footer>
     </section>
   );
@@ -175,5 +188,10 @@ export function AgentConversationHistory({
 function formatHistoryDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.valueOf())) return "";
-  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }

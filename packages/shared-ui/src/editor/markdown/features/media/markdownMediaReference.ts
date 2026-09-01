@@ -27,6 +27,7 @@ export type BrokeredMarkdownMediaUrlResolver = (
 
 /** Public host adapter for resolving any authored Markdown media path. */
 export function resolveMarkdownAssetPath(sourcePath: string, href: string): string | null {
+  if (isDataResourceUri(href)) return href;
   if (isDataResourceUri(sourcePath)) {
     const parsed = parseResourceUri(sourcePath);
     const rootSegment = parsed.path.split("/").filter(Boolean)[0];
@@ -55,16 +56,17 @@ export function resolveMarkdownMediaReference(
 
   const resolved = linkGraph?.resolveWikiLink(sourcePath, href) ?? null;
   if (resolved?.ambiguous) return null;
-  if (resolved?.exists && resolved.path) return toWorkspaceRootHref(resolved.path);
+  if (resolved?.exists && resolved.path) return toWorkspaceRootReference(resolved.path);
 
   // An explicit Obsidian path is vault/workspace-root relative even while the
   // metadata index is still warming. A bare filename keeps a same-folder
   // fallback, then upgrades to the indexed target on the next graph refresh.
   const authoredPath = href.split(/[?#]/, 1)[0]?.trim().replace(/\\/g, "/") ?? "";
   if (!authoredPath) return null;
-  return authoredPath.includes("/") ? toWorkspaceRootHref(authoredPath) : authoredPath;
+  return authoredPath.includes("/") ? toWorkspaceRootReference(authoredPath) : authoredPath;
 }
 
-function toWorkspaceRootHref(path: string): string {
+function toWorkspaceRootReference(path: string): string {
+  if (isDataResourceUri(path)) return path;
   return `/${path.replace(/\\/g, "/").replace(/^\/+/, "")}`;
 }

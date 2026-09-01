@@ -215,6 +215,7 @@ describe("scrollbar architecture", () => {
     for (const css of [dataWorkspaceCss, desktopDataShellCss]) {
       const resizerRule = readRule(css, ".data-explorer-resizer");
       const resizerDividerRule = readRule(css, ".data-explorer-resizer::after");
+      const explorerColumnRule = readRule(css, ".explorer-column");
       expect(css).toMatch(
         /\.data-content\[data-resizable-explorer="true"\]\s*\{[^}]*grid-template-columns:[^}]*var\(--data-explorer-width[^}]*minmax/s,
       );
@@ -234,9 +235,10 @@ describe("scrollbar architecture", () => {
       expect(resizerRule).not.toContain("transform:");
       expect(resizerDividerRule).toContain("inset-inline-start: 0;");
       expect(resizerDividerRule).toContain("inset-inline-end: auto;");
-      expect(resizerDividerRule).toContain(
-        "background: var(--po-shell-divider, var(--po-divider));",
+      expect(explorerColumnRule).toContain(
+        "border-inline-end: 1px solid var(--po-sidebar-divider, var(--po-divider));",
       );
+      expect(resizerDividerRule).toContain("background: transparent;");
     }
 
     expect(dataWorkspaceSource.indexOf('className="data-explorer-resizer"')).toBeGreaterThan(

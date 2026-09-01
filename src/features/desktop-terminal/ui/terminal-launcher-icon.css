@@ -1,6 +1,4 @@
 .desktop-terminal-launcher-icon {
-  --desktop-terminal-launcher-mark-scale: 1;
-
   display: grid;
   width: 18px;
   height: 18px;
@@ -26,70 +24,32 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  transform: scale(var(--desktop-terminal-launcher-mark-scale));
+  transform: scale(var(--po-agent-brand-image-scale, 1));
   transform-origin: center;
 }
 
 .desktop-terminal-launcher-icon.is-codex {
-  /* Optical crop removes the App Icon's oversized safety area without
-     stretching or recoloring the official light/dark Codex artwork. */
-  --desktop-terminal-launcher-mark-scale: 1;
-
   border-radius: 4px;
   opacity: 0.9;
 }
 
-.desktop-terminal-launcher-icon.is-claude {
-  /* Claude's radial mark fills its entire 24px viewBox; reduce its visible
-     footprint to match the other launcher marks rather than their canvases. */
-  --desktop-terminal-launcher-mark-scale: 0.84;
-}
-
 .desktop-terminal-launcher-icon.is-opencode {
-  /* OpenCode's visible frame occupies only about half of its source canvas. */
-  --desktop-terminal-launcher-mark-scale: 1.3;
-
   background: #111418;
 }
 
-.desktop-terminal-launcher-icon.is-cursor {
-  /* Cursor's solid cube fills its viewBox, so match its optical weight to the other marks. */
-  --desktop-terminal-launcher-mark-scale: 0.84;
-}
-
 .desktop-terminal-launcher-icon.is-pi {
-  /* Pi's official mark occupies about 59% of its square source canvas. */
-  --desktop-terminal-launcher-mark-scale: 1.28;
-
   border-radius: 3px;
 }
 
 .desktop-terminal-launcher-icon.is-hermes {
-  /* The official favicon is a dense edge-to-edge square at launcher size. */
-  --desktop-terminal-launcher-mark-scale: 0.82;
-
   border-radius: 4px;
 }
 
 .desktop-terminal-launcher-icon.is-puppyone {
-  --desktop-terminal-launcher-mark-scale: 0.94;
-
   opacity: 0.9;
 }
 
-.desktop-terminal-launcher-icon.is-compact.is-hermes {
+.desktop-terminal-launcher-icon.is-compact.is-hermes img {
   /* Preserve the favicon's face details at tab scale without enlarging it in the launcher. */
-  --desktop-terminal-launcher-mark-scale: 0.94;
-}
-
-.dark .desktop-terminal-launcher-icon.is-cursor img {
-  content: url("/assets/icons/agents/cursor-dark.svg");
-}
-
-.dark .desktop-terminal-launcher-icon.is-codex img {
-  content: url("/assets/icons/agents/codex-dark.png");
-}
-
-.dark .desktop-terminal-launcher-icon.is-pi img {
-  content: url("/assets/icons/agents/pi-dark.svg");
+  transform: scale(0.94);
 }

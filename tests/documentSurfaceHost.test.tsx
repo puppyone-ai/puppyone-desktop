@@ -121,9 +121,11 @@ describe("DocumentSurfaceHost", () => {
     expect(pdfSurface.getAttribute("aria-hidden")).toBeNull();
     expect(pdfSurface.inert).toBe(false);
     expect(container.querySelector(".document-surface-slot.is-staging")).toBeNull();
+    expect(container.querySelector('[data-testid="official-loading-indicator"]')).not.toBeNull();
 
     act(() => ready.get("report.pdf")?.());
     expect(pdfSurface.dataset.surfaceReady).toBe("true");
+    expect(container.querySelector('[data-testid="official-loading-indicator"]')).toBeNull();
   });
 
   it("updates the current document without remounting or creating a staging slot", async () => {
@@ -217,6 +219,7 @@ async function renderSurface(
     <DocumentSurfaceHost
       surfaceKey={surfaceKey}
       surfacePreparation={surfacePreparation}
+      pendingIndicator={<span data-testid="official-loading-indicator" />}
     >
       {({ onSurfaceReady }) => {
         ready.set(surfaceKey, onSurfaceReady);

@@ -24,6 +24,8 @@ import type {
   AgentSessionCreateRequest,
   AgentSessionExitEvent,
   AgentSessionMutationRequest,
+  AgentSessionOpenRequest,
+  AgentSessionOpenResult,
   AgentSessionResumeRequest,
   AgentSessionSnapshot,
   AgentSessionsListRequest,
@@ -392,6 +394,14 @@ export type TerminalCreateRequest = {
   };
 };
 
+export type TerminalAppearanceRequest = {
+  id: string;
+  defaultColors: {
+    foreground: [number, number, number];
+    background: [number, number, number];
+  };
+};
+
 export type TerminalAgentId = Exclude<DesktopTerminalLauncherId, "shell">;
 
 export type TerminalAgentLocationSnapshot = {
@@ -627,6 +637,7 @@ export type GitRepositoryWindowFocusEvent = {
 };
 
 export type LastWorkspaceResult = {
+  workspaceId: string | null;
   path: string | null;
   workspace: Workspace | null;
   workspaces?: Workspace[];
@@ -648,12 +659,14 @@ export type RecentWorkspacesResult = {
 
 export type WorkspaceOpenResult = {
   status: "opened-current" | "opened-new-window" | "focused-existing";
+  workspaceId: string | null;
   path: string | null;
   workspace: Workspace | null;
 };
 
 export type WorkspaceAttachResult = {
   status: "attached-current" | "already-attached" | "focused-existing";
+  workspaceId: string;
   path: string | null;
   workspace: Workspace | null;
   workspaces: Workspace[];
@@ -661,6 +674,7 @@ export type WorkspaceAttachResult = {
 
 export type WorkspaceDetachResult = {
   status: "detached-current" | "not-attached";
+  workspaceId: string;
   path: string | null;
   workspace: Workspace | null;
   workspaces: Workspace[];
@@ -834,6 +848,43 @@ export type PuppyoneWorkspaceConfig = {
   updatedAt?: string;
 };
 
+export type DesktopThemeTarget = "application" | "markdown" | "csv";
+export type DesktopThemeColorMode = "light" | "dark";
+export type DesktopThemeFirstPaint = Readonly<{
+  background: string;
+  colorScheme: DesktopThemeColorMode;
+}>;
+export type DesktopThemeDefinition = Readonly<{
+  id: string;
+  name: string;
+  version: string;
+  author?: string;
+  contractVersion?: number;
+  compatibleRootThemeIds?: readonly string[];
+  modes: readonly DesktopThemeColorMode[];
+  targets: readonly DesktopThemeTarget[];
+  source: "local-css" | "local-package";
+  compiledCss: Readonly<Partial<Record<DesktopThemeTarget, string>>>;
+  firstPaint?: Readonly<Partial<Record<DesktopThemeColorMode, DesktopThemeFirstPaint>>>;
+}>;
+export type DesktopThemeDiagnostic = Readonly<{
+  source: string;
+  message: string;
+}>;
+export type DesktopThemeSnapshot = Readonly<{
+  themes: readonly DesktopThemeDefinition[];
+  diagnostics: readonly DesktopThemeDiagnostic[];
+}>;
+export type DesktopThemeMenuState = Readonly<{
+  pack: string;
+  requiredTargets?: readonly DesktopThemeTarget[];
+  themes: readonly Readonly<{
+    id: string;
+    name: string;
+    targets: readonly DesktopThemeTarget[];
+  }>[];
+}>;
+
 declare global {
   interface Window {
     puppyoneDesktop?: {
@@ -852,6 +903,15 @@ declare global {
         background: string;
         themeSource: "system" | "light" | "dark";
       }) => void;
+      themes: {
+        list: () => Promise<DesktopThemeSnapshot>;
+        openDirectory: () => Promise<{ opened: true }>;
+        create: () => Promise<{ created: true; themeId: string }>;
+        syncNativeMenu: (request: DesktopThemeMenuState) => Promise<{ synced: true }>;
+        onSelectionRequested: (
+          callback: (request: { kind: "pack"; themeId: string }) => void,
+        ) => () => void;
+      };
       setWindowMinimumWidth: (request: { width: number }) => Promise<{
         applied: boolean;
         width?: number;
@@ -1306,6 +1366,7 @@ declare global {
       readAgentAccount: (request?: AgentAccountReadRequest) => Promise<AgentAccountState | null>;
       createAgentSession: (request: AgentSessionCreateRequest) => Promise<AgentSessionSnapshot>;
       resumeAgentSession: (request: AgentSessionResumeRequest) => Promise<AgentSessionSnapshot | null>;
+      openAgentSession: (request: AgentSessionOpenRequest) => Promise<AgentSessionOpenResult>;
       replayAgentSession: (request: AgentReplayRequest) => Promise<AgentSessionSnapshot>;
       listAgentSessions: (request: AgentSessionsListRequest) => Promise<AgentSessionsListResponse>;
       forkAgentSession: (request: AgentSessionMutationRequest) => Promise<AgentSessionSnapshot>;
@@ -1373,6 +1434,7 @@ declare global {
       createTerminal: (request: TerminalCreateRequest) => Promise<TerminalCreateResult>;
       writeTerminal: (request: TerminalInputRequest) => void;
       resizeTerminal: (request: TerminalResizeRequest) => void;
+      updateTerminalAppearance: (request: TerminalAppearanceRequest) => void;
       closeTerminal: (id: string) => Promise<void>;
       onTerminalData: (callback: (event: TerminalDataEvent) => void) => () => void;
       onTerminalExit: (callback: (event: TerminalExitEvent) => void) => () => void;

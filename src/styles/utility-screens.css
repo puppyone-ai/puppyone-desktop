@@ -4,6 +4,36 @@
   overflow: auto;
 }
 
+.application-render-fallback {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 32px;
+  background: var(--po-canvas);
+  color: var(--po-text-muted);
+  text-align: center;
+}
+
+.application-render-fallback > strong { color: var(--po-text); font-size: 15px; font-weight: 600; }
+.application-render-fallback > p { max-width: 420px; margin: 0; font-size: 13px; line-height: 1.5; }
+.application-render-fallback > button {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  padding: 0 12px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 7px;
+  background: var(--po-control);
+  color: var(--po-text);
+  font: inherit;
+  cursor: var(--po-clickable-cursor, pointer);
+}
+.application-render-fallback > button:hover { background: var(--po-hover); }
+
 .utility-heading {
   display: flex;
   align-items: center;

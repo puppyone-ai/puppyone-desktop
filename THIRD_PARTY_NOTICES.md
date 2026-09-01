@@ -1,5 +1,19 @@
 # Third-party notices
 
+## Open Sans
+
+The built-in GitHub Theme Pack includes Open Sans font files. Copyright 2020
+The Open Sans Project Authors. The fonts are redistributed under the SIL Open
+Font License, Version 1.1; the complete license text is distributed at
+`public/fonts/open-sans/OFL.txt`.
+
+## PT Serif
+
+The built-in Newspaper Theme Pack includes PT Serif font files. Copyright
+ParaType Ltd. The fonts are redistributed under the SIL Open Font License,
+Version 1.1, with the reserved font names stated in the license; the complete
+license text is distributed at `public/fonts/pt-serif/OFL.txt`.
+
 ## B00merang Windows-XP icon theme
 
 The Windows XP interface Style includes seven 128px toolbar assets and ten

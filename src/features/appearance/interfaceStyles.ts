@@ -1,4 +1,6 @@
 import { INTERFACE_STYLE_MANIFEST } from "./interfaceStyles.generated";
+import { FALLBACK_SUB_THEME_FIRST_PAINT } from "../themes/subThemeBootstrap.generated";
+import type { SubThemeDefinition } from "../themes/themeTypes";
 
 export type ThemeMode = "system" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
@@ -14,6 +16,7 @@ export const INTERFACE_STYLES = INTERFACE_STYLE_MANIFEST.styles;
 export const DEFAULT_INTERFACE_STYLE: InterfaceStyle = INTERFACE_STYLE_MANIFEST.defaultStyle;
 export const INTERFACE_STYLE_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.interfaceStyle;
 export const APPEARANCE_PREFERENCES_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.appearancePreferences;
+export const LEGACY_APPEARANCE_PREFERENCES_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.legacyAppearancePreferences;
 export const THEME_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.themeMode;
 export const LIGHT_THEME_PRESET_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.lightThemePreset;
 export const DARK_THEME_PRESET_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.darkThemePreset;
@@ -38,6 +41,22 @@ export function getInterfaceStyleComposition(style: InterfaceStyle) {
 
 export function getInterfaceStylePolicies(style: InterfaceStyle) {
   return getInterfaceStyleDefinition(style).policies;
+}
+
+export function getInterfaceStyleSubThemePolicy(style: InterfaceStyle) {
+  return getInterfaceStyleDefinition(style).subThemes;
+}
+
+export function getDefaultSubThemeId(
+  style: InterfaceStyle,
+  mode: ResolvedTheme,
+): string {
+  const defaults = getInterfaceStyleSubThemePolicy(style).defaultSubThemeIds as Partial<
+    Record<ResolvedTheme, string>
+  >;
+  const id = defaults[mode] ?? defaults.light ?? defaults.dark;
+  if (!id) throw new Error(`Interface style ${style} has no default Sub Theme for ${mode}.`);
+  return id;
 }
 
 export function getDefaultInterfaceStyleDefinition(): InterfaceStyleDefinition {
@@ -72,21 +91,17 @@ export function supportsThemePreset(
 export function getInterfaceStyleFirstPaint(
   interfaceStyle: InterfaceStyle,
   theme: ResolvedTheme,
-  preset?: string | null,
+  subTheme?: Pick<SubThemeDefinition, "firstPaint"> | null,
 ): InterfaceStyleFirstPaint {
   const definition = getInterfaceStyleDefinition(interfaceStyle);
-  if ("presetFirstPaint" in definition) {
-    const presetFirstPaint = definition.presetFirstPaint[theme];
-    if (presetFirstPaint) {
-      const presetId = preset && Object.hasOwn(presetFirstPaint.values, preset)
-        ? preset
-        : presetFirstPaint.defaultPreset;
-      const paint = presetFirstPaint.values[presetId as keyof typeof presetFirstPaint.values];
-      if (paint) return paint;
-    }
+  if (typeof subTheme === "object" && subTheme?.firstPaint) {
+    const paint = subTheme.firstPaint[theme];
+    if (paint) return paint;
   }
-  const firstPaint = definition.firstPaint as Partial<Record<ResolvedTheme, InterfaceStyleFirstPaint>>;
-  const paint = firstPaint[theme] ?? firstPaint.light ?? firstPaint.dark;
-  if (!paint) throw new Error(`Interface style ${interfaceStyle} has no first-paint palette.`);
-  return paint;
+  if ("firstPaint" in definition) {
+    const rootFirstPaint = definition.firstPaint as Partial<Record<ResolvedTheme, InterfaceStyleFirstPaint>>;
+    const rootPaint = rootFirstPaint[theme] ?? rootFirstPaint.light ?? rootFirstPaint.dark;
+    if (rootPaint) return rootPaint;
+  }
+  return FALLBACK_SUB_THEME_FIRST_PAINT[theme];
 }

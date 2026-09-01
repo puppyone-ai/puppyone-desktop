@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from "react";
-import type { ClipboardEvent, DragEvent } from "react";
+import { useCallback, useState } from "react";
+import type { DragEvent } from "react";
 import {
   classifyReferenceDataTransfer,
   hasReferenceDataTransferSource,
@@ -9,6 +9,11 @@ import { useLocalization } from "@puppyone/localization/react";
 import type { AgentSessionController } from "../application/AgentSessionController";
 import type { AgentReferenceVisualPreview } from "../application/AgentReferencePreviewStore";
 import type { AgentReferenceInputCapabilities } from "../domain/agent-contract";
+import {
+  acceptsAgentAttachment,
+  hasAgentAttachmentSupport,
+} from "../domain/agent-reference-capabilities";
+import type { AgentReferenceDropEvent } from "./agentReferenceDropEvent";
 
 export type AgentWorkspaceReferenceResolution = Readonly<{
   workspaceRoot: string;
@@ -32,9 +37,6 @@ export function useAgentReferenceIngestion({
   resolveWorkspaceReference?: AgentWorkspaceReferenceResolver;
 }) {
   const { t } = useLocalization();
-  const dragDepth = useRef(0);
-  const [dropActive, setDropActive] = useState(false);
-  const [dropInvalid, setDropInvalid] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const announceBatchResult = useCallback((beforeIds: Set<string>, count: number) => {
     const failed = controller.getSnapshot().references
@@ -44,40 +46,19 @@ export function useAgentReferenceIngestion({
       : t("agent.reference.batchResult", { count }));
   }, [controller, t]);
 
-  const onDragEnter = useCallback((event: DragEvent<HTMLElement>) => {
-    if (!hasReferenceDataTransferSource(event.dataTransfer)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    dragDepth.current += 1;
-    setDropActive(true);
-    setDropInvalid(!canIngestDataTransfer(event.dataTransfer, workspaceId, capabilities));
-  }, [capabilities, workspaceId]);
-
   const onDragOver = useCallback((event: DragEvent<HTMLElement>) => {
     if (!hasReferenceDataTransferSource(event.dataTransfer)) return;
     event.preventDefault();
     event.stopPropagation();
-    event.dataTransfer.dropEffect = "copy";
-  }, []);
+    event.dataTransfer.dropEffect = canIngestDataTransfer(event.dataTransfer, workspaceId, capabilities)
+      ? "copy"
+      : "none";
+  }, [capabilities, workspaceId]);
 
-  const onDragLeave = useCallback((event: DragEvent<HTMLElement>) => {
-    if (!dropActive) return;
-    event.preventDefault();
-    event.stopPropagation();
-    dragDepth.current = Math.max(0, dragDepth.current - 1);
-    if (dragDepth.current === 0) {
-      setDropActive(false);
-      setDropInvalid(false);
-    }
-  }, [dropActive]);
-
-  const onDrop = useCallback((event: DragEvent<HTMLElement>) => {
+  const ingestDrop = useCallback((event: AgentReferenceDropEvent) => {
     if (!hasReferenceDataTransferSource(event.dataTransfer)) return;
     event.preventDefault();
     event.stopPropagation();
-    dragDepth.current = 0;
-    setDropActive(false);
-    setDropInvalid(false);
     const beforeIds = new Set(controller.getSnapshot().references.map((reference) => reference.id));
     void ingestDataTransfer(
       event.dataTransfer,
@@ -94,15 +75,26 @@ export function useAgentReferenceIngestion({
     });
   }, [announceBatchResult, controller, resolveWorkspaceReference, t, workspaceId]);
 
-  const onPaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
-    const images = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
-    if (images.length === 0) return;
+  const onDrop = useCallback((event: DragEvent<HTMLElement>) => {
+    ingestDrop(event);
+  }, [ingestDrop]);
+
+  const onEditorDrop = useCallback((event: AgentReferenceDropEvent) => {
+    ingestDrop(event);
+  }, [ingestDrop]);
+
+  const onPaste = useCallback((event: { clipboardData: DataTransfer; preventDefault: () => void }) => {
+    const files = Array.from(event.clipboardData.files).filter((file) => acceptsAgentAttachment(capabilities, {
+      mime: file.type,
+      name: file.name,
+    }));
+    if (files.length === 0) return;
     event.preventDefault();
     const beforeIds = new Set(controller.getSnapshot().references.map((reference) => reference.id));
-    void controller.stageExternalFiles(images).then((count) => {
+    void controller.stageExternalFiles(files).then((count) => {
       announceBatchResult(beforeIds, count);
     });
-  }, [announceBatchResult, controller]);
+  }, [announceBatchResult, capabilities, controller]);
 
   const addExternalFiles = useCallback((files: File[]) => {
     const beforeIds = new Set(controller.getSnapshot().references.map((reference) => reference.id));
@@ -119,14 +111,10 @@ export function useAgentReferenceIngestion({
   }, [announceBatchResult, controller]);
 
   return {
-    dropActive,
-    dropInvalid,
-    dropLabel: t(dropInvalid ? "agent.reference.dropUnsupported" : "agent.reference.dropLabel"),
     announcement,
-    onDragEnter,
     onDragOver,
-    onDragLeave,
     onDrop,
+    onEditorDrop,
     onPaste,
     addExternalFiles,
     pickWorkspaceReferences,
@@ -142,25 +130,23 @@ function canIngestDataTransfer(
   if (source.kind === "text") return true;
   if (source.kind === "none") {
     const types = Array.from(dataTransfer.types ?? []);
-    if (types.includes("Files")) return Boolean(capabilities
-      && (capabilities.images !== "none" || capabilities.genericFiles !== "none"));
+    if (types.includes("Files")) return hasAgentAttachmentSupport(capabilities);
     return true;
   }
   if (!capabilities) return false;
   if (source.kind === "workspace-entries") {
     if (source.workspaceId && source.workspaceId !== workspaceId) return false;
     return source.entries.every((entry) => entry.entryType === "directory"
-      ? capabilities.workspaceDirectories
-      : capabilities.workspaceFiles);
+      ? capabilities.workspace.directories
+      : capabilities.workspace.files);
   }
   if (source.files.length === 0) {
-    return capabilities.images !== "none" || capabilities.genericFiles !== "none";
+    return hasAgentAttachmentSupport(capabilities);
   }
-  return source.files.every((file) => {
-    const transport = file.type.startsWith("image/") ? capabilities.images : capabilities.genericFiles;
-    return transport !== "none"
-      && (!capabilities.acceptedMimeTypes?.length || capabilities.acceptedMimeTypes.includes(file.type));
-  });
+  return source.files.every((file) => acceptsAgentAttachment(capabilities, {
+    mime: file.type,
+    name: file.name,
+  }));
 }
 
 async function ingestDataTransfer(

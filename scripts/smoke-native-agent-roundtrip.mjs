@@ -4,7 +4,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { EventEmitter } from "node:events";
-import { fileURLToPath } from "node:url";
 import { createDefaultAgentRuntimeHost } from "../electron/main/agent/bootstrap/create-agent-runtime-host.mjs";
 import { createAgentService } from "../electron/main/agent/application/agent-service.mjs";
 import { createEphemeralAgentSessionCache } from "../electron/main/agent/cache/ephemeral-agent-session-cache.mjs";
@@ -14,8 +13,12 @@ import {
   NativeAgentRoundtripError,
   runNativeAgentRoundtrip,
 } from "./native-agent-roundtrip-runner.mjs";
-
-const NATIVE_RUNTIME_IDS = Object.freeze(["codex", "claude", "cursor", "opencode-native"]);
+import {
+  NATIVE_AGENT_RUNTIME_IDS,
+  nativeAgentSmokeTimeout,
+  requestedNativeAgentRuntimeIds,
+  safeNativeAgentReadinessStatus,
+} from "./native-agent-smoke-runtime-selection.mjs";
 const FORBIDDEN_CATALOG_KEYS = new Set([
   "events", "messages", "transcript", "prompt", "answer", "reasoning",
   "toolOutput", "commandOutput", "diff", "environment", "executablePath",
@@ -34,9 +37,9 @@ class SmokeSender extends EventEmitter {
 if (process.env.RUN_NATIVE_AGENT_SMOKE !== "1") {
   console.log("Skipped native Agent round-trip. Set RUN_NATIVE_AGENT_SMOKE=1 to run against installed Agents.");
 } else {
-  const selection = requestedRuntimeIds(process.argv.slice(2), process.env.PUPPYONE_NATIVE_AGENT_RUNTIMES);
+  const selection = requestedNativeAgentRuntimeIds(process.argv.slice(2), process.env.PUPPYONE_NATIVE_AGENT_RUNTIMES);
   if (!selection.valid) {
-    console.error("Invalid native Agent runtime selection. Use codex, claude, cursor, opencode-native, or all.");
+    console.error("Invalid native Agent runtime selection. Use codex, claude, cursor, opencode-native, pi, or all.");
     process.exitCode = 2;
   } else {
     await main(selection).catch(() => {
@@ -48,12 +51,11 @@ if (process.env.RUN_NATIVE_AGENT_SMOKE !== "1") {
 }
 
 async function main(selection) {
-  const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const temporaryRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), "puppyone-native-agent-smoke-"));
   const workspaceRoot = path.join(temporaryRoot, "workspace");
   const userDataRoot = path.join(temporaryRoot, "user-data");
   const catalogPath = path.join(userDataRoot, "agent-runtime", "conversations.json");
-  const timeoutMs = smokeTimeout(process.env.PUPPYONE_NATIVE_AGENT_TIMEOUT_MS);
+  const timeoutMs = nativeAgentSmokeTimeout(process.env.PUPPYONE_NATIVE_AGENT_TIMEOUT_MS);
   const safeLogger = Object.freeze({ warn() {}, error() {}, info() {} });
   let service = null;
   const results = [];
@@ -61,9 +63,6 @@ async function main(selection) {
   try {
     await fs.promises.mkdir(workspaceRoot, { recursive: true, mode: 0o700 });
     const runtimeHost = createDefaultAgentRuntimeHost({
-      appPath: repositoryRoot,
-      resourcesPath: path.join(repositoryRoot, "resources"),
-      managedOpenCodeConfigDir: path.join(temporaryRoot, "managed-agent"),
       appVersion: "native-roundtrip-smoke",
       logger: safeLogger,
     });
@@ -80,7 +79,7 @@ async function main(selection) {
     });
     const sender = new SmokeSender();
     const catalog = await runtimeHost.discover({ refresh: true });
-    const runtimeIds = selection.runtimeIds ?? [...NATIVE_RUNTIME_IDS];
+    const runtimeIds = selection.runtimeIds ?? [...NATIVE_AGENT_RUNTIME_IDS];
 
     for (const runtimeId of runtimeIds) {
       const entry = catalog.find((candidate) => candidate.descriptor.id === runtimeId);
@@ -89,7 +88,7 @@ async function main(selection) {
           runtimeId,
           status: selection.explicit ? "failed" : "skipped",
           check: "readiness",
-          reason: safeReadinessStatus(entry?.readiness?.status),
+          reason: safeNativeAgentReadinessStatus(entry?.readiness?.status),
         });
         continue;
       }
@@ -129,32 +128,6 @@ async function main(selection) {
   const passed = results.filter((result) => result.status === "passed");
   const failed = results.filter((result) => result.status === "failed");
   if (passed.length === 0 || failed.length > 0) process.exitCode = 1;
-}
-
-function requestedRuntimeIds(argv, environmentValue) {
-  const argument = argv.find((entry) => entry.startsWith("--runtimes="));
-  const value = argument?.slice("--runtimes=".length) || environmentValue || "";
-  if (!value) return { valid: true, explicit: false, runtimeIds: null };
-  const runtimeIds = value === "all"
-    ? [...NATIVE_RUNTIME_IDS]
-    : value.split(",").map((entry) => entry.trim()).filter(Boolean);
-  const unknown = runtimeIds.filter((runtimeId) => !NATIVE_RUNTIME_IDS.includes(runtimeId));
-  if (runtimeIds.length === 0 || unknown.length > 0) {
-    return { valid: false, explicit: true, runtimeIds: [] };
-  }
-  return { valid: true, explicit: true, runtimeIds: [...new Set(runtimeIds)] };
-}
-
-function smokeTimeout(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 1_000 ? Math.min(parsed, 10 * 60_000) : 120_000;
-}
-
-function safeReadinessStatus(value) {
-  return [
-    "not-installed", "unsupported-version", "authentication-required",
-    "protocol-unavailable", "setup-required", "error",
-  ].includes(value) ? value : "unavailable";
 }
 
 async function assertLocatorCatalogSafe(filePath) {

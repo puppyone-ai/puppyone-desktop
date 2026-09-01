@@ -14,9 +14,16 @@ import { CLAUDE_RUNTIME_DESCRIPTOR } from "./claude-identity.mjs";
 import { ClaudeMessageChannel, createClaudeUserMessage } from "./claude-message-channel.mjs";
 import { createClaudeSpawn } from "./claude-spawn.mjs";
 import { AgentProviderSessionUnavailableError } from "../../runtime/agent-runtime-port.mjs";
+import { formatAuthorizedWorkspaceReferencePrompt } from "../../security/authorized-workspace-reference-prompt.mjs";
+import {
+  buildClaudeUserMessageContent,
+  CLAUDE_NATIVE_IMAGE_MAX_BYTES,
+  CLAUDE_NATIVE_IMAGE_MIME_TYPES,
+} from "./claude-prompt-input.mjs";
 
 const INSPECTION_TIMEOUT_MS = 30_000;
 const CLAUDE_PROJECT_INSTRUCTION_NAMES = Object.freeze(["CLAUDE.md", "AGENTS.md", "CONTEXT.md"]);
+export { CLAUDE_NATIVE_IMAGE_MAX_BYTES, CLAUDE_NATIVE_IMAGE_MIME_TYPES };
 
 export const CLAUDE_CAPABILITIES = Object.freeze({
   streamingText: true,
@@ -29,12 +36,13 @@ export const CLAUDE_CAPABILITIES = Object.freeze({
   fork: true,
   steer: false,
   queue: false,
-  attachments: false,
+  attachments: true,
   contextReferences: true,
   modelSelection: true,
   modeSelection: true,
   slashCommands: true,
   sessionHistory: true,
+  history: Object.freeze({ discovery: "paged", exactOpen: "supported", hydration: "snapshot" }),
   usage: true,
   accountState: true,
   mcp: true,
@@ -49,19 +57,39 @@ export const CLAUDE_CAPABILITIES = Object.freeze({
     compactionRequiresIdle: true,
   }),
   referenceInputs: Object.freeze({
-    workspaceFiles: true,
-    workspaceDirectories: true,
-    images: "none",
-    genericFiles: "none",
-    maxReferences: 32,
-    maxReferenceBytes: 25 * 1024 * 1024,
-    maxTotalReferenceBytes: 25 * 1024 * 1024,
+    schemaVersion: 1,
+    workspace: Object.freeze({ files: true, directories: true }),
+    attachments: Object.freeze({
+      image: Object.freeze({
+        accepted: true,
+        mimeTypes: CLAUDE_NATIVE_IMAGE_MIME_TYPES,
+        maxBytes: CLAUDE_NATIVE_IMAGE_MAX_BYTES,
+      }),
+      text: Object.freeze({ accepted: true }),
+      audio: Object.freeze({ accepted: false }),
+      video: Object.freeze({ accepted: false }),
+      binary: Object.freeze({ accepted: true }),
+    }),
+    limits: Object.freeze({
+      maxCount: 32,
+      maxBytesPerReference: 25 * 1024 * 1024,
+      maxTotalBytes: 25 * 1024 * 1024,
+    }),
     steer: false,
     attachmentOnly: false,
   }),
 });
 
 export class ClaudeAgentSdkAdapter {
+  referenceMentionDelivery() { return "path"; }
+
+  getSessionHistoryPort() {
+    return Object.freeze({
+      discover: (request) => this.discoverSessions(request),
+      hydrate: () => this.readHistory(),
+    });
+  }
+
   constructor({
     readiness,
     workspaceRoot,
@@ -131,7 +159,7 @@ export class ClaudeAgentSdkAdapter {
           { id: "plan", displayName: "Plan", description: "Read-only planning with Claude Code's native plan mode.", isDefault: false },
         ],
         commands: normalizeCommands(initialized?.commands),
-        capabilities: CLAUDE_CAPABILITIES,
+        capabilities: claudeCapabilitiesForRuntime(this.readiness.version),
         runtime: {
           ...CLAUDE_RUNTIME_DESCRIPTOR,
           version: this.readiness.version ?? null,
@@ -223,10 +251,11 @@ export class ClaudeAgentSdkAdapter {
     const sdk = await this.#loadSdk();
     const projectInstructions = await this.projectInstructionLoader(this.workspaceRoot);
     const references = allReferences.length > 0 ? allReferences : [...contextReferences, ...attachments];
-    if (references.some((entry) => entry?.kind === "staged-attachment"
-      || typeof entry?.path !== "string" || !isInsideWorkspace(this.workspaceRoot, entry.path))) {
-      throw new Error("Claude Code received an unsupported or unauthorized reference input.");
-    }
+    const messageContent = await buildClaudeUserMessageContent({
+      prompt,
+      references,
+      workspaceRoot: this.workspaceRoot,
+    });
     const turnId = `claude:${randomUUID()}`;
     const controller = new AbortController();
     const state = createClaudeEventState({ turnId, resumed: this.resuming || Boolean(this.sessionId) });
@@ -237,7 +266,7 @@ export class ClaudeAgentSdkAdapter {
     this.interruptRequested = false;
     this.messageChannel.setSessionId(this.sessionId ?? "");
     this.messageChannel.enqueue(createClaudeUserMessage(
-      formatClaudePrompt(prompt, references, this.workspaceRoot),
+      messageContent,
       this.sessionId ?? "",
     ));
     return { turnId };
@@ -656,12 +685,19 @@ function questionAnswerMap(questions, answers) {
 }
 
 export function formatClaudePrompt(prompt, references, workspaceRoot) {
-  const paths = Array.from(new Set(references
-    .map((entry) => typeof entry?.path === "string" ? path.resolve(entry.path) : null)
-    .filter((filename) => filename && isInsideWorkspace(workspaceRoot, filename))));
-  return paths.length
-    ? `${prompt}\n\nAuthorized context files for this turn:\n${paths.map((filename) => `- ${filename}`).join("\n")}`
-    : prompt;
+  return formatAuthorizedWorkspaceReferencePrompt(prompt, references, workspaceRoot);
+}
+
+function claudeCapabilitiesForRuntime(version) {
+  const agentVersion = bounded(version, 80) || null;
+  return {
+    ...CLAUDE_CAPABILITIES,
+    revision: `${CLAUDE_CAPABILITIES.revision}:claude-code:${agentVersion ?? "unknown"}`,
+    protocol: {
+      ...CLAUDE_CAPABILITIES.protocol,
+      agentVersion,
+    },
+  };
 }
 
 function projectInstructionIdentity(value) {
@@ -671,11 +707,6 @@ function projectInstructionIdentity(value) {
     .update("\0")
     .update(String(value.text ?? ""))
     .digest("hex");
-}
-
-function isInsideWorkspace(workspaceRoot, filename) {
-  const relative = path.relative(workspaceRoot, filename);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 async function* idleInput(signal) {

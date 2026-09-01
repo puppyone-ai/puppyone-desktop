@@ -1,9 +1,11 @@
 {
-  "version": 3,
+  "version": 4,
   "defaultStyle": "default",
+  "fallbackSubThemeId": "default.neutral",
   "storage": {
     "interfaceStyle": "puppyone.desktop.interfaceStyle",
-    "appearancePreferences": "puppyone.desktop.appearance.v2",
+    "appearancePreferences": "puppyone.desktop.appearance",
+    "legacyAppearancePreferences": "puppyone.desktop.appearance.v2",
     "themeMode": "puppyone.desktop.theme",
     "lightThemePreset": "puppyone.desktop.lightThemePreset",
     "darkThemePreset": "puppyone.desktop.darkThemePreset",
@@ -33,6 +35,13 @@
         "textSize": { "mode": "inherit" },
         "fileIconTheme": { "mode": "inherit" }
       },
+      "subThemes": {
+        "defaultSubThemeIds": {
+          "light": "default.neutral",
+          "dark": "default.neutral"
+        },
+        "allowedTargets": ["application", "markdown", "csv"]
+      },
       "palette": {
         "kind": "adaptive",
         "modes": ["system", "light", "dark"],
@@ -40,52 +49,6 @@
         "presetControls": {
           "light": true,
           "dark": true
-        }
-      },
-      "firstPaint": {
-        "light": {
-          "background": "#fafafa",
-          "colorScheme": "light"
-        },
-        "dark": {
-          "background": "#161413",
-          "colorScheme": "dark"
-        }
-      },
-      "presetFirstPaint": {
-        "light": {
-          "defaultPreset": "neutral",
-          "values": {
-            "neutral": {
-              "background": "#fafafa",
-              "colorScheme": "light"
-            },
-            "warm": {
-              "background": "#fbfaf7",
-              "colorScheme": "light"
-            },
-            "graphite": {
-              "background": "#fbfbfc",
-              "colorScheme": "light"
-            }
-          }
-        },
-        "dark": {
-          "defaultPreset": "default",
-          "values": {
-            "default": {
-              "background": "#161413",
-              "colorScheme": "dark"
-            },
-            "warm": {
-              "background": "#18130f",
-              "colorScheme": "dark"
-            },
-            "graphite": {
-              "background": "#17181c",
-              "colorScheme": "dark"
-            }
-          }
         }
       },
       "stylesheet": null
@@ -120,6 +83,12 @@
         },
         "textSize": { "mode": "inherit" },
         "fileIconTheme": { "mode": "inherit" }
+      },
+      "subThemes": {
+        "defaultSubThemeIds": {
+          "light": "windows-xp.luna-blue"
+        },
+        "allowedTargets": ["markdown", "csv"]
       },
       "palette": {
         "kind": "fixed",

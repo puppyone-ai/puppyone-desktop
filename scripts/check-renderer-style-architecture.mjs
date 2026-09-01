@@ -16,6 +16,7 @@ const interfaceSkinContractStyles = read("src/styles/interface-skin-contract.css
 const windowChromeOwner = path.join(repoRoot, "src", "styles", "window-chrome.css");
 const sharedUiRoot = path.join(repoRoot, "packages", "shared-ui", "src");
 const interfaceStyleRoot = path.join(repoRoot, "src", "styles", "interfaces");
+const builtinSubThemeRoot = path.join(repoRoot, "sub-themes");
 const viewerSurfaceTokenContract = JSON.parse(read("src/styles/viewer-surface-token-contract.json"));
 const concreteStylePattern = /\bwindows-xp\b/;
 const editorInternalSelectorPattern = /\.(?:cm-|markdown-codemirror-editor\b|csv-table-editor\b|desktop-terminal-xterm\b|puppyflow-[a-z0-9-]+\b|editor-mode-toggle\b|plain-text-editor\b|code-codemirror-editor\b)/;
@@ -23,8 +24,8 @@ const genericFormControlPattern = /(^|[\s>:,(])(?:input|textarea|select)(?=[\s.#
 const ownedFormControlScopePattern = /\.(?:desktop-settings-view|desktop-settings-switch|desktop-dialog-surface|onboarding-shell|desktop-agent-composer)\b/;
 const rootRelativeAssetPattern = /(["'`])\/(?!\/)[^"'`]+\.(?:png|svg|webp|jpe?g|gif|ico|woff2?)(?:[?#][^"'`]*)?\1/gi;
 
-if (cascade.trim() !== "@layer reset, tokens, primitives, patterns, features, interface-style, accessibility, overrides;") {
-  errors.push("Renderer cascade order must remain reset → tokens → primitives → patterns → features → interface-style → accessibility → overrides.");
+if (cascade.trim() !== "@layer reset, fallback, tokens, primitives, patterns, features, interface-style, sub-theme, appearance-overrides, accessibility, overrides;") {
+  errors.push("Renderer cascade order must keep Root Theme → Sub Theme → semantic User Overrides → safety layers explicit.");
 }
 
 const cascadeIndex = rendererEntry.indexOf('import "./styles/cascade.css";');
@@ -51,6 +52,10 @@ if (!/corePlugins\s*:\s*\{[\s\S]*?preflight\s*:\s*false/.test(tailwindConfig)) {
 
 if (!productStyles.includes('@import "./styles/base.css" layer(reset);')) {
   errors.push("The PuppyOne base stylesheet must remain explicitly owned by the reset layer.");
+}
+
+if (!productStyles.includes('@import "./styles/fallback-theme.generated.css" layer(fallback);')) {
+  errors.push("The generated Neutral recovery palette must remain in the lowest fallback layer.");
 }
 
 if (!productStyles.includes('@import "@puppyone/shared-ui/shared-ui-patterns.css" layer(patterns);')) {
@@ -137,6 +142,25 @@ for (const filePath of walkRendererSource(sharedUiRoot)) {
   }
   if (concreteStylePattern.test(source)) {
     errors.push(`${path.relative(repoRoot, filePath)} references a concrete Desktop Interface Style; MDI and editors must remain Style-agnostic.`);
+  }
+  if (/ThemeSurfaceContext|useThemeSurfaceId|data-sub-theme-id|ThemeCatalog/.test(source)) {
+    errors.push(`${path.relative(repoRoot, filePath)} imports product Sub Theme identity into Shared UI; consume semantic tokens and the generic appearance revision only.`);
+  }
+}
+
+for (const filePath of readdirSync(builtinSubThemeRoot, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => path.join(builtinSubThemeRoot, entry.name, "theme.css"))) {
+  const relativePath = path.relative(repoRoot, filePath);
+  const source = readAbsolute(filePath);
+  if (editorInternalSelectorPattern.test(source)) {
+    errors.push(`${relativePath} targets Editor internals; built-in Sub Themes must use the public token contract.`);
+  }
+  if (!source.includes("@puppyone-theme") || !source.includes("@puppyone ")) {
+    errors.push(`${relativePath} is not a self-describing single-file Sub Theme package.`);
+  }
+  if (/--po-host-(?:md|csv)-/.test(source)) {
+    errors.push(`${relativePath} authors private host tokens; use the public Sub Theme token contract.`);
   }
 }
 

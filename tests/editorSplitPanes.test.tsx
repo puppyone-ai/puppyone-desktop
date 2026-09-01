@@ -50,6 +50,122 @@ afterEach(() => {
 });
 
 describe("DesktopEditorSplitView", () => {
+  it("shows an explicit empty state when a split pane has no document", () => {
+    const group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("a.md"));
+    const layout = splitEditorPane(
+      createEditorPaneLayout("a.md"),
+      "editor-pane-1",
+      "horizontal",
+      { editorId: null },
+    );
+    const container = renderSplitView(group, layout);
+    const emptyPane = container.querySelector<HTMLElement>('[data-empty="true"]');
+
+    expect(emptyPane).not.toBeNull();
+    expect(emptyPane?.dataset.contentState).toBe("empty");
+    expect(emptyPane?.querySelector(".desktop-editor-pane-empty")?.textContent)
+      .toBe("Select a file to preview");
+    expect(emptyPane?.querySelector(".document-surface-host")).toBeNull();
+  });
+
+  it("uses the official loading animation without visible loading copy", async () => {
+    const markdown: DataNode = {
+      id: "loading.md",
+      name: "loading.md",
+      path: "loading.md",
+      type: "markdown",
+      mimeType: "text/markdown",
+      source: "local",
+    };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const dataPort: DataPort = {
+      listChildren: async () => [],
+      readFile: vi.fn(() => new Promise(() => undefined)),
+    };
+
+    await act(async () => root?.render(withTestLocalization(
+      <EditorPaneDocumentRuntime
+        {...runtimeProps(markdown, runtimeEnvironment(0))}
+        dataPort={dataPort}
+      />,
+    )));
+
+    expect(container.querySelector('[data-puppy-loader="pulse-grid"]')).not.toBeNull();
+    expect(container.textContent).not.toContain("Loading file");
+    expect(container.querySelector(".document-surface-pending")?.getAttribute("aria-busy"))
+      .toBe("true");
+  });
+
+  it("restarts content reads after Strict Mode replays the Files surface around Settings", async () => {
+    const path = "return-from-settings.md";
+    const node: DataNode = {
+      id: path,
+      name: path,
+      path,
+      type: "markdown",
+      mimeType: "text/markdown",
+      source: "local",
+    };
+    const group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput(path));
+    const layout = createEditorPaneLayout(path);
+    const readFile = vi.fn(async () => ({
+      path,
+      name: path,
+      type: "markdown" as const,
+      mimeType: "text/markdown",
+      content: "# Restored document",
+      version: `version:${readFile.mock.calls.length}`,
+    }));
+    const dataPort: DataPort = { listChildren: async () => [node], readFile };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    const renderRoute = async (route: "files" | "settings") => act(async () => root?.render(
+      withTestLocalization(
+        <React.StrictMode>
+          {route === "settings" ? <div>Settings</div> : (
+            <DesktopEditorSplitView
+              aiEditRequest={null}
+              dataPort={dataPort}
+              editorGroup={group}
+              editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+              editorTree={[node]}
+              fileIconTheme="default"
+              layout={layout}
+              markdownEnvironment={emptyWorkspaceState().markdownEnvironment}
+              workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
+              onClosePane={vi.fn()}
+              onFocusPane={vi.fn()}
+              onMovePane={vi.fn()}
+              onOpenAtPaneEdge={vi.fn()}
+              onResizeSplit={vi.fn()}
+              onSplitPane={vi.fn()}
+            />
+          )}
+        </React.StrictMode>,
+      ),
+    ));
+
+    await renderRoute("files");
+    await waitForCondition(() => (
+      container.querySelector(".cm-editor") !== null
+      && container.querySelector("[data-puppy-loader]") === null
+    ));
+    const readsAfterFirstMount = readFile.mock.calls.length;
+    expect(readsAfterFirstMount).toBeGreaterThanOrEqual(2);
+    await renderRoute("settings");
+    expect(container.textContent).toContain("Settings");
+    await renderRoute("files");
+    await waitForCondition(() => (
+      readFile.mock.calls.length > readsAfterFirstMount
+      && container.querySelector(".cm-editor") !== null
+      && container.querySelector("[data-puppy-loader]") === null
+    ));
+  });
+
   it("keeps the pane actions handle when only one pane exists", () => {
     const group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("a.md"));
     const container = renderSplitView(group, createEditorPaneLayout("a.md"));
@@ -1032,7 +1148,7 @@ describe("DesktopEditorSplitView", () => {
     )).toBe(true);
   });
 
-  it("never routes a directory node through the unknown-document fallback", () => {
+  it("shows an unavailable state instead of blanking a pane restored as a directory", () => {
     const folder: DataNode = {
       id: "docs",
       name: "docs",
@@ -1051,6 +1167,8 @@ describe("DesktopEditorSplitView", () => {
     expect(container.querySelector(".document-preview")).toBeNull();
     expect(container.textContent).not.toContain("Binary file");
     expect(container.textContent).not.toContain("folder file");
+    expect(container.querySelector('[role="alert"]')?.textContent)
+      .toContain("Cannot open in editor");
   });
 });
 

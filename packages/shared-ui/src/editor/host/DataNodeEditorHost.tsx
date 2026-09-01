@@ -5,6 +5,7 @@ import type {
   FileContent,
   OfficeDocumentConverter,
 } from "../../core/types";
+import type { ReactNode } from "react";
 import type { FileIconThemeId } from "../../file/fileIcons";
 import {
   EditorDocumentHost,
@@ -21,6 +22,7 @@ import type {
   OfficeEditorActionResolver,
 } from "../registry/viewerTypes";
 import type { ViewerExtensionHostAdapter } from "../registry/viewerHostAdapters";
+import type { ViewerSurfacePreparation } from "../registry/viewerContract";
 import type { DocumentPersistedCommit } from "../document-session/types";
 
 export type DataNodeEditorHostProps = {
@@ -30,6 +32,8 @@ export type DataNodeEditorHostProps = {
   fileUrlLoading?: boolean;
   fileUrlError?: string | null;
   loading?: boolean;
+  loadingIndicator?: ReactNode;
+  surfacePreparation?: ViewerSurfacePreparation;
   error?: string | null;
   documentPersistence?: DocumentPersistencePort | null;
   onDocumentPersisted?: (commit: DocumentPersistedCommit) => void;
@@ -61,6 +65,8 @@ export function DataNodeEditorHost({
   fileUrlLoading = false,
   fileUrlError = null,
   loading = false,
+  loadingIndicator,
+  surfacePreparation,
   error = null,
   documentPersistence = null,
   onDocumentPersisted,
@@ -102,6 +108,8 @@ export function DataNodeEditorHost({
       }}
       viewerExtensionAdapter={viewerExtensionAdapter}
       loading={loading}
+      loadingIndicator={loadingIndicator}
+      surfacePreparation={surfacePreparation}
       error={error}
       fileUrlLoading={fileUrlLoading}
       fileUrlError={fileUrlError}

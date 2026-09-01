@@ -1,6 +1,7 @@
 @import "./styles/typography/foundations.css" layer(tokens);
 @import "./styles/typography/locales.css" layer(tokens);
 @import "./styles/typography/roles.css" layer(tokens);
+@import "./styles/fallback-theme.generated.css" layer(fallback);
 @import "./styles/tokens.css" layer(tokens);
 @import "./styles/base.css" layer(reset);
 @import "./styles/scrollbars.css" layer(primitives);

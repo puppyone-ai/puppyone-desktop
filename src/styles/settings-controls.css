@@ -56,6 +56,127 @@
   animation: spin 0.85s linear infinite;
 }
 
+.desktop-theme-settings-section {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.desktop-theme-settings-error {
+  margin: 0;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.desktop-theme-settings-error {
+  color: var(--po-danger);
+}
+
+.desktop-theme-pack-controls {
+  display: flex;
+  width: max-content;
+  height: 28px;
+  max-width: 100%;
+  min-width: 0;
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.desktop-theme-pack-label {
+  flex: 0 0 auto;
+  color: var(--po-text-subtle);
+  white-space: nowrap;
+}
+
+.desktop-theme-pack-picker {
+  display: flex;
+  width: fit-content;
+  max-width: 156px;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.desktop-theme-pack-select {
+  width: fit-content;
+  min-width: 124px;
+  max-width: 156px;
+  flex: 0 1 auto;
+  field-sizing: content;
+}
+
+.desktop-theme-pack-icon-action {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+}
+
+.desktop-theme-pack-icon-action:hover:not(:disabled),
+.desktop-theme-pack-icon-action:focus-visible:not(:disabled) {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-theme-pack-icon-action:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--po-accent) 32%, transparent);
+  outline-offset: 1px;
+}
+
+.desktop-theme-pack-icon-action:disabled {
+  color: var(--po-text-disabled);
+  opacity: 0.58;
+}
+
+.desktop-theme-settings-folder-help {
+  margin: 8px 0 0;
+  width: min(100%, 360px);
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: end;
+}
+
+.desktop-theme-settings-help-row {
+  justify-content: flex-end;
+}
+
+.desktop-theme-settings-help-row .desktop-theme-settings-folder-help:first-child {
+  margin-top: 0;
+}
+
+.desktop-settings-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  margin: -1px;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.desktop-theme-settings-diagnostics {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-inline-start: 20px;
+  color: var(--po-text-muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
 .desktop-settings-action.danger {
   border-color: color-mix(in srgb, var(--po-danger) 22%, transparent);
   background: color-mix(in srgb, var(--po-danger) 7%, transparent);
@@ -95,15 +216,43 @@
   padding: 0;
 }
 
-.desktop-content-font-segment {
+.desktop-content-font-segment,
+.desktop-markdown-font-segment {
   max-width: 50%;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
 
+.desktop-editor-typography-preview.markdown-codemirror-editor {
+  container-name: desktop-editor-typography-preview;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  margin: 8px 10px 0;
+  border: 1px solid color-mix(in srgb, var(--po-divider) 88%, transparent);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: default;
+}
+
+.desktop-editor-typography-preview .cm-md-html-rendered-surface {
+  padding: 22px 24px;
+}
+
+.desktop-editor-typography-preview .desktop-editor-typography-preview-body {
+  margin-block-end: 0;
+}
+
 @media (max-width: 760px) {
-  .desktop-content-font-segment {
+  .desktop-content-font-segment,
+  .desktop-markdown-font-segment {
     max-width: 100%;
+  }
+}
+
+@container (max-width: 560px) {
+  .desktop-editor-typography-preview .cm-md-html-rendered-surface {
+    padding: 18px;
   }
 }
 
@@ -391,6 +540,42 @@
   padding: 4px 10px 0;
 }
 
+.desktop-markdown-theme-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 4px 10px 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel) 72%, transparent);
+}
+
+.desktop-markdown-theme-summary > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.desktop-markdown-theme-summary span,
+.desktop-markdown-presentation-toolbar > span {
+  color: var(--po-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.desktop-markdown-theme-summary strong {
+  color: var(--po-text);
+  font-size: 13px;
+}
+
+.desktop-markdown-theme-summary small {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .desktop-markdown-presentation-controls {
   display: grid;
   min-width: 0;
@@ -398,6 +583,18 @@
   border: 1px solid var(--po-border-subtle);
   border-radius: 8px;
   background: color-mix(in srgb, var(--po-panel) 72%, transparent);
+}
+
+.desktop-markdown-presentation-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+}
+
+.desktop-markdown-presentation-toolbar + .desktop-markdown-presentation-setting {
+  border-top: 1px solid var(--po-border-subtle);
 }
 
 .desktop-markdown-presentation-setting {
@@ -438,6 +635,11 @@
 }
 
 @media (max-width: 760px) {
+  .desktop-markdown-theme-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .desktop-markdown-presentation-setting {
     gap: 8px;
     grid-template-columns: minmax(0, 1fr);

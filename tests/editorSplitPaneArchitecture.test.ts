@@ -94,6 +94,10 @@ const dataShellStyles = readFileSync(
   new URL("../src/features/data-workspace/data-shell.css", import.meta.url),
   "utf8",
 );
+const sharedDataWorkspaceStyles = readFileSync(
+  new URL("../packages/shared-ui/src/styles/data-workspace.css", import.meta.url),
+  "utf8",
+);
 const layoutStyles = readFileSync(
   new URL("../src/styles/layout.css", import.meta.url),
   "utf8",
@@ -137,6 +141,13 @@ describe("editor split-pane architecture", () => {
     expect(paneActionsMenuSource).not.toContain('t("editor.panes.splitDown")');
     expect(workbenchControllerSource).toContain("const splitPane = useCallback");
     expect(workbenchControllerSource).toContain("editorId: null");
+    expect(paneShellSource).toContain('contentState: "empty" | "document"');
+    expect(paneShellSource).toContain('data-content-state={contentState}');
+    expect(paneDocumentRuntimeSource).not.toContain("if (invalidTreeNode) return null");
+    expect(paneDocumentRuntimeSource).toContain('import { PageLoading } from "../../../components/loading"');
+    expect(paneDocumentRuntimeSource).toContain('label={null}');
+    expect(sharedDataWorkspaceStyles).not.toContain(".document-surface-pending::after");
+    expect(sharedDataWorkspaceStyles).not.toContain("po-document-surface-spin");
     expect(paneShellSource).toContain('className="desktop-editor-drop-preview"');
     expect(dropGeometrySource).toContain("closestPaneDropEdge");
     expect(fileDropSource).toContain("parseExplorerReferenceDrag");
@@ -399,16 +410,16 @@ describe("editor split-pane architecture", () => {
     const resizerRule = readCssBlock(dataShellStyles, ".data-explorer-resizer");
     const resizerDividerRule = readCssBlock(dataShellStyles, ".data-explorer-resizer::after");
 
-    expect(explorerRule).toContain("border-inline-end: 1px solid transparent;");
+    expect(explorerRule).toContain(
+      "border-inline-end: 1px solid var(--po-sidebar-divider, var(--po-divider));",
+    );
     expect(resizerRule).toContain("background: transparent;");
     expect(resizerRule).toContain(
       "inset-inline-start: var(--data-explorer-width, clamp(282px, 26vw, 360px));",
     );
     expect(resizerDividerRule).toContain("inset-inline-start: 0;");
     expect(resizerDividerRule).toContain("inset-inline-end: auto;");
-    expect(resizerDividerRule).toContain(
-      "background: var(--po-shell-divider, var(--po-divider));",
-    );
+    expect(resizerDividerRule).toContain("background: transparent;");
     expect(dataShellStyles).not.toContain("grid-column: 3;");
     expect(dataShellStyles).not.toMatch(
       /grid-template-columns:[^}]*var\(--po-pane-resizer-hit-size/s,

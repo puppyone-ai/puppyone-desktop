@@ -9,10 +9,11 @@
 .desktop-agent-composer-floating {
   position: absolute;
   bottom: calc(100% + 8px);
-  inset-inline-start: 0;
+  inset-inline-end: 8px;
+  inset-inline-start: auto;
   z-index: 2;
   width: max-content;
-  max-width: 100%;
+  max-width: calc(100% - 16px);
   pointer-events: none;
 }
 
@@ -31,7 +32,6 @@
   border-radius: var(--agent-radius-composer);
   background: var(--agent-composer-surface);
   box-shadow: none;
-  cursor: text;
   transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 
@@ -67,30 +67,70 @@
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 0;
-  padding: var(--agent-composer-input-padding);
+  padding: 0;
 }
 
-.desktop-agent-composer textarea {
-  box-sizing: border-box;
+.desktop-agent-prompt-editor-host,
+.desktop-agent-prompt-editor,
+.desktop-agent-prompt-editor .cm-editor {
   width: 100%;
   min-width: 0;
-  min-height: var(--agent-composer-text-min-height);
-  max-height: var(--agent-composer-text-max-height);
-  field-sizing: content;
-  overflow-y: auto;
-  resize: none;
-  padding: 0;
-  border: 0;
-  outline: 0 !important;
+}
+.desktop-agent-composer:not([data-input-disabled="true"]) :is(
+  .desktop-agent-prompt-editor-host,
+  .desktop-agent-prompt-editor,
+  .cm-editor,
+  .cm-scroller,
+  .cm-content,
+  .cm-line,
+  .cm-placeholder
+) {
+  cursor: text;
+}
+.desktop-agent-prompt-editor .cm-editor {
+  min-height: var(--agent-composer-input-min-height);
+  max-height: calc(var(--agent-composer-text-max-height) + var(--agent-composer-input-padding-block) + var(--agent-composer-input-padding-block));
+  overflow: hidden;
   background: transparent;
   color: var(--agent-text);
-  cursor: text;
   font: inherit;
   font-size: var(--agent-font-size);
   line-height: var(--agent-composer-line-height);
 }
-.desktop-agent-composer textarea::placeholder { color: var(--agent-text-subtle); font-size: inherit; }
-.desktop-agent-composer textarea:disabled { cursor: default; opacity: 0.6; }
+.desktop-agent-prompt-editor .cm-editor.cm-focused { outline: 0; }
+.desktop-agent-prompt-editor .cm-scroller {
+  max-height: calc(var(--agent-composer-text-max-height) + var(--agent-composer-input-padding-block) + var(--agent-composer-input-padding-block));
+  overflow-y: auto;
+  font: inherit;
+}
+.desktop-agent-prompt-editor .cm-content {
+  min-height: var(--agent-composer-input-min-height);
+  padding-block: var(--agent-composer-input-padding-block);
+  padding-inline: var(--agent-composer-text-inset-inline);
+  caret-color: var(--agent-text);
+  cursor: text;
+}
+.desktop-agent-prompt-editor .cm-content[contenteditable="false"] { cursor: default; }
+.desktop-agent-prompt-editor .cm-line { padding: 0; }
+.desktop-agent-prompt-editor .cm-placeholder { color: var(--agent-text-subtle); }
+.desktop-agent-prompt-editor .cm-cursor { border-inline-start-color: var(--agent-text); }
+.desktop-agent-prompt-editor .cm-selectionBackground,
+.desktop-agent-prompt-editor .cm-content ::selection {
+  background: var(--po-selection, color-mix(in srgb, var(--agent-text) 16%, transparent)) !important;
+}
+.desktop-agent-prompt-mention {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--agent-accent) 36%, var(--agent-border-subtle));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--agent-accent-soft) 58%, transparent);
+  color: color-mix(in srgb, var(--agent-accent) 78%, var(--agent-text));
+  font-weight: 450;
+  line-height: 18px;
+  vertical-align: baseline;
+  white-space: pre;
+}
 .desktop-agent-composer-actions {
   display: flex;
   min-width: 0;
@@ -103,7 +143,7 @@
   width: 100%;
   min-width: 0;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 .desktop-agent-composer-trailing {
   display: grid;
@@ -114,7 +154,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 8px 8px 12px;
+  padding-block: 0 8px;
+  padding-inline: var(--agent-composer-toolbar-padding-inline);
   border: 0;
 }
 .desktop-agent-composer-picker {
@@ -124,12 +165,15 @@
 }
 .desktop-agent-composer-picker.is-model { width: max-content; max-width: min(148px, 34vw); }
 .desktop-agent-composer-picker.is-model .desktop-agent-picker,
-.desktop-agent-composer-picker.is-effort .desktop-agent-picker { width: max-content; max-width: 100%; }
+.desktop-agent-composer-picker.is-effort .desktop-agent-picker,
+.desktop-agent-composer-picker.is-mode .desktop-agent-picker { width: max-content; max-width: 100%; }
 .desktop-agent-composer-picker.is-effort { width: max-content; max-width: min(72px, 20vw); }
+.desktop-agent-composer-picker.is-mode { width: max-content; max-width: min(88px, 22vw); }
 .desktop-agent-composer-picker .desktop-agent-picker-trigger {
   width: max-content;
   max-width: 100%;
-  padding: 0 6px 0 0;
+  padding-block: 0;
+  padding-inline: var(--agent-composer-picker-padding-inline);
   border: 0;
   color: var(--agent-text-subtle);
   font-weight: 400;
@@ -143,8 +187,11 @@
   background: var(--agent-row-hover-surface);
   color: var(--agent-text-muted);
 }
-.desktop-agent-composer-picker.is-effort .desktop-agent-picker-trigger { padding-inline-end: 4px; }
+.desktop-agent-attachment-control + .desktop-agent-composer-action {
+  margin-inline-start: var(--agent-primary-action-separation);
+}
 .desktop-agent-composer-action {
+  position: relative;
   display: grid;
   width: var(--agent-control-size);
   height: var(--agent-control-size);
@@ -153,15 +200,28 @@
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--agent-text);
+  background: transparent;
   box-shadow: none;
   color: var(--agent-canvas);
   cursor: var(--po-clickable-cursor, pointer);
   transition: opacity 120ms ease;
 }
+.desktop-agent-composer-action::before {
+  position: absolute;
+  inset: calc((var(--agent-control-size) - var(--agent-primary-action-visual-size)) / 2);
+  border-radius: 50%;
+  background: var(--agent-text);
+  content: "";
+}
+.desktop-agent-composer-action > svg {
+  position: relative;
+  z-index: 1;
+}
 .desktop-agent-composer-action:hover:not(:disabled) { opacity: 0.84; }
-.desktop-agent-composer-action:disabled { cursor: default; background: color-mix(in srgb, var(--agent-text) 14%, transparent); box-shadow: none; color: color-mix(in srgb, var(--agent-text) 48%, transparent); opacity: 1; }
-.desktop-agent-composer-action.is-stop:disabled { background: var(--agent-text); color: var(--agent-canvas); opacity: 0.52; }
+.desktop-agent-composer-action:disabled { cursor: default; box-shadow: none; color: color-mix(in srgb, var(--agent-text) 48%, transparent); opacity: 1; }
+.desktop-agent-composer-action:disabled::before { background: color-mix(in srgb, var(--agent-text) 14%, transparent); }
+.desktop-agent-composer-action.is-stop:disabled { color: var(--agent-canvas); opacity: 0.52; }
+.desktop-agent-composer-action.is-stop:disabled::before { background: var(--agent-text); }
 
 .desktop-agent-reference-cards {
   display: flex;
@@ -170,7 +230,7 @@
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 14px;
-  padding: 8px 12px 8px 0;
+  padding: 12px 12px 0;
 }
 .desktop-agent-reference-card {
   position: relative;
@@ -251,10 +311,10 @@
   height: 18px;
   place-items: center;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--agent-composer-surface) 92%, transparent);
+  background: var(--agent-reference-surface);
   color: var(--agent-text-muted);
 }
-.desktop-agent-reference-card-status.is-error { background: color-mix(in srgb, var(--po-danger) 12%, var(--agent-composer-surface)); color: var(--po-danger); }
+.desktop-agent-reference-card-status.is-error { background: var(--agent-reference-error-surface); color: var(--po-danger); }
 .desktop-agent-attachment-control { position: relative; display: grid; flex: 0 0 auto; }
 .desktop-agent-reference-trigger {
   display: grid;
@@ -265,10 +325,10 @@
   border: 0;
   border-radius: var(--desktop-control-radius);
   background: transparent;
-  color: var(--agent-text-muted);
+  color: var(--agent-text-subtle);
   cursor: var(--po-clickable-cursor, pointer);
 }
-.desktop-agent-reference-trigger:hover:not(:disabled) { background: var(--agent-row-hover-surface); color: var(--agent-text); }
+.desktop-agent-reference-trigger:hover:not(:disabled) { background: var(--agent-row-hover-surface); color: var(--agent-text-muted); }
 .desktop-agent-reference-trigger:disabled { cursor: default; color: var(--agent-text-subtle); opacity: 0.48; }
 .desktop-agent-command-menu {
   position: absolute;

@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentTurnTerminalState } from "./agent-contract";
+import type { AgentEvent } from "./agent-contract";
 import type {
   AgentActivity,
   AgentPart,
@@ -16,23 +16,15 @@ import {
 } from "./agent-projection-readers";
 import {
   isNonDiagnosticProviderStatusMessage,
+  legacyProviderConnectionUpdate,
   providerActivityIdentity,
 } from "./agent-provider-notice-policy";
 import { parseAgentEventTime, readAgentTurnDurationMs } from "./agent-turn-timing";
+import { agentTurnTerminalState } from "./agent-turn-lifecycle";
 
 export function projectTypedPart(projection: AgentProjection, event: AgentEvent) {
+  if (event.type === "provider.connection.updated") return;
   const turn = updateTurn(projection, event);
-  if (isTerminalTurnEvent(event)) {
-    const terminalState = event.type.slice("turn.".length) as AgentTurnTerminalState;
-    const indexes = projectionIndexes(projection);
-    for (const partId of turn?.partIds ?? []) {
-      const partIndex = indexes.parts.get(partId);
-      const part = partIndex === undefined ? null : projection.parts[partIndex];
-      if (partIndex !== undefined && part?.kind === "assistant") {
-        projection.parts[partIndex] = { ...part, streaming: false, terminalState };
-      }
-    }
-  }
   const part = partForEvent(projection, event);
   if (!part) return;
   const indexes = projectionIndexes(projection);
@@ -47,6 +39,9 @@ export function projectTypedPart(projection: AgentProjection, event: AgentEvent)
     const nextTurn = { ...turn, partIds: [...turn.partIds, part.id] };
     if (turnIndex !== undefined) projection.turns[turnIndex] = nextTurn;
   }
+  // Usage is session metadata, not visible transcript content. Keep the typed
+  // part for consumers that need it, but never allocate virtual-list geometry.
+  if (part.kind === "usage") return;
   const row: TimelineRow = {
     id: `row:${part.id}`,
     partId: part.id,
@@ -82,10 +77,11 @@ function updateTurn(projection: AgentProjection, event: AgentEvent) {
     indexes.turns.set(event.turnId, turnIndex);
     projection.turns.push(turn);
   }
-  if (isTerminalTurnEvent(event)) {
+  const terminalState = agentTurnTerminalState(event);
+  if (terminalState) {
     turn = {
       ...turn,
-      status: event.type.slice("turn.".length) as AgentTurnTerminalState,
+      status: terminalState,
       completedAtSequence: event.sequence,
       durationMs: readAgentTurnDurationMs(event.payload.durationMs, turn.startedAtMs, event.emittedAt),
     };
@@ -117,6 +113,7 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
   }
   if (event.type === "provider.warning" || event.type === "provider.error") {
     const label = readProviderMessage(event.payload.message);
+    if (legacyProviderConnectionUpdate(event, label)) return null;
     if (label && isNonDiagnosticProviderStatusMessage(label)) return null;
     const activityIndex = projectionIndexes(projection).activities.get(providerActivityIdentity(
       projection,
@@ -189,10 +186,4 @@ function estimatePartHeight(part: AgentPart) {
   if (part.kind === "turn-summary") return 30;
   if (part.kind === "permission" || part.kind === "question" || part.kind === "usage") return 36;
   return 42;
-}
-
-function isTerminalTurnEvent(event: AgentEvent) {
-  return event.type === "turn.completed"
-    || event.type === "turn.failed"
-    || event.type === "turn.interrupted";
 }

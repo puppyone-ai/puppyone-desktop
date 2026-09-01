@@ -5,7 +5,13 @@ describe("Desktop Terminal architecture boundaries", () => {
   it("keeps terminal processes user-owned and the content free of overlapping chrome", () => {
     const panel = source("src/features/desktop-terminal/ui/RightTerminalPanel.tsx");
     const closeDialog = source(
-      "src/features/desktop-terminal/ui/TerminalCloseConfirmationDialog.tsx",
+      "src/features/app-shell/auxiliary-workbench/AuxiliaryWorkbenchCloseDialog.tsx",
+    );
+    const closeCoordinator = source(
+      "src/features/app-shell/auxiliary-workbench/useAuxiliaryWorkbenchCloseCoordinator.ts",
+    );
+    const closePolicy = source(
+      "src/features/desktop-terminal/model/terminalClosePolicy.ts",
     );
     const launcher = source("src/features/desktop-terminal/ui/TerminalLauncher.tsx");
     const launchers = source("src/features/desktop-terminal/model/terminalLaunchers.ts");
@@ -105,11 +111,15 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(controller).toContain('dispatchTopology({ type: "close"');
     expect(controller).toContain("runtimeRegistry.ensure(itemId, launcherId, root.path)");
     expect(controller).toContain("runtimeRegistry.close(itemId)");
-    expect(controller).toContain("pendingCloseItemId");
+    expect(controller).not.toContain("pendingCloseItemId");
     expect(panel).not.toContain("useImperativeHandle");
     expect(panel).toContain("onCloseItem={(itemId)");
     expect(groupViewport).toContain("onClose={onCloseItem}");
-    expect(panel).toContain("<TerminalCloseConfirmationDialog");
+    expect(panel).toContain("<AuxiliaryWorkbenchCloseDialog");
+    expect(panel).toContain("useAuxiliaryWorkbenchCloseCoordinator");
+    expect(panel).toContain("getTerminalClosePolicy(session.status)");
+    expect(closePolicy).toContain('status === "starting" || status === "running"');
+    expect(closeCoordinator).toContain("activeItemIdsRef");
     expect(closeDialog).toContain("<DesktopOverlayLayer>");
     expect(closeDialog).toContain("<DesktopDialogRoot");
     expect(panel).toContain("<TerminalLauncher");
@@ -291,7 +301,7 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(launcherCss).toContain(".desktop-terminal-launcher");
     expect(launcherCss).toContain("container-type: size");
     expect(launcherCss).toMatch(
-      /\.desktop-terminal-launcher\s*\{[^}]*place-items:\s*start center;[^}]*padding:\s*clamp\(56px, 20vh, 220px\) 0 32px;/s,
+      /\.desktop-terminal-launcher\s*\{[^}]*place-items:\s*safe center;[^}]*padding:\s*32px 0;/s,
     );
     expect(launcherCss).toMatch(
       /\.desktop-terminal-launcher-availability\s*\{[^}]*position:\s*absolute;[^}]*width:\s*1px;[^}]*height:\s*1px;/s,
@@ -306,13 +316,14 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(launcher).toContain("desktop-terminal-launcher-heading");
     expect(launcher).toContain("desktop-terminal-launcher-scan");
     expect(launcher).toContain("desktop-terminal-launcher-group is-agents");
-    expect(launcher).toContain("desktop-terminal-launcher-group is-shell");
+    expect(launcher).toContain("desktop-terminal-launcher-group is-history-entry");
+    expect(launcher).toContain("desktop-terminal-launcher-divider");
     expect(launcher).toContain('"terminal.launcher.title"');
-    expect(launcher).toContain('"terminal.launcher.shell.title"');
+    expect(launcher).toContain('"agent.history.continueTitle"');
     expect(launcher).toContain('aria-label={t("terminal.launcher.scanAgain")}');
     expect(launcherCss).toMatch(/\.desktop-terminal-launcher-content\s*\{[^}]*gap:\s*28px;/s);
     expect(launcherCss).toMatch(/\.desktop-terminal-launcher-heading h2\s*\{[^}]*font-size:\s*12px;[^}]*font-weight:\s*500;/s);
-    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-tool,\s*\.desktop-terminal-launcher-shell\s*\{[^}]*min-height:\s*34px;[^}]*border-radius:\s*6px;/s);
+    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-tool,\s*\.desktop-terminal-launcher-shell,\s*\.desktop-terminal-launcher-history\s*\{[^}]*min-height:\s*34px;[^}]*border-radius:\s*6px;/s);
     expect(launcherCss).toContain('.desktop-terminal-launcher-tool[data-status="coming-soon"]::after');
     expect(launcherCss).not.toContain("aspect-ratio:");
     expect(header).toContain('import "./terminal-session-header.css"');
@@ -467,13 +478,15 @@ describe("Desktop Terminal architecture boundaries", () => {
 
   it("keeps plain output close to editor text while preserving ANSI tiers", () => {
     const tokens = source("src/styles/tokens.css");
-    const light = terminalNeutralTier(tokens, ":root");
-    const dark = terminalNeutralTier(tokens, ".dark");
+    const neutralTheme = source("sub-themes/default-neutral/theme.css");
+    const light = terminalNeutralTier(neutralTheme, ":root");
+    const dark = terminalNeutralTier(neutralTheme, ".dark .theme-root");
 
     expect(tokens).toMatch(
       /--po-terminal-fg:\s*color-mix\(in srgb, var\(--po-text\) 70%, var\(--po-text-muted\)\);/,
     );
     expect(tokens.match(/--po-terminal-fg:/g)).toHaveLength(1);
+    expect(tokens).not.toContain("--po-terminal-black:");
     expect(relativeLuminance(light.text)).toBeLessThan(relativeLuminance(light.foreground));
     expect(relativeLuminance(light.foreground)).toBeLessThan(relativeLuminance(light.muted));
     expect(relativeLuminance(dark.text)).toBeGreaterThan(relativeLuminance(dark.foreground));

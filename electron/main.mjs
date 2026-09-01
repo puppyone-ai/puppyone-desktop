@@ -47,6 +47,10 @@ import {
 import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
 import { registerAgentActivityIpcHandlers } from "./main/ipc/agent-activity-ipc.mjs";
 import { registerAppearanceIpcHandlers } from "./main/ipc/appearance-ipc.mjs";
+import {
+  registerThemeIpcHandlers,
+  THEME_SELECTION_REQUESTED_CHANNEL,
+} from "./main/ipc/theme-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerBuildInfoIpcHandlers } from "./main/ipc/build-info-ipc.mjs";
 import { registerPlatformIpcHandlers } from "./main/ipc/platform-ipc.mjs";
@@ -84,6 +88,7 @@ import { createTerminalService } from "./main/terminal-service.mjs";
 import { createTerminalAgentLocator } from "./main/terminal-agent/terminal-agent-locator.mjs";
 import { createDefaultTerminalAgentActivityHost } from "./main/terminal-agent/activity/bootstrap/create-terminal-agent-activity-host.mjs";
 import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
+import { createThemeService } from "./main/themes/theme-service.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
 import { WindowWorkspaceState } from "./main/window-workspace-state.mjs";
@@ -108,7 +113,7 @@ import {
   reapplyWindowChromeProfile,
 } from "./main/window-chrome-profile.mjs";
 import { createDesktopPlatformHost } from "./main/platform/create-platform-host.mjs";
-import { DEFAULT_INTERFACE_STYLE_FIRST_PAINT } from "./main/interface-style-first-paint.generated.mjs";
+import { FALLBACK_SUB_THEME_FIRST_PAINT } from "./main/sub-theme-first-paint.generated.mjs";
 import { createGitOperationCoordinator } from "./main/git-operation-coordinator.mjs";
 import { createCloudPublishCoordinator } from "./main/cloud-publish-coordinator.mjs";
 import { createCloudPublishSecretVault } from "./main/cloud-publish-secret-vault.mjs";
@@ -222,6 +227,11 @@ const nativeSurfacePointerPassthrough = createNativeSurfacePointerPassthroughCoo
   },
 });
 const externalNavigation = createExternalNavigationService({ shell });
+const themeService = createThemeService({
+  userDataPath: app.getPath("userData"),
+  bundledThemesPath: path.join(app.getAppPath(), "electron", "themes"),
+  shell,
+});
 const localeService = createDesktopLocaleService({
   app,
   getWindows: () => BrowserWindow.getAllWindows(),
@@ -239,6 +249,12 @@ const nativeMenuService = createDesktopNativeMenuService({
   t: (messageId, values) => localeService.t(messageId, values),
   onNewWindow: () => createWindow(),
   onCheckForUpdates: checkForUpdatesFromNativeMenu,
+  onSelectTheme: (request) => {
+    const window = getLastFocusedWindow();
+    if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
+    window.webContents.send(THEME_SELECTION_REQUESTED_CHANNEL, request);
+  },
+  onOpenThemesDirectory: () => themeService.openDirectory(),
 });
 const applicationQuitIntent = createApplicationQuitIntent({ app });
 const documentSessionCloseCoordinator = createDocumentSessionCloseCoordinator({
@@ -273,10 +289,6 @@ const agentSessionRepository = createAgentSessionRepository({
 const agentProcessSupervisor = createAgentProcessSupervisor({ maxConcurrentStarts: 2 });
 const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
   appVersion: desktopBuildInfo.version,
-  appPath: app.getAppPath(),
-  resourcesPath: process.resourcesPath,
-  managedOpenCodeConfigDir: path.join(app.getPath("userData"), "agent-runtime", "opencode", "config"),
-  allowExternalOpenCode: !app.isPackaged && process.env.PUPPYONE_ALLOW_EXTERNAL_OPENCODE === "1",
 });
 const agentAttachmentStore = createAgentAttachmentStore({
   rootPath: path.join(app.getPath("userData"), "agent-runtime", "attachments"),
@@ -344,7 +356,9 @@ const windowWorkspaceCompositionService = createWindowWorkspaceCompositionServic
   getWindowState: getOrCreateWindowState,
   getWorkspaceWindow,
   indexWorkspacePath: (folderPath, window) => workspaceWindowByPath.set(folderPath, window),
-  persistWorkspaceComposition: (workspaces) => workspaceStateStore.rememberWorkspaceComposition(workspaces),
+  persistWorkspaceComposition: (workspaces, workbenchWorkspaceId) => (
+    workspaceStateStore.rememberWorkspaceComposition(workspaces, { workbenchWorkspaceId })
+  ),
   revealWindow,
   unindexWorkspacePath: (folderPath, window) => {
     if (workspaceWindowByPath.get(folderPath) === window) workspaceWindowByPath.delete(folderPath);
@@ -391,8 +405,8 @@ async function createWindow(options = {}) {
     title: appName,
     ...(appIconPath ? { icon: appIconPath } : {}),
     backgroundColor: nativeTheme.shouldUseDarkColors
-      ? DEFAULT_INTERFACE_STYLE_FIRST_PAINT.dark.background
-      : DEFAULT_INTERFACE_STYLE_FIRST_PAINT.light.background,
+      ? FALLBACK_SUB_THEME_FIRST_PAINT.dark.background
+      : FALLBACK_SUB_THEME_FIRST_PAINT.light.background,
     ...desktopWindowChromeOptions,
     webPreferences: {
       contextIsolation: true,
@@ -414,7 +428,10 @@ async function createWindow(options = {}) {
     externalNavigation,
   });
   windowsById.set(webContentsId, window);
-  windowStateById.set(webContentsId, new WindowWorkspaceState({ initialWorkspacePaths }));
+  windowStateById.set(webContentsId, new WindowWorkspaceState({
+    initialWorkspaceId: options.initialWorkspaceId ?? null,
+    initialWorkspacePaths,
+  }));
   lastFocusedWindowId = webContentsId;
 
   window.on("focus", () => {
@@ -712,10 +729,13 @@ app.whenReady().then(async () => {
   }
   await telemetryHost.start();
   updateService.start();
-  const initialWorkspacePaths = initialLaunchIntent.workspacePath
-    ? [initialLaunchIntent.workspacePath]
-    : await workspaceStateStore.readLastActiveWorkspacePaths();
-  await createWindow({ initialWorkspacePaths });
+  const initialWorkspaceComposition = initialLaunchIntent.workspacePath
+    ? { workspaceId: null, paths: [initialLaunchIntent.workspacePath] }
+    : await workspaceStateStore.readLastActiveWorkspaceComposition();
+  await createWindow({
+    initialWorkspaceId: initialWorkspaceComposition.workspaceId,
+    initialWorkspacePaths: initialWorkspaceComposition.paths,
+  });
 
   app.on("activate", () => {
     void localeService.refreshSystemLanguages().catch((error) => {
@@ -725,8 +745,11 @@ app.whenReady().then(async () => {
       revealLastFocusedWindow();
       return;
     }
-    void workspaceStateStore.readLastActiveWorkspacePaths()
-      .then((initialWorkspacePaths) => createWindow({ initialWorkspacePaths }));
+    void workspaceStateStore.readLastActiveWorkspaceComposition()
+      .then((composition) => createWindow({
+        initialWorkspaceId: composition.workspaceId,
+        initialWorkspacePaths: composition.paths,
+      }));
   });
 }).catch((error) => {
   console.error("puppyone failed to start:", error);
@@ -779,6 +802,11 @@ function registerIpcHandlers() {
     ipcMain: trustedIpcMain,
     BrowserWindow,
     nativeTheme,
+  });
+  registerThemeIpcHandlers({
+    ipcMain: trustedIpcMain,
+    themeService,
+    onSyncNativeMenu: (state) => nativeMenuService.setThemeState(state),
   });
   registerWindowLayoutIpcHandlers({
     ipcMain: trustedIpcMain,
@@ -1009,6 +1037,7 @@ async function getInitialWorkspaceResultForWindow(sender) {
   const window = BrowserWindow.fromWebContents(sender);
   if (!window || window.isDestroyed()) {
     return {
+      workspaceId: null,
       path: null,
       workspace: null,
       workspaces: [],
@@ -1020,6 +1049,7 @@ async function getInitialWorkspaceResultForWindow(sender) {
   if (state?.folders.length) {
     const workspaces = state.folders.map((folder) => folder.workspace);
     return {
+      workspaceId: state.workspaceId,
       path: state.folderPaths[0] ?? null,
       workspace: workspaces[0] ?? null,
       workspaces,
@@ -1030,6 +1060,7 @@ async function getInitialWorkspaceResultForWindow(sender) {
   const initialPaths = state?.initialRestorePaths ?? [];
   if (initialPaths.length === 0) {
     return {
+      workspaceId: state?.workspaceId ?? null,
       path: null,
       workspace: null,
       workspaces: [],
@@ -1053,9 +1084,12 @@ async function getInitialWorkspaceResultForWindow(sender) {
     const workspaces = folders.map((folder) => folder.workspace);
     const validationState = new WindowWorkspaceState();
     validationState.replaceFolders(folders);
-    await workspaceStateStore.rememberWorkspaceComposition(workspaces);
+    await workspaceStateStore.rememberWorkspaceComposition(workspaces, {
+      workbenchWorkspaceId: state?.workspaceId,
+    });
     assignWindowWorkspaceComposition(window, folders, { cleanupPrevious: false });
     return {
+      workspaceId: state?.workspaceId ?? null,
       path: folders[0]?.path ?? null,
       workspace: workspaces[0] ?? null,
       workspaces,
@@ -1063,6 +1097,7 @@ async function getInitialWorkspaceResultForWindow(sender) {
     };
   } catch (error) {
     return {
+      workspaceId: state?.workspaceId ?? null,
       path: initialPaths[0] ?? null,
       workspace: null,
       workspaces: [],
@@ -1185,18 +1220,30 @@ async function openWorkspaceInCurrentWindow(sender, folderPath, options = {}) {
   const existingWindow = getWorkspaceWindow(canonicalPath);
   if (existingWindow && existingWindow !== window) {
     revealWindow(existingWindow);
-    if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
+    const existingState = getOrCreateWindowState(existingWindow);
+    if (options.remember !== false) {
+      await workspaceStateStore.rememberWorkspaceComposition(
+        existingState.folders.map((folder) => folder.workspace),
+        { workbenchWorkspaceId: existingState.workspaceId },
+      );
+    }
     return {
       status: "focused-existing",
+      workspaceId: existingState.workspaceId,
       path: canonicalPath,
       workspace,
     };
   }
 
-  assignWindowWorkspace(window, workspace, canonicalPath);
-  if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
+  const state = assignWindowWorkspace(window, workspace, canonicalPath);
+  if (options.remember !== false) {
+    await workspaceStateStore.rememberWorkspaceComposition([workspace], {
+      workbenchWorkspaceId: state.workspaceId,
+    });
+  }
   return {
     status: "opened-current",
+    workspaceId: state.workspaceId,
     path: canonicalPath,
     workspace,
   };
@@ -1208,9 +1255,16 @@ async function openWorkspaceInNewWindow(folderPath, options = {}) {
   const existingWindow = getWorkspaceWindow(canonicalPath);
   if (existingWindow) {
     revealWindow(existingWindow);
-    if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
+    const existingState = getOrCreateWindowState(existingWindow);
+    if (options.remember !== false) {
+      await workspaceStateStore.rememberWorkspaceComposition(
+        existingState.folders.map((folder) => folder.workspace),
+        { workbenchWorkspaceId: existingState.workspaceId },
+      );
+    }
     return {
       status: "focused-existing",
+      workspaceId: existingState.workspaceId,
       path: canonicalPath,
       workspace,
     };
@@ -1219,10 +1273,15 @@ async function openWorkspaceInNewWindow(folderPath, options = {}) {
   const window = await createWindow({
     initialWorkspacePath: canonicalPath,
   });
-  assignWindowWorkspace(window, workspace, canonicalPath, { cleanupPrevious: false });
-  if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
+  const state = assignWindowWorkspace(window, workspace, canonicalPath, { cleanupPrevious: false });
+  if (options.remember !== false) {
+    await workspaceStateStore.rememberWorkspaceComposition([workspace], {
+      workbenchWorkspaceId: state.workspaceId,
+    });
+  }
   return {
     status: "opened-new-window",
+    workspaceId: state.workspaceId,
     path: canonicalPath,
     workspace,
   };
@@ -1245,7 +1304,12 @@ async function detachWorkspaceFromCurrentWindow(sender, folderPath) {
 }
 
 function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
+  const state = getOrCreateWindowState(window);
+  const alreadySameSingleFolder = state.folderPaths.length === 1
+    && state.folderPaths[0] === canonicalPath;
+  if (state.folders.length > 0 && !alreadySameSingleFolder) state.beginNewWorkspace();
   assignWindowWorkspaceComposition(window, [{ workspace, path: canonicalPath }], options);
+  return state;
 }
 
 function assignWindowWorkspaceComposition(window, folders, options = {}) {

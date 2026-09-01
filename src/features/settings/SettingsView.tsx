@@ -7,7 +7,7 @@ import {
   FileGlyphIcon,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
-import { SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, TEXT_SIZE_PRESETS } from "../../preferences";
+import { SIDEBAR_NAVIGATION_LAYOUT_OPTIONS } from "../../preferences";
 import { getOrderedHeaderElementDefinitions } from "../app-shell/headerElements";
 import {
   isAppearanceDecisionLocked,
@@ -16,7 +16,6 @@ import {
 import { useFeatureFlag } from "../flags";
 import { LocalAgentsSettingsView } from "../local-agents";
 import { SettingsSectionHeader } from "./components";
-import { ContentFontSetting } from "./ContentFontSetting";
 import { AccountSettingsView } from "./main/AccountSettingsView";
 import { ExperimentalSettingsView } from "./main/ExperimentalSettingsView";
 import { FilesSettingsView } from "./main/FileSettingsViews";
@@ -25,6 +24,7 @@ import { LocalProjectSettingsView } from "./main/LocalProjectSettingsView";
 import { PrivacySettingsView } from "./main/PrivacySettingsView";
 import { InterfacePaletteSettings } from "./main/InterfacePaletteSettings";
 import { InterfaceStyleSetting } from "./main/InterfaceStyleSetting";
+import { SubThemeSettingsSection } from "./main/SubThemeSettingsSection";
 import { CreateNewSettingsView } from "./main/CreateNewSettingsView";
 import { PulseGrid } from "../../components/loading";
 import { CloudHostingSettingsView, GitSettingsView } from "./main/RepositorySettingsViews";
@@ -51,7 +51,8 @@ export function SettingsView({
   localAgentsSettings,
   typographyPreferences,
   pointerCursors,
-  markdownPresentation,
+  requestedSubThemeId,
+  subThemeCatalog,
   fileIconTheme,
   sidebarNavigationVisibilitySettings,
   filesVisibilitySettings,
@@ -71,15 +72,13 @@ export function SettingsView({
   updateState,
   onThemeModeChange,
   onInterfaceStyleChange,
-  onLightThemePresetChange,
-  onDarkThemePresetChange,
   onLoadingAnimationPresetChange,
   onLocalAgentsSettingsChange,
   onAgentFileActivityIndicatorsEnabledChange,
   onTextSizeChange,
   onTypographyPreferencesChange,
   onPointerCursorsChange,
-  onMarkdownPresentationChange,
+  onSubThemeChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
   onSidebarNavigationVisibilitySettingsChange,
@@ -239,18 +238,19 @@ export function SettingsView({
     return (
       <Suspense fallback={null}>
         <EditorSettingsView
-          markdownPresentation={markdownPresentation}
-          onMarkdownPresentationChange={onMarkdownPresentationChange}
+          textSizeDecision={resolvedAppearance.decisions.textSize}
+          typographyPreferences={typographyPreferences}
+          markdownThemeId={resolvedAppearance.subThemeId}
+          onTextSizeChange={onTextSizeChange}
+          onTypographyPreferencesChange={onTypographyPreferencesChange}
         />
       </Suspense>
     );
   }
 
   if (activeSection === "appearance") {
-    const textSizeDecision = resolvedAppearance.decisions.textSize;
     const fileIconDecision = resolvedAppearance.decisions.fileIconTheme;
     const navigationDecision = resolvedAppearance.decisions.sidebarNavigationLayout;
-    const textSizeLocked = isAppearanceDecisionLocked(textSizeDecision);
     const fileIconLocked = isAppearanceDecisionLocked(fileIconDecision);
     const navigationLocked = isAppearanceDecisionLocked(navigationDecision);
     return (
@@ -265,43 +265,19 @@ export function SettingsView({
               <InterfaceStyleSetting value={interfaceStyle} onChange={onInterfaceStyleChange} />
               <InterfacePaletteSettings
                 interfaceStyle={interfaceStyle}
+                subThemeId={resolvedAppearance.subThemeId}
                 decision={resolvedAppearance.decisions.themeMode}
                 lightThemePreset={lightThemePreset}
                 darkThemePreset={darkThemePreset}
                 onThemeModeChange={onThemeModeChange}
-                onLightThemePresetChange={onLightThemePresetChange}
-                onDarkThemePresetChange={onDarkThemePresetChange}
               />
-              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-                <span>{t("settings.appearance.textSize.title")}</span>
-                <div className="desktop-theme-segment desktop-appearance-option-segment desktop-appearance-hug-segment" aria-label={t("settings.appearance.textSize.ariaLabel")}>
-                  {TEXT_SIZE_PRESETS.map((option) => (
-                    <button
-                      key={option.value}
-                      className={`${textSizeDecision.effectiveValue === option.value ? "active" : ""}${textSizeLocked || !isAppearanceValueAllowed(textSizeDecision, option.value) ? " is-policy-controlled" : ""}`}
-                      type="button"
-                      title={textSizeDecision.reasonKey
-                        ? t(textSizeDecision.reasonKey)
-                        : t(`settings.appearance.textSize.${option.value}.description`)}
-                      aria-disabled={textSizeLocked || !isAppearanceValueAllowed(textSizeDecision, option.value)}
-                      aria-pressed={textSizeDecision.effectiveValue === option.value}
-                      onClick={() => {
-                        if (!textSizeLocked && isAppearanceValueAllowed(textSizeDecision, option.value)) {
-                          onTextSizeChange(option.value);
-                        }
-                      }}
-                    >
-                      <span>{t(`settings.appearance.textSize.${option.value}.label`)}</span>
-                    </button>
-                  ))}
-                </div>
-                {textSizeDecision.reasonKey && (
-                  <small className="desktop-appearance-policy-reason">{t(textSizeDecision.reasonKey)}</small>
-                )}
-              </div>
-              <ContentFontSetting
-                preferences={typographyPreferences}
-                onChange={onTypographyPreferencesChange}
+              <SubThemeSettingsSection
+                catalog={subThemeCatalog}
+                rootThemeId={interfaceStyle}
+                requestedSubThemeId={requestedSubThemeId}
+                effectiveSubThemeId={resolvedAppearance.subThemeId}
+                effectiveColorMode={resolvedAppearance.effectiveColorMode}
+                onSubThemeChange={onSubThemeChange}
               />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.fileIcons.title")}</span>

@@ -16,6 +16,7 @@ type RestoringWorkspaceScreenProps = {
   pointerCursors: boolean;
   diffMarkers: DiffMarkers;
   resolvedTheme: "light" | "dark";
+  subThemeId: string;
 };
 
 export function RestoringWorkspaceScreen({
@@ -27,19 +28,19 @@ export function RestoringWorkspaceScreen({
   pointerCursors,
   diffMarkers,
   resolvedTheme,
+  subThemeId,
 }: RestoringWorkspaceScreenProps) {
   const { t } = useLocalization();
   return (
     <main
       className={`onboarding-shell ${resolvedTheme === "dark" ? "dark" : ""}`}
+      data-po-appearance-root="true"
+      data-sub-theme-id={subThemeId}
       data-po-scrollbar="content"
       data-theme-mode={themeMode}
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}
-      data-text-size={textSize}
-      data-interface-text-size={textSize}
       data-content-text-size={textSize}
-      data-terminal-text-size={textSize}
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
       {...createTypographyRootProps(typography)}

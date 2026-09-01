@@ -4,9 +4,10 @@
 import React, { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ContentFontSetting } from "../src/features/settings/ContentFontSetting";
+import { MarkdownFontSetting } from "../src/features/settings/MarkdownFontSetting";
 import {
   DEFAULT_TYPOGRAPHY_PREFERENCES,
+  THEME_CONTENT_FONT_ID,
   TypographyCatalogProvider,
   type FontCatalogEntry,
 } from "../src/features/typography";
@@ -22,15 +23,15 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("ContentFontSetting", () => {
-  it("updates the selected content font without rendering a redundant preview field", () => {
+describe("MarkdownFontSetting", () => {
+  it("defaults to Follow theme and can select an explicit content font", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
 
     function ControlledSetting() {
       const [preferences, setPreferences] = useState(DEFAULT_TYPOGRAPHY_PREFERENCES);
-      return <ContentFontSetting preferences={preferences} onChange={setPreferences} />;
+      return <MarkdownFontSetting preferences={preferences} onChange={setPreferences} />;
     }
 
     act(() => renderWithTestLocalization(root,
@@ -39,18 +40,23 @@ describe("ContentFontSetting", () => {
       </TypographyCatalogProvider>,
     ));
 
+    const themeButton = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((candidate) => (
+        stripBidiIsolation(candidate.getAttribute("aria-label"))
+        === "Follow the active theme font for Markdown text"
+      ));
+    expect(themeButton?.getAttribute("aria-pressed")).toBe("true");
+    expect(DEFAULT_TYPOGRAPHY_PREFERENCES.contentFontId).toBe(THEME_CONTENT_FONT_ID);
+
     const serifButton = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
       .find((candidate) => (
-        stripBidiIsolation(candidate.getAttribute("aria-label")) === "Use Serif for content"
+        stripBidiIsolation(candidate.getAttribute("aria-label")) === "Use Serif for Markdown text"
       ));
     expect(serifButton).not.toBeNull();
-    expect(container.querySelector(".desktop-content-font-preview")).toBeNull();
-    expect(container.textContent).not.toContain("Knowledge, notes, and ideas");
-    expect(container.textContent).not.toContain("知识、笔记与思考");
 
     act(() => serifButton?.click());
-
     expect(serifButton?.getAttribute("aria-pressed")).toBe("true");
+    expect(themeButton?.getAttribute("aria-pressed")).toBe("false");
   });
 
   it("renders future imported catalog entries without changing its preference contract", () => {
@@ -61,7 +67,7 @@ describe("ContentFontSetting", () => {
 
     act(() => renderWithTestLocalization(root,
       <TypographyCatalogProvider additionalEntries={[importedFont]}>
-        <ContentFontSetting
+        <MarkdownFontSetting
           preferences={DEFAULT_TYPOGRAPHY_PREFERENCES}
           onChange={onChange}
         />
@@ -70,6 +76,7 @@ describe("ContentFontSetting", () => {
 
     const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>("button"));
     expect(buttons.map((button) => button.textContent)).toEqual([
+      "Follow theme",
       "Geist",
       "System",
       "Serif",

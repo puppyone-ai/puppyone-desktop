@@ -27,6 +27,10 @@ export function registerTerminalIpcHandlers({
     terminalService.resize(event.sender, request);
   });
 
+  ipcMain.on("terminal:appearance", (event, request) => {
+    terminalService.appearance(event.sender, request);
+  });
+
   ipcMain.handle("terminal:close", async (event, id) => {
     terminalService.close(event.sender, id);
   });

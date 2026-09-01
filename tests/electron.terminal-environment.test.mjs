@@ -50,6 +50,7 @@ describe("Desktop Terminal environment boundary", () => {
       CONDA_EXE: "/opt/anaconda3/bin/conda",
       CONDA_ROOT: "/opt/anaconda3",
       NO_COLOR: "1",
+      COLORFGBG: "0;15",
       TERM: "inherited-term",
       TERM_PROGRAM: "inherited-program",
     };
@@ -81,6 +82,7 @@ describe("Desktop Terminal environment boundary", () => {
       "CONDA_PATH_BACKUP",
       "CONDA_PS1_BACKUP",
       "NO_COLOR",
+      "COLORFGBG",
     ]) {
       expect(environment[key], key).toBeUndefined();
     }
@@ -104,6 +106,26 @@ describe("Desktop Terminal environment boundary", () => {
       TERM_PROGRAM_VERSION: "0.2.0-test",
       PUPPYONE_TERMINAL: "1",
     });
+  });
+
+  it("declares the renderer brightness for programs that cannot query OSC", () => {
+    const darkEnvironment = buildTerminalEnvironment({ COLORFGBG: "0;15" }, {
+      appVersion: "test",
+      defaultColors: {
+        foreground: [209, 206, 198],
+        background: [22, 20, 19],
+      },
+    });
+    const lightEnvironment = buildTerminalEnvironment({}, {
+      appVersion: "test",
+      defaultColors: {
+        foreground: [41, 39, 35],
+        background: [251, 250, 247],
+      },
+    });
+
+    expect(darkEnvironment.COLORFGBG).toBe("15;0");
+    expect(lightEnvironment.COLORFGBG).toBe("0;15");
   });
 
   it.each([
@@ -166,6 +188,10 @@ describe("Desktop Terminal environment boundary", () => {
       cwd: workspaceRoot,
       cols: 90,
       rows: 30,
+      defaultColors: {
+        foreground: [209, 206, 198],
+        background: [22, 20, 19],
+      },
     }, workspaceRoot);
     const canonicalWorkspaceRoot = await realpath(workspaceRoot);
 
@@ -182,6 +208,7 @@ describe("Desktop Terminal environment boundary", () => {
         PATH: "/usr/bin",
         TERM_PROGRAM: "PuppyOne",
         PUPPYONE_TERMINAL: "1",
+        COLORFGBG: "15;0",
       },
     });
     expect(options.env.npm_config_prefix).toBeUndefined();

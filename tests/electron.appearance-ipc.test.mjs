@@ -35,12 +35,21 @@ describe("native appearance IPC", () => {
     expect(nativeTheme.themeSource).toBe("system");
   });
 
-  it("rejects colors that are not owned by the interface-style manifest", () => {
+  it("accepts compiler-shaped opaque colors from local Sub Themes", () => {
     const ownerWindow = createWindow();
     const { handler } = register(ownerWindow);
 
     handler(createEvent(), { background: "#ff00ff", themeSource: "light" });
+
+    expect(ownerWindow.setBackgroundColor).toHaveBeenCalledWith("#ff00ff");
+  });
+
+  it("rejects values outside the opaque first-paint contract", () => {
+    const ownerWindow = createWindow();
+    const { handler } = register(ownerWindow);
+
     handler(createEvent(), { background: "linear-gradient(red, blue)", themeSource: "light" });
+    handler(createEvent(), { background: "#fff8", themeSource: "light" });
 
     expect(ownerWindow.setBackgroundColor).not.toHaveBeenCalled();
   });

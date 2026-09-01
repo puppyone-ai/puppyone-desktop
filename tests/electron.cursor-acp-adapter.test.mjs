@@ -84,7 +84,14 @@ describe("Cursor ACP runtime", () => {
       manualApprovals: true,
       structuredQuestions: true,
       resume: true,
+      referenceInputs: {
+        attachments: {
+          image: { accepted: true },
+          text: { accepted: false },
+        },
+      },
     });
+    expect(inspection.capabilities.revision).toBe("cursor-acp:1:image1:embedded0");
 
     await adapter.createSession({ mode: "agent" });
     const { turnId } = await adapter.startTurn({ prompt: "Fix it" });
@@ -100,6 +107,36 @@ describe("Cursor ACP runtime", () => {
     await vi.waitFor(() => expect(connection.respond).toHaveBeenCalledWith(11, expect.objectContaining({ outcome: "answered" })));
     connection.finishPrompt({ stopReason: "end_turn" });
     await vi.waitFor(() => expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "turn.completed" })));
+    await adapter.dispose();
+  });
+
+  it("bootstraps authentication, inspection and the live session on one ACP connection", async () => {
+    const connections = [];
+    const adapter = new CursorAcpAdapter({
+      readiness: { executablePath: "/tools/agent", environment: {}, version: "2026.08.1", source: "path-installation" },
+      workspaceRoot: "/workspace",
+      connectionFactory: (options) => {
+        const connection = new FakeCursorConnection();
+        connection.options = options;
+        connections.push(connection);
+        return connection;
+      },
+      fileSystemFactory: () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn() }),
+      projectInstructionLoader: vi.fn(async () => ({ source: null, text: "", bytes: 0 })),
+    });
+
+    const result = await adapter.bootstrapSession({ kind: "create", mode: "agent" });
+
+    expect(connections).toHaveLength(1);
+    expect(result).toMatchObject({
+      inspection: { account: { requiresRuntimeSetup: false } },
+      providerSession: { providerSessionId: "cursor-session", mode: "agent" },
+    });
+    expect(connections[0].request.mock.calls.map(([method]) => method)).toEqual([
+      "initialize",
+      "authenticate",
+      "session/new",
+    ]);
     await adapter.dispose();
   });
 
@@ -126,10 +163,45 @@ describe("Cursor ACP runtime", () => {
     ]));
     await adapter.dispose();
   });
+
+  it("classifies a stale Cursor ACP locator as unavailable", async () => {
+    const connection = new FakeCursorConnection({ invalidLoad: true });
+    const adapter = new CursorAcpAdapter({
+      readiness: { executablePath: "/tools/agent", environment: {}, version: "2026.08.1", source: "path-installation" },
+      workspaceRoot: "/workspace",
+      appVersion: "0.3.11",
+      connectionFactory: () => connection,
+      fileSystemFactory: () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn() }),
+      projectInstructionLoader: vi.fn(async () => ({ source: null, text: "", bytes: 0 })),
+    });
+
+    await expect(adapter.resumeSession({ threadId: "cursor-stale" })).rejects.toMatchObject({
+      code: "AGENT_PROVIDER_SESSION_UNAVAILABLE",
+    });
+    await adapter.dispose();
+  });
+
+  it("uses ACP session/resume when an Agent can reconnect but cannot replay history", async () => {
+    const connection = new FakeCursorConnection({ loadSession: false });
+    const adapter = new CursorAcpAdapter({
+      readiness: { executablePath: "/tools/agent", environment: {}, version: "2026.08.1", source: "path-installation" },
+      workspaceRoot: "/workspace",
+      appVersion: "0.3.11",
+      connectionFactory: () => connection,
+      fileSystemFactory: () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn() }),
+      projectInstructionLoader: vi.fn(async () => ({ source: null, text: "", bytes: 0 })),
+    });
+
+    await adapter.resumeSession({ threadId: "cursor-history" });
+    expect(connection.request.mock.calls.map(([method]) => method)).toContain("session/resume");
+    expect(connection.request.mock.calls.map(([method]) => method)).not.toContain("session/load");
+    await expect(adapter.readHistory()).resolves.toEqual([]);
+    await adapter.dispose();
+  });
 });
 
 class FakeCursorConnection extends EventEmitter {
-  constructor({ list = false, replayHistory = false } = {}) {
+  constructor({ list = false, replayHistory = false, loadSession = true, invalidLoad = false } = {}) {
     super();
     this.closed = false;
     this.prompt = deferred();
@@ -138,7 +210,7 @@ class FakeCursorConnection extends EventEmitter {
         protocolVersion: 1,
         agentInfo: { name: "Cursor", version: "2026.08.1" },
         agentCapabilities: {
-          loadSession: true,
+          ...(loadSession ? { loadSession: true } : {}),
           sessionCapabilities: { resume: {}, ...(list ? { list: {} } : {}) },
           promptCapabilities: { image: true },
           _meta: { cursor: { askQuestion: 1 } },
@@ -149,14 +221,17 @@ class FakeCursorConnection extends EventEmitter {
       if (method === "session/list") return {
         sessions: [{ sessionId: "cursor-history", cwd: "/workspace", title: "Fix tabs", updatedAt: "2026-08-30T00:00:00.000Z" }],
       };
-      if (method === "session/new" || method === "session/load") {
+      if (method === "session/load" && invalidLoad) {
+        throw Object.assign(new Error("session/load: Invalid params"), { code: -32602 });
+      }
+      if (method === "session/new" || method === "session/load" || method === "session/resume") {
         if (method === "session/load" && replayHistory) queueMicrotask(() => {
           this.sendUpdate({ sessionUpdate: "user_message_chunk", messageId: "user-1", content: { type: "text", text: "Fix " } }, "cursor-history");
           this.sendUpdate({ sessionUpdate: "user_message_chunk", messageId: "user-1", content: { type: "text", text: "tabs" } }, "cursor-history");
           this.sendUpdate({ sessionUpdate: "agent_message_chunk", messageId: "assistant-1", content: { type: "text", text: "Done" } }, "cursor-history");
         });
         return {
-          sessionId: method === "session/load" ? "cursor-history" : "cursor-session",
+          sessionId: method === "session/new" ? "cursor-session" : "cursor-history",
           modes: { currentModeId: "agent", availableModes: [{ id: "agent", name: "Agent" }, { id: "plan", name: "Plan" }] },
         };
       }

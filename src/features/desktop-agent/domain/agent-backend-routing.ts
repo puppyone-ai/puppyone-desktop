@@ -18,6 +18,18 @@ export function listEnabledAgentRuntimes(
   ));
 }
 
+/** New-chat catalog filtered by the user's Active Chat visibility settings. */
+export function listVisibleAgentRuntimes(
+  inspection: AgentRuntimeInspection | null,
+  hiddenRuntimeIds: readonly string[],
+): AgentRuntimeCatalogEntry[] {
+  const hidden = new Set(hiddenRuntimeIds);
+  return listAgentRuntimes(inspection).filter((entry) => (
+    entry.readiness.status !== "not-installed"
+    && !hidden.has(entry.descriptor.id)
+  ));
+}
+
 export function isSelectableAgentBackend(entry: AgentRuntimeCatalogEntry) {
   return entry.readiness.status === "ready" && entry.readiness.selectable !== false;
 }

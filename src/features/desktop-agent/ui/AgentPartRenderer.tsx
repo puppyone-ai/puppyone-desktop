@@ -1,68 +1,78 @@
-import type { ComponentType } from "react";
 import { useLocalization } from "@puppyone/localization/react";
-import type { AgentPart } from "../domain/agent-projection-types";
-import { AgentActivityItem } from "./AgentActivityItem";
+import { AgentActivityRenderBoundary } from "./AgentActivityRenderBoundary";
 import { AgentMessagePart } from "./AgentMessagePart";
-import { AgentToolRenderer, isAgentToolPart } from "./AgentToolRendererRegistry";
+import {
+  type AgentPartRendererProps,
+  registerAgentPartRenderer,
+  resolveAgentPartRenderer,
+} from "./AgentPartRendererRegistry";
+import { AgentToolRenderer } from "./AgentToolRendererRegistry";
 import { AgentTurnSummary } from "./AgentTurnSummary";
+import {
+  AgentNoticeActivity,
+  AgentPlanActivity,
+  AgentReasoningActivity,
+} from "./activity";
 
-type PartRendererProps = {
-  part: AgentPart;
-  runtimeLabel: string;
-  onOpenFile?: (path: string) => void;
-};
-
-const registry = new Map<AgentPart["kind"], ComponentType<PartRendererProps>>();
-
-export function registerAgentPartRenderer(kind: AgentPart["kind"], renderer: ComponentType<PartRendererProps>) {
-  registry.set(kind, renderer);
-}
-
-export function AgentPartRenderer(props: PartRendererProps) {
-  const Renderer = registry.get(props.part.kind) ?? UnknownPart;
+export function AgentPartRenderer(props: AgentPartRendererProps) {
+  const Renderer = resolveAgentPartRenderer(props.part.kind);
+  if (!Renderer) return <UnregisteredPart {...props} />;
   return <Renderer {...props} />;
 }
 
-function MessagePart({ part, runtimeLabel }: PartRendererProps) {
-  if (part.kind !== "user" && part.kind !== "assistant") return null;
+function MessagePart({ part, runtimeLabel }: AgentPartRendererProps<"user" | "assistant">) {
   return <AgentMessagePart part={part} runtimeLabel={runtimeLabel} />;
 }
 
-function ActivityPart({ part, onOpenFile }: PartRendererProps) {
-  if (!("label" in part) || !("status" in part) || !("detail" in part)) return null;
-  if (isAgentToolPart(part)) {
-    return <AgentToolRenderer part={part} onOpenFile={onOpenFile} />;
-  }
-  return <AgentActivityItem activity={{
-    id: part.id,
-    turnId: part.turnId,
-    itemId: part.itemId,
-    kind: part.kind,
-    label: part.label,
-    status: part.status,
-    detail: part.detail,
-    output: part.output,
-    sequence: part.sequence,
-  }} onOpenFile={onOpenFile} />;
+function ReasoningPart({ part }: AgentPartRendererProps<"reasoning">) {
+  return (
+    <AgentActivityRenderBoundary activityId={part.id} resetKey={`${part.id}:${part.sequence}`}>
+      <AgentReasoningActivity activity={part} />
+    </AgentActivityRenderBoundary>
+  );
 }
 
-function StatusPart({ part }: PartRendererProps) {
+function PlanPart({ part }: AgentPartRendererProps<"plan">) {
+  return (
+    <AgentActivityRenderBoundary activityId={part.id} resetKey={`${part.id}:${part.sequence}`}>
+      <AgentPlanActivity activity={part} />
+    </AgentActivityRenderBoundary>
+  );
+}
+
+function NoticePart({ part }: AgentPartRendererProps<"warning" | "error">) {
+  return (
+    <AgentActivityRenderBoundary activityId={part.id} resetKey={`${part.id}:${part.sequence}`}>
+      <AgentNoticeActivity activity={part} />
+    </AgentActivityRenderBoundary>
+  );
+}
+
+function ToolPart({ part, onOpenFile }: AgentPartRendererProps<"tool" | "command" | "file-change">) {
+  return (
+    <AgentActivityRenderBoundary activityId={part.id} resetKey={`${part.id}:${part.sequence}`}>
+      <AgentToolRenderer part={part} onOpenFile={onOpenFile} />
+    </AgentActivityRenderBoundary>
+  );
+}
+
+function StatusPart({ part }: AgentPartRendererProps<"usage" | "permission" | "question">) {
   const { t } = useLocalization();
   if (part.kind === "usage") return null;
-  if (part.kind === "permission" || part.kind === "question") {
-    return <div className="desktop-agent-inline-part" role="status">
-      {t(`agent.part.${part.kind}`)} {t(`agent.part.state.${part.state}`)}
-    </div>;
-  }
-  return <UnknownPart part={part} runtimeLabel={t("agent.name")} />;
+  return <div className="desktop-agent-inline-part" role="status">
+    {t(`agent.part.${part.kind}`)} {t(`agent.part.state.${part.state}`)}
+  </div>;
 }
 
-function TurnSummaryPart({ part }: PartRendererProps) {
-  if (part.kind !== "turn-summary") return null;
+function TurnSummaryPart({ part }: AgentPartRendererProps<"turn-summary">) {
   return <AgentTurnSummary durationMs={part.durationMs} status={part.status} />;
 }
 
-function UnknownPart({ part }: PartRendererProps) {
+function UnknownPart({ part }: AgentPartRendererProps<"unknown">) {
+  return <UnregisteredPart part={part} runtimeLabel="" />;
+}
+
+function UnregisteredPart({ part }: AgentPartRendererProps) {
   const { t } = useLocalization();
   const label = "eventType" in part
     ? part.label || t(`agent.part.${part.labelCode ?? "unsupported-event"}`)
@@ -70,13 +80,19 @@ function UnknownPart({ part }: PartRendererProps) {
   return <div className="desktop-agent-inline-part is-muted" dir="auto">{label}</div>;
 }
 
-registerAgentPartRenderer("user", MessagePart);
-registerAgentPartRenderer("assistant", MessagePart);
+registerAgentPartRenderer("user", (props) => <MessagePart {...props} />);
+registerAgentPartRenderer("assistant", (props) => <MessagePart {...props} />);
 registerAgentPartRenderer("turn-summary", TurnSummaryPart);
-for (const kind of ["reasoning", "plan", "tool", "command", "file-change", "warning", "error"] as const) {
-  registerAgentPartRenderer(kind, ActivityPart);
-}
-registerAgentPartRenderer("usage", StatusPart);
-registerAgentPartRenderer("permission", StatusPart);
-registerAgentPartRenderer("question", StatusPart);
+registerAgentPartRenderer("reasoning", ReasoningPart);
+registerAgentPartRenderer("plan", PlanPart);
+registerAgentPartRenderer("tool", (props) => <ToolPart {...props} />);
+registerAgentPartRenderer("command", (props) => <ToolPart {...props} />);
+registerAgentPartRenderer("file-change", (props) => <ToolPart {...props} />);
+registerAgentPartRenderer("warning", (props) => <NoticePart {...props} />);
+registerAgentPartRenderer("error", (props) => <NoticePart {...props} />);
+registerAgentPartRenderer("usage", (props) => <StatusPart {...props} />);
+registerAgentPartRenderer("permission", (props) => <StatusPart {...props} />);
+registerAgentPartRenderer("question", (props) => <StatusPart {...props} />);
 registerAgentPartRenderer("unknown", UnknownPart);
+
+export { registerAgentPartRenderer } from "./AgentPartRendererRegistry";

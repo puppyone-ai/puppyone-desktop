@@ -1,4 +1,8 @@
-import type { AgentDraftReference, AgentSubmissionIntent } from "../domain/agent-contract";
+import type {
+  AgentDraftReference,
+  AgentPromptReferenceMention,
+  AgentSubmissionIntent,
+} from "../domain/agent-contract";
 import type { AgentClientPort, AgentClientProvider } from "./AgentClientPort";
 import type { AgentControllerState } from "./agent-controller-state";
 import { AgentKnownError, createAgentError, formatAgentError } from "./agent-error";
@@ -12,7 +16,7 @@ type AgentTurnSubmissionCoordinatorOptions = {
   references: AgentReferenceDraftManager;
   readState: () => AgentControllerState;
   patch: (patch: Partial<AgentControllerState>) => void;
-  writeDraft: (draft: string) => void;
+  writeDraft: (draft: string, mentions: AgentPromptReferenceMention[]) => void;
   prepareSession: () => Promise<boolean>;
 };
 
@@ -25,7 +29,8 @@ export class AgentTurnSubmissionCoordinator {
   async submit(prompt: string) {
     const bridge = this.requireBridge("startAgentTurn");
     const state = this.options.readState();
-    const text = prompt.trim();
+    const normalized = normalizeSubmissionDraft(prompt, state.draftMentions);
+    const text = normalized.prompt;
     const attachmentOnly = state.references.length > 0
       && state.inspection?.capabilities?.referenceInputs?.attachmentOnly === true;
     if ((!text && !attachmentOnly) || state.submitting || state.pendingIntent) return false;
@@ -44,6 +49,7 @@ export class AgentTurnSubmissionCoordinator {
       effort: state.selectedEffort,
       mode: state.selectedMode,
       references: state.references,
+      promptMentions: normalized.mentions,
     });
     const activeTurnId = state.projection.runningTurnId;
     if (activeTurnId && state.session && state.inspection?.capabilities?.steer && bridge.steerAgentTurn) {
@@ -59,10 +65,11 @@ export class AgentTurnSubmissionCoordinator {
           message: text,
           referenceEpoch: intent.referenceEpoch,
           references: intent.references,
+          promptMentions: intent.promptMentions,
         });
         this.options.references.releasePreviews(intent.references);
-        this.options.patch({ draft: "", references: [], error: null });
-        this.options.writeDraft("");
+        this.options.patch({ draft: "", draftMentions: [], references: [], error: null });
+        this.options.writeDraft("", []);
         return true;
       } catch (error) {
         this.options.patch({ error: formatAgentError(error) });
@@ -75,8 +82,8 @@ export class AgentTurnSubmissionCoordinator {
         return false;
       }
       this.queuedIntents.push(intent);
-      this.options.patch({ draft: "", references: [], error: null });
-      this.options.writeDraft("");
+      this.options.patch({ draft: "", draftMentions: [], references: [], error: null });
+      this.options.writeDraft("", []);
       return true;
     }
     if (activeTurnId) return false;
@@ -104,10 +111,10 @@ export class AgentTurnSubmissionCoordinator {
       submitting: true,
       pendingPrompt: intent.prompt,
       pendingIntent: intent,
-      ...(captureCurrentDraft ? { draft: "", references: [] } : {}),
+      ...(captureCurrentDraft ? { draft: "", draftMentions: [], references: [] } : {}),
       error: null,
     });
-    if (captureCurrentDraft) this.options.writeDraft("");
+    if (captureCurrentDraft) this.options.writeDraft("", []);
     try {
       let session = this.options.readState().session;
       if (!session) {
@@ -124,6 +131,7 @@ export class AgentTurnSubmissionCoordinator {
         mode: intent.mode,
         referenceEpoch: intent.referenceEpoch,
         references: intent.references,
+        promptMentions: intent.promptMentions,
       });
       this.options.references.releasePreviews(intent.references);
       this.options.patch({ phase: "running" });
@@ -133,29 +141,31 @@ export class AgentTurnSubmissionCoordinator {
       if (accepted) this.options.references.releasePreviews(intent.references);
       if (!captureCurrentDraft && !accepted) {
         const state = this.options.readState();
-        const restoredDraft = mergeFailedPrompt(intent.prompt, state.draft);
+        const restored = mergeFailedDraft(intent, state.draft, state.draftMentions);
         this.options.patch({
           pendingPrompt: null,
           pendingIntent: null,
-          draft: restoredDraft,
+          draft: restored.prompt,
+          draftMentions: restored.mentions,
           references: this.options.references.mergeAndValidate(intent.references, state.references),
           error: formatAgentError(error),
         });
-        this.options.writeDraft(restoredDraft);
+        this.options.writeDraft(restored.prompt, restored.mentions);
         return false;
       }
       const state = this.options.readState();
-      const restoredDraft = mergeFailedPrompt(intent.prompt, state.draft);
+      const restored = mergeFailedDraft(intent, state.draft, state.draftMentions);
       this.options.patch({
         pendingPrompt: null,
         pendingIntent: null,
         ...(accepted ? {} : {
-          draft: restoredDraft,
+          draft: restored.prompt,
+          draftMentions: restored.mentions,
           references: this.options.references.mergeAndValidate(intent.references, state.references),
         }),
         error: formatAgentError(error),
       });
-      if (!accepted) this.options.writeDraft(restoredDraft);
+      if (!accepted) this.options.writeDraft(restored.prompt, restored.mentions);
       return false;
     } finally {
       this.options.patch({ submitting: false });
@@ -166,26 +176,28 @@ export class AgentTurnSubmissionCoordinator {
     const state = this.options.readState();
     const preparationError = state.error ?? createAgentError("session-prepare-failed");
     if (!captureCurrentDraft) {
-      const restoredDraft = mergeFailedPrompt(intent.prompt, state.draft);
+      const restored = mergeFailedDraft(intent, state.draft, state.draftMentions);
       this.options.patch({
         pendingPrompt: null,
         pendingIntent: null,
-        draft: restoredDraft,
+        draft: restored.prompt,
+        draftMentions: restored.mentions,
         references: this.options.references.mergeAndValidate(intent.references, state.references),
         error: preparationError,
       });
-      this.options.writeDraft(restoredDraft);
+      this.options.writeDraft(restored.prompt, restored.mentions);
       return false;
     }
-    const restoredDraft = mergeFailedPrompt(intent.prompt, state.draft);
+    const restored = mergeFailedDraft(intent, state.draft, state.draftMentions);
     this.options.patch({
       pendingPrompt: null,
       pendingIntent: null,
-      draft: restoredDraft,
+      draft: restored.prompt,
+      draftMentions: restored.mentions,
       references: this.options.references.mergeAndValidate(intent.references, state.references),
       error: preparationError,
     });
-    this.options.writeDraft(restoredDraft);
+    this.options.writeDraft(restored.prompt, restored.mentions);
     return false;
   }
 
@@ -205,6 +217,7 @@ function createSubmissionIntent({
   effort,
   mode,
   references,
+  promptMentions,
 }: Omit<AgentSubmissionIntent, "id">): AgentSubmissionIntent {
   const identity = globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   return {
@@ -218,13 +231,44 @@ function createSubmissionIntent({
       ...reference,
       ...(reference.error ? { error: { ...reference.error } } : {}),
     })),
+    promptMentions: promptMentions.map((mention) => ({ ...mention })),
   };
 }
 
-function mergeFailedPrompt(failedPrompt: string, currentDraft: string) {
-  if (!currentDraft) return failedPrompt;
-  if (currentDraft === failedPrompt) return currentDraft;
-  return `${failedPrompt}\n\n${currentDraft}`;
+function normalizeSubmissionDraft(prompt: string, mentions: AgentPromptReferenceMention[]) {
+  const leading = prompt.length - prompt.trimStart().length;
+  const trailingBoundary = prompt.trimEnd().length;
+  const normalizedPrompt = prompt.slice(leading, trailingBoundary);
+  return {
+    prompt: normalizedPrompt,
+    mentions: mentions.flatMap((mention) => (
+      mention.start >= leading && mention.end <= trailingBoundary
+        ? [{ ...mention, start: mention.start - leading, end: mention.end - leading }]
+        : []
+    )),
+  };
+}
+
+function mergeFailedDraft(
+  failed: Pick<AgentSubmissionIntent, "prompt" | "promptMentions">,
+  currentPrompt: string,
+  currentMentions: AgentPromptReferenceMention[],
+) {
+  if (!currentPrompt) return { prompt: failed.prompt, mentions: failed.promptMentions.map((mention) => ({ ...mention })) };
+  if (currentPrompt === failed.prompt) return { prompt: currentPrompt, mentions: currentMentions };
+  const separator = "\n\n";
+  const offset = failed.prompt.length + separator.length;
+  return {
+    prompt: `${failed.prompt}${separator}${currentPrompt}`,
+    mentions: [
+      ...failed.promptMentions.map((mention) => ({ ...mention })),
+      ...currentMentions.map((mention) => ({
+        ...mention,
+        start: mention.start + offset,
+        end: mention.end + offset,
+      })),
+    ],
+  };
 }
 
 export const agentTurnSubmissionLimits = Object.freeze({ maxQueuedPrompts: MAX_QUEUED_PROMPTS });

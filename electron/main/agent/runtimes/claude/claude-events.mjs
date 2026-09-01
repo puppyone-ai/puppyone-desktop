@@ -40,10 +40,11 @@ export function normalizeClaudeMessage(message, state = createClaudeEventState()
   }
   if (message.type === "result") return normalizeResult(message, state, sessionId);
   if (message.type === "system" && message.subtype === "api_retry") {
-    return [event("provider.warning", sessionId, turnId, null, {
+    return [event("provider.connection.updated", sessionId, turnId, null, {
+      state: "reconnecting",
       message: redactSecretText(message.error || "Claude Code is retrying the provider request."),
       attempt: Number(message.attempt) || 0,
-      maxRetries: Number(message.max_retries) || 0,
+      maxAttempts: Number(message.max_retries) || 0,
       retryDelayMs: Number(message.retry_delay_ms) || 0,
     })];
   }

@@ -17,6 +17,7 @@ export type DesktopOverlayTheme = "light" | "dark";
 export type DesktopOverlayPortalProps = {
   children: ReactNode;
   theme?: DesktopOverlayTheme;
+  subThemeId?: string;
   lightThemePreset?: LightThemePreset;
   darkThemePreset?: DarkThemePreset;
   textSize?: TextSize;
@@ -28,6 +29,7 @@ export type DesktopOverlayPortalProps = {
 export function DesktopOverlayPortal({
   children,
   theme,
+  subThemeId,
   lightThemePreset,
   darkThemePreset,
   textSize,
@@ -43,6 +45,7 @@ export function DesktopOverlayPortal({
     applyDesktopOverlayTheme(
       root,
       theme,
+      subThemeId,
       lightThemePreset,
       darkThemePreset,
       textSize,
@@ -50,7 +53,7 @@ export function DesktopOverlayPortal({
       pointerCursors,
       diffMarkers,
     );
-  }, [root, theme, lightThemePreset, darkThemePreset, textSize, typography, pointerCursors, diffMarkers]);
+  }, [root, theme, subThemeId, lightThemePreset, darkThemePreset, textSize, typography, pointerCursors, diffMarkers]);
 
   if (!root) return null;
   return createPortal(children, root);
@@ -92,6 +95,7 @@ function getDesktopOverlayRoot() {
 function applyDesktopOverlayTheme(
   root: HTMLElement,
   theme: DesktopOverlayTheme,
+  subThemeId?: string,
   lightThemePreset?: LightThemePreset,
   darkThemePreset?: DarkThemePreset,
   textSize?: TextSize,
@@ -101,14 +105,13 @@ function applyDesktopOverlayTheme(
 ) {
   root.className = `desktop-overlay-root ${theme === "dark" ? "dark" : ""}`.trim();
   root.dataset.themeMode = theme;
+  root.dataset.poAppearanceRoot = "true";
+  if (subThemeId) root.dataset.subThemeId = subThemeId;
+  else delete root.dataset.subThemeId;
   if (lightThemePreset) root.dataset.lightThemePreset = lightThemePreset;
   if (darkThemePreset) root.dataset.darkThemePreset = darkThemePreset;
-  if (textSize) {
-    root.dataset.textSize = textSize;
-    root.dataset.interfaceTextSize = textSize;
-    root.dataset.contentTextSize = textSize;
-    root.dataset.terminalTextSize = textSize;
-  }
+  if (textSize) root.dataset.contentTextSize = textSize;
+  else delete root.dataset.contentTextSize;
   if (typography) applyTypographyToElement(root, typography);
   if (pointerCursors !== undefined) root.dataset.pointerCursors = pointerCursors ? "true" : "false";
   if (diffMarkers) root.dataset.diffMarkers = diffMarkers;

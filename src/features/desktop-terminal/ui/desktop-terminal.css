@@ -13,11 +13,6 @@
   color: var(--po-terminal-fg);
 }
 
-.desktop-terminal-close-dialog-detail {
-  margin: 0;
-  color: var(--po-text-muted);
-}
-
 .desktop-terminal-body {
   position: relative;
   box-sizing: border-box;

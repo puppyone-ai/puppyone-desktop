@@ -8,6 +8,7 @@ import {
   type AiEditRequest,
   type DataNode,
   type EditorInteractionPreferences,
+  type ResourceUri,
   type Workspace,
   type WorkspaceContentChange,
   type WorkspaceFolder,
@@ -34,6 +35,7 @@ import { useDesktopViewerPacks } from "../viewer-packs/host";
 import { DesktopDataWorkspaceSurface } from "./DesktopDataWorkspaceSurface";
 import type { DesktopEditorWorkbenchController } from "../editor-workbench/controller/useDesktopEditorWorkbench";
 import type { ResolvedWorkbenchDataResource } from "../data-workspace/workbenchDataPort";
+import type { SubThemeCatalogController } from "../themes/useSubThemeCatalog";
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
 type DesktopWorkspaceContentProps = {
@@ -77,6 +79,7 @@ type DesktopWorkspaceContentProps = {
   settingsSection: SettingsSection;
   sidebarCompanion?: ReactNode;
   sidebarUtility?: ReactNode;
+  subThemeCatalog: SubThemeCatalogController;
   workspace: Workspace;
   workspaceFolders: readonly WorkspaceFolder[];
   resolveWorkspaceResource: (path: string | null) => ResolvedWorkbenchDataResource | null;
@@ -122,6 +125,7 @@ export function DesktopWorkspaceContent({
   settingsSection,
   sidebarCompanion,
   sidebarUtility,
+  subThemeCatalog,
   workspace,
   workspaceFolders,
   resolveWorkspaceResource,
@@ -152,6 +156,11 @@ export function DesktopWorkspaceContent({
     preferences.experimentalSettings.enableEditorSaveStatus,
     preferences.experimentalSettings.enableMarkdownBlockDrag,
   ]);
+  const workspaceRootUri = (
+    workspaceFolders.find((folder) => folder.workspace.path === workspace.path)?.uri
+    ?? workspaceFolders[0]?.uri
+    ?? null
+  ) as ResourceUri | null;
   const {
     availableSurfaceIds,
     cloudHubNavigationEnabled,
@@ -177,6 +186,7 @@ export function DesktopWorkspaceContent({
     puppyoneConfigLoading,
     puppyoneConfigSaving,
     settingsSection,
+    subThemeCatalog,
     viewerPacks: {
       hostAvailable: externalViewerPacksEnabled,
       refresh: refreshViewerPackSnapshot,
@@ -184,6 +194,7 @@ export function DesktopWorkspaceContent({
     },
     viewerPluginsEnabled,
     workspace,
+    workspaceRootUri,
   });
 
   if (!dataPort) {
