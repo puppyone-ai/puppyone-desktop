@@ -13,12 +13,15 @@
   --agent-message-turn-gap: 24px;
   --agent-work-handoff-gap: 8px;
   --agent-composer-line-height: 20px;
-  --agent-composer-input-padding: 12px;
+  --agent-composer-input-padding-block: 12px;
+  --agent-composer-text-inset-inline: 16px;
   --agent-composer-text-max-height: 120px;
   /* One visible text line at rest; CodeMirror grows naturally until max-height. */
-  --agent-composer-input-min-height: calc(var(--agent-composer-line-height) + var(--agent-composer-input-padding) + var(--agent-composer-input-padding));
+  --agent-composer-input-min-height: calc(var(--agent-composer-line-height) + var(--agent-composer-input-padding-block) + var(--agent-composer-input-padding-block));
   --agent-composer-toolbar-height: 38px;
-  --agent-composer-picker-padding-inline: 8px;
+  --agent-composer-toolbar-padding-inline: 8px;
+  /* Prompt and picker labels share one text edge even when either inset changes. */
+  --agent-composer-picker-padding-inline: calc(var(--agent-composer-text-inset-inline) - var(--agent-composer-toolbar-padding-inline));
   --agent-reference-card-height: 52px;
   --agent-empty-state-dock-reserve: calc(
     var(--agent-dock-padding-top)

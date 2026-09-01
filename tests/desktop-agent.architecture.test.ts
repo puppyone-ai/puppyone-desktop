@@ -95,7 +95,7 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(foundation).toMatch(/\.desktop-agent-header-region,\s*\.desktop-agent-status-region,\s*\.desktop-agent-conversation-region,\s*\.desktop-agent-conversation-overlay,\s*\.desktop-agent-dock-region\s*\{[^}]*grid-column:\s*1/s);
     expect(foundation).toContain("--agent-radius-composer: 8px");
     expect(foundation).toContain("--agent-inline-inset: var(--desktop-sidebar-row-left-gap, 12px)");
-    expect(foundation).toContain("--agent-composer-input-min-height: calc(var(--agent-composer-line-height) + var(--agent-composer-input-padding) + var(--agent-composer-input-padding));");
+    expect(foundation).toContain("--agent-composer-input-min-height: calc(var(--agent-composer-line-height) + var(--agent-composer-input-padding-block) + var(--agent-composer-input-padding-block));");
     expect(foundation).not.toContain("--agent-composer-input-min-height: 70px");
     expect(theme).toContain("--agent-composer-surface: var(--po-active)");
     expect(theme).toContain("--agent-user-message-surface: var(--po-hover)");
@@ -150,7 +150,7 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(promptEditor).not.toContain("Decoration.mark");
     expect(promptEditor).not.toContain("focusAtCoordinates");
     expect(promptEditor).not.toMatch(/mousedown\s*:/);
-    expect(css).toMatch(/\.desktop-agent-prompt-editor \.cm-scroller\s*\{[^}]*max-height:\s*calc\(var\(--agent-composer-text-max-height\) \+ var\(--agent-composer-input-padding\) \+ var\(--agent-composer-input-padding\)\)[^}]*overflow-y:\s*auto/s);
+    expect(css).toMatch(/\.desktop-agent-prompt-editor \.cm-scroller\s*\{[^}]*max-height:\s*calc\(var\(--agent-composer-text-max-height\) \+ var\(--agent-composer-input-padding-block\) \+ var\(--agent-composer-input-padding-block\)\)[^}]*overflow-y:\s*auto/s);
     expect(composer).not.toContain("<select");
     expect(picker).toContain("DesktopOverlayLayer");
     expect(picker).toContain("useAnchoredOverlayPosition");
