@@ -283,5 +283,8 @@
   "changes.ariaLabel": "View changes: {additions, number} additions and {deletions, number} deletions",
   "changes.label": "Changes",
   "markdown.collapse": "Collapse long response",
-  "markdown.showFull": "Show full response"
+  "markdown.showFull": "Show full response",
+  "markdown.diagram": "Mermaid",
+  "markdown.diagramRendering": "Rendering diagram",
+  "markdown.image": "Image"
 }

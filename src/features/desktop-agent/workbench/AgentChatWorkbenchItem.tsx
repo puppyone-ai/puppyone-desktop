@@ -11,10 +11,11 @@ import {
 } from "../application/controllerRegistry";
 import type { AgentChatTabPresentation } from "../domain/agent-chat-tabs";
 import type { AgentRoutePreference } from "../domain/agent-route-preference";
-import { getElectronAgentClient } from "../infrastructure/electron/electronAgentClient";
+import { getElectronAgentClient, openExternalAgentUrl } from "../infrastructure/electron/electronAgentClient";
 import { AgentChatTabPanel } from "../ui/AgentChatTabPanel";
 import { scheduleAgentStreamFrame } from "../ui/agent-stream-frame-scheduler";
 import type { AgentWorkspaceReferenceResolver } from "../ui/useAgentReferenceIngestion";
+import { AgentMarkdownEnvironmentProvider } from "../ui/markdown/AgentMarkdownEnvironment";
 import "../ui/desktop-agent.css";
 
 export type AgentChatWorkbenchItemProps = AuxiliaryWorkbenchItemRenderContext & Readonly<{
@@ -53,23 +54,27 @@ export function AgentChatWorkbenchItem({
   const present = useCallback((agent: AgentChatTabPresentation) => {
     onPresentationChange(presentAgentChatWorkbenchItem(agent, t("agent.name")));
   }, [onPresentationChange, t]);
-  return <AgentChatTabPanel
-    commandTarget={presentation.commandTarget}
-    presented={presentation.presented}
-    controller={controller}
-    workspaceId={item.contextId}
-    onPresentationChange={present}
-    onViewChanges={onViewChanges}
-    onOpenFile={onOpenFile}
-    preferredRuntimeId={preferredRuntimeId}
-    onPreferredRuntimeChange={onPreferredRuntimeChange}
-    preferredRoute={preferredRoute}
-    onPreferredRouteChange={onPreferredRouteChange}
-    preferredModel={preferredModel}
-    onPreferredModelChange={onPreferredModelChange}
-    hiddenRuntimeIds={hiddenRuntimeIds}
-    resolveWorkspaceReference={resolveWorkspaceReference}
-  />;
+  return (
+    <AgentMarkdownEnvironmentProvider openExternalUrl={openExternalAgentUrl}>
+      <AgentChatTabPanel
+        commandTarget={presentation.commandTarget}
+        presented={presentation.presented}
+        controller={controller}
+        workspaceId={item.contextId}
+        onPresentationChange={present}
+        onViewChanges={onViewChanges}
+        onOpenFile={onOpenFile}
+        preferredRuntimeId={preferredRuntimeId}
+        onPreferredRuntimeChange={onPreferredRuntimeChange}
+        preferredRoute={preferredRoute}
+        onPreferredRouteChange={onPreferredRouteChange}
+        preferredModel={preferredModel}
+        onPreferredModelChange={onPreferredModelChange}
+        hiddenRuntimeIds={hiddenRuntimeIds}
+        resolveWorkspaceReference={resolveWorkspaceReference}
+      />
+    </AgentMarkdownEnvironmentProvider>
+  );
 }
 
 export async function requestCloseAgentChatWorkbenchItem(rootId: string, itemId: string) {

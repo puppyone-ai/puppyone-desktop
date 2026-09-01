@@ -68,6 +68,7 @@
     "smoke:appearance-dialog": "electron scripts/smoke-appearance-visual-matrix.mjs --dialog-only",
     "smoke:workspace-menu": "electron scripts/smoke-workspace-menu-visual.mjs",
     "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
+    "smoke:agent-markdown": "npm run build && electron scripts/smoke-agent-markdown.mjs",
     "smoke:native-agents": "node scripts/smoke-native-agent-roundtrip.mjs",
     "smoke:native-agent-references": "node scripts/smoke-native-agent-references.mjs",
     "smoke:terminal-p0": "electron scripts/smoke-terminal-p0.mjs",
@@ -101,6 +102,8 @@
     "jszip": "^3.10.1",
     "node-pty": "^1.1.0",
     "postcss": "^8.5.26",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "semver": "^7.7.3"
   },
   "devDependencies": {

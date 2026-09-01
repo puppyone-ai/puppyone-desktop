@@ -47,7 +47,7 @@ describe("Desktop Agent virtual transcript", () => {
     expect(container.querySelector("a")?.getAttribute("href")).toContain("https://example.com");
   });
 
-  it("renders fenced output as one compact surface with an icon-only copy action", () => {
+  it("renders fenced output with a visible language and an icon-only copy action", () => {
     const container = render(React.createElement(SafeMarkdown, { text: "```text\n项目备注\n```" }));
     const block = container.querySelector(".desktop-agent-code-block");
     const copy = block?.querySelector<HTMLButtonElement>(".desktop-agent-code-copy");
@@ -55,7 +55,7 @@ describe("Desktop Agent virtual transcript", () => {
     expect(block?.querySelector("pre")?.textContent).toBe("项目备注");
     expect(copy?.getAttribute("aria-label")).toBe("Copy");
     expect(copy?.textContent).toBe("");
-    expect(block?.querySelector(":scope > div")).toBeNull();
+    expect(block?.querySelector(".desktop-agent-code-language")?.textContent).toBe("text");
   });
 
   it("progressively discloses long Markdown without mounting an unbounded initial document", () => {

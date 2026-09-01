@@ -21,3 +21,15 @@ export {
   isMarkdownFormatCommand,
   type MarkdownFormatCommand,
 } from "./core/commands/markdownFormatHotkeys";
+export {
+  getMermaidThemeSnapshot,
+  mountSanitizedMermaidSvg,
+  renderMermaidDiagram,
+  subscribeMermaidThemeChanges,
+} from "./features/mermaid/mermaidRenderer";
+export type {
+  MermaidRenderRequest,
+  MermaidRenderResult,
+  MermaidSvgMount,
+  MermaidThemeSnapshot,
+} from "./features/mermaid/mermaidRenderer";

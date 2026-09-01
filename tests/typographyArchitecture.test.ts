@@ -180,7 +180,7 @@ describe("typography architecture", () => {
     const markdownEditor = source("packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor.tsx");
     const codeEditor = source("packages/shared-ui/src/editor/viewers/code/CodeMirrorCodeEditor.tsx");
     const plainTextEditor = source("packages/shared-ui/src/editor/viewers/code/PlainTextEditor.tsx");
-    const agentMarkdown = source("src/features/desktop-agent/ui/SafeMarkdown.tsx");
+    const agentMarkdown = source("src/features/desktop-agent/ui/markdown/AgentMarkdownDocument.tsx");
     const typographyRuntime = source("src/features/typography/typographyRuntime.ts");
     const app = source("src/App.tsx");
 

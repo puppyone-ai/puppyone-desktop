@@ -15,3 +15,10 @@ export const getElectronAgentClient: AgentClientProvider = () => {
 export function getElectronFilePath(file: File) {
   return window.puppyoneDesktop?.getPathForFile?.(file) || null;
 }
+
+/** Routes Agent-authored external links through the Main-owned URL policy. */
+export function openExternalAgentUrl(href: string) {
+  const openExternalUrl = window.puppyoneDesktop?.openExternalUrl;
+  if (!openExternalUrl) return;
+  void openExternalUrl(href).catch(() => {});
+}

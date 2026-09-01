@@ -283,5 +283,8 @@
   "changes.ariaLabel": "Ver cambios: {additions, number} adiciones y {deletions, number} eliminaciones",
   "changes.label": "Cambios",
   "markdown.collapse": "Contraer respuesta larga",
-  "markdown.showFull": "Mostrar respuesta completa"
+  "markdown.showFull": "Mostrar respuesta completa",
+  "markdown.diagram": "Mermaid",
+  "markdown.diagramRendering": "Renderizando diagrama",
+  "markdown.image": "Imagen"
 }
