@@ -112,10 +112,10 @@ describe("lightweight Office preview experience", () => {
     );
     expect(officePreviewCss).toContain('.office-pptx-thumbnail__frame[data-render-state="error"]');
     expect(officePreviewCss).toContain("prefers-reduced-motion: reduce");
-    // Neutral owns the fallback accents; variants only redeclare intentional
-    // differences. The global token layer no longer duplicates the palette.
-    expect(paletteTokenSource.match(/--po-file-accent-presentation:/g)).toHaveLength(4);
-    expect(paletteTokenSource.match(/--po-file-accent-word:/g)).toHaveLength(4);
+    // Neutral owns the fallback accents; Warm dark and Graphite light/dark
+    // redeclare intentional differences. The global layer adds no duplicate.
+    expect(paletteTokenSource.match(/--po-file-accent-presentation:/g)).toHaveLength(5);
+    expect(paletteTokenSource.match(/--po-file-accent-word:/g)).toHaveLength(5);
     expect(officePreviewCss).not.toMatch(
       /\.office-pptx-workspace\s*\{[^}]*var\(--po-inset\)/s,
     );
