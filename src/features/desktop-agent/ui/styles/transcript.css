@@ -76,6 +76,43 @@
   letter-spacing: -0.004em;
 }
 
+.desktop-agent-run-status {
+  display: grid;
+  width: min(100%, 520px);
+  min-width: 0;
+  justify-items: start;
+}
+
+.desktop-agent-run-status-toggle {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.desktop-agent-run-status-toggle:hover,
+.desktop-agent-run-status-toggle:focus-visible {
+  background: var(--agent-row-hover-surface);
+}
+
+.desktop-agent-run-summary-preview {
+  max-width: 100%;
+  margin: 1px var(--agent-message-content-inset) 0;
+  padding: 4px 0 4px 12px;
+  border-inline-start: 1px solid var(--agent-border-subtle);
+  color: var(--agent-text-muted);
+  font-size: var(--agent-font-size);
+  font-style: italic;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
 .desktop-agent-connection-status {
   display: inline-flex;
   width: fit-content;

@@ -5,6 +5,7 @@ import { useLocalization } from "@puppyone/localization/react";
 import { ArrowDown, CircleAlert } from "lucide-react";
 import { InlineLoading, PageLoading } from "../../../components/loading";
 import type { AgentSubmissionStage } from "../application/agent-controller-state";
+import { formatAgentDuration, outputForActivity } from "../domain/agent-activity-presentation";
 import type { AgentDraftReference, AgentPromptReferenceMention, AgentReferenceDisplay } from "../domain/agent-contract";
 import type { AgentPart, AgentProjection } from "../domain/agent-projection-types";
 import { AgentConnectionStatus } from "./AgentConnectionStatus";
@@ -26,6 +27,10 @@ import {
   agentVirtualCanvasGeometry,
   agentVirtualRowGeometry,
 } from "./agent-runtime-geometry";
+import {
+  AGENT_RUN_ELAPSED_LABEL_THRESHOLD_MS,
+  useAgentRunActiveElapsed,
+} from "./useAgentRunActiveElapsed";
 
 type AgentTranscriptProps = {
   projection: AgentProjection;
@@ -62,7 +67,7 @@ function AgentTranscriptView({
   onViewportChange,
   onOpenFile,
 }: AgentTranscriptProps) {
-  const { t } = useLocalization();
+  const { t, formatNumber } = useLocalization();
   const runtimeLabel = runtimeLabelProp || t("agent.name");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [measurements, setMeasurements] = useState<Record<string, number>>(() => ({ ...initialMeasurements }));
@@ -105,12 +110,23 @@ function AgentTranscriptView({
     ? agentRunStatusCode(projection, working)
     : null;
   const showThinking = runStatus === "thinking";
+  const runningTurn = projection.turns.find((turn) => turn.id === projection.runningTurnId) ?? null;
+  const runElapsedMs = useAgentRunActiveElapsed(runningTurn, runStatus !== null);
+  const runDuration = runElapsedMs !== null && runElapsedMs >= AGENT_RUN_ELAPSED_LABEL_THRESHOLD_MS
+    ? formatAgentDuration(Math.floor(runElapsedMs / 1_000) * 1_000, t, formatNumber)
+    : null;
+  const runStatusLabel = runStatus === "thinking"
+    ? t("agent.activity.thinking")
+    : runStatus === "working" ? t("agent.activity.working") : null;
+  const liveReasoningSummary = runStatus === "thinking"
+    ? currentAgentReasoningSummary(projection)
+    : null;
   const workingStatus = projection.connectionStatus
     ? null
     : submissionStatus
-      || (runStatus === "thinking"
-        ? t("agent.activity.thinking")
-        : runStatus === "working" ? t("agent.activity.workingThroughRequest") : null);
+      || (runStatusLabel && runDuration
+        ? t("agent.transcript.runElapsed", { status: runStatusLabel, duration: runDuration })
+        : runStatusLabel);
   const hasLiveTail = Boolean(pendingPrompt)
     || pendingReferences.length > 0
     || Boolean(projection.connectionStatus)
@@ -353,14 +369,13 @@ function AgentTranscriptView({
             }} runtimeLabel={runtimeLabel} />}
             {projection.connectionStatus && <AgentConnectionStatus status={projection.connectionStatus} />}
             {workingStatus && (
-              <InlineLoading
-                className="desktop-agent-working-indicator"
-                size="xs"
-                tone="neutral"
+              <AgentRunStatus
+                key={liveReasoningSummary?.id ?? projection.runningTurnId ?? "run-status"}
                 label={workingStatus}
                 ariaLabel={showThinking
-                  ? t("agent.transcript.thinkingAria", { agent: bidiIsolate(runtimeLabel) })
-                  : workingStatus}
+                    ? t("agent.transcript.thinkingAria", { agent: bidiIsolate(runtimeLabel) })
+                    : workingStatus}
+                reasoningSummary={liveReasoningSummary?.text ?? null}
               />
             )}
           </div>
@@ -405,6 +420,62 @@ export const AgentTranscript = memo(AgentTranscriptView);
 AgentTranscript.displayName = "AgentTranscript";
 
 const MemoAgentPartRenderer = memo(AgentPartRenderer);
+
+function AgentRunStatus({ label, ariaLabel, reasoningSummary }: {
+  label: string;
+  ariaLabel: string;
+  reasoningSummary: string | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const indicator = (
+    <InlineLoading
+      className="desktop-agent-working-indicator"
+      size="xs"
+      tone="neutral"
+      label={label}
+      ariaLabel={ariaLabel}
+    />
+  );
+  if (!reasoningSummary) return indicator;
+  return (
+    <div className={`desktop-agent-run-status${expanded ? " is-expanded" : ""}`}>
+      <button
+        className="desktop-agent-run-status-toggle"
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((value) => !value)}
+      >
+        {indicator}
+      </button>
+      {expanded && (
+        <div className="desktop-agent-run-summary-preview" dir="auto">
+          {reasoningSummary}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function currentAgentReasoningSummary(projection: AgentProjection) {
+  const turnId = projection.runningTurnId;
+  if (!turnId) return null;
+  const parts = projection.parts.length > 0
+    ? projection.parts
+    : projection.activities.map((activity): AgentPart => ({ ...activity }));
+  const reasoning = parts
+    .filter((part): part is Extract<AgentPart, { kind: "reasoning" }> => (
+      part.kind === "reasoning" && part.turnId === turnId
+    ))
+    .sort((left, right) => (
+      (left.updatedSequence ?? left.sequence) - (right.updatedSequence ?? right.sequence)
+    ))
+    .at(-1);
+  if (!reasoning) return null;
+  const text = (typeof reasoning.detail.delta === "string"
+    ? reasoning.detail.delta
+    : outputForActivity(reasoning)).trim().slice(0, 2_048);
+  return text ? { id: reasoning.id, text } : null;
+}
 
 function MeasuredRow({ rowId, kind, top, gapAfter, animate, onMeasureElement, children }: {
   rowId: string;

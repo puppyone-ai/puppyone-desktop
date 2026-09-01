@@ -71,7 +71,9 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(timelineLayout).toContain("buildAgentTimelineLayout");
     expect(timelineLayout).toContain("agentTimelineGapAfter");
     expect(timelinePresentation).toContain("buildAgentTimeline");
-    expect(timelinePresentation).toContain('part.kind !== "usage"');
+    expect(timelinePresentation).toContain('part.kind === "usage"');
+    expect(timelinePresentation).toContain('part.kind !== "reasoning"');
+    expect(timelinePresentation).toContain("isLiveAgentActivityStatus(part.status)");
     expect(timeline).toContain("buildAgentTimeline(projection)");
     expect(timeline).toContain("buildAgentTimelineLayout(timeline.rows");
     expect(timeline).not.toContain("function buildLayout(");

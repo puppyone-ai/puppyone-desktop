@@ -78,6 +78,8 @@ function updateTurn(projection: AgentProjection, event: AgentEvent) {
       status: "running",
       startedAtSequence: event.sequence,
       startedAtMs: parseAgentEventTime(event.emittedAt),
+      userWaitStartedAtMs: null,
+      userWaitDurationMs: 0,
       completedAtSequence: null,
       durationMs: null,
       partIds: [],
@@ -86,17 +88,46 @@ function updateTurn(projection: AgentProjection, event: AgentEvent) {
     indexes.turns.set(event.turnId, turnIndex);
     projection.turns.push(turn);
   }
+  const eventAtMs = parseAgentEventTime(event.emittedAt);
+  if (
+    (event.type === "approval.requested" || event.type === "question.requested")
+    && turn.userWaitStartedAtMs == null
+    && eventAtMs !== null
+  ) {
+    turn = { ...turn, userWaitStartedAtMs: eventAtMs };
+  }
+  if (
+    (event.type === "approval.resolved" || event.type === "question.resolved")
+    && !projection.approvals.some((approval) => approval.turnId === event.turnId)
+    && !projection.questions.some((question) => question.turnId === event.turnId)
+  ) {
+    turn = closeAgentTurnUserWait(turn, eventAtMs);
+  }
   const terminalState = agentTurnTerminalState(event);
   if (terminalState) {
+    turn = closeAgentTurnUserWait(turn, eventAtMs);
     turn = {
       ...turn,
       status: terminalState,
       completedAtSequence: event.sequence,
       durationMs: readAgentTurnDurationMs(event.payload.durationMs, turn.startedAtMs, event.emittedAt),
     };
-    if (turnIndex !== undefined) projection.turns[turnIndex] = turn;
   }
+  if (turnIndex !== undefined) projection.turns[turnIndex] = turn;
   return turn;
+}
+
+function closeAgentTurnUserWait(turn: AgentProjection["turns"][number], eventAtMs: number | null) {
+  const waitStartedAtMs = turn.userWaitStartedAtMs ?? null;
+  if (waitStartedAtMs === null) return turn;
+  const elapsed = eventAtMs !== null && eventAtMs >= waitStartedAtMs
+    ? eventAtMs - waitStartedAtMs
+    : 0;
+  return {
+    ...turn,
+    userWaitStartedAtMs: null,
+    userWaitDurationMs: (turn.userWaitDurationMs ?? 0) + elapsed,
+  };
 }
 
 function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart | null {

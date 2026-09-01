@@ -22,6 +22,7 @@ import {
   agentSubmissionStatusLabel,
   shouldShowAgentThinking,
 } from "../src/features/desktop-agent/ui/AgentTranscript";
+import { agentRunActiveElapsedMs } from "../src/features/desktop-agent/ui/useAgentRunActiveElapsed";
 import { registerAgentToolRenderer } from "../src/features/desktop-agent/ui/AgentToolRendererRegistry";
 import { registerAgentPartRenderer } from "../src/features/desktop-agent/ui/AgentPartRenderer";
 import { agentToolEvidenceLimits } from "../src/features/desktop-agent/domain/agent-tool-evidence";
@@ -42,6 +43,7 @@ let root: Root | null = null;
 afterEach(() => {
   act(() => root?.unmount());
   root = null;
+  vi.useRealTimers();
   document.body.innerHTML = "";
   document.head.querySelectorAll("style[data-agent-layout-test]").forEach((node) => node.remove());
 });
@@ -477,6 +479,82 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.querySelector(".desktop-agent-stream-caret")).not.toBeNull();
   });
 
+  it("uses one quiet live-tail indicator and reveals elapsed work after five seconds", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const projection = createAgentProjection();
+    projection.runningTurnId = "turn-live";
+    projection.turns = [{
+      id: "turn-live",
+      status: "running",
+      startedAtSequence: 1,
+      startedAtMs: 1_000,
+      completedAtSequence: null,
+      durationMs: null,
+      partIds: [],
+    }];
+
+    const container = render(React.createElement(AgentTranscript, {
+      projection,
+      loading: false,
+      working: true,
+      runtimeLabel: "Codex",
+    }));
+    expect(container.querySelectorAll(".desktop-agent-working-indicator")).toHaveLength(1);
+    expect(container.querySelector(".desktop-agent-working-indicator")?.textContent).toBe("Thinking");
+
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(container.querySelector(".desktop-agent-working-indicator")?.textContent).toBe("Thinking · 5s");
+    expect(container.querySelectorAll("[data-puppy-loader='dots']")).toHaveLength(1);
+  });
+
+  it("excludes approval wait from the active run duration", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      {
+        schemaVersion: 1,
+        sequence: 1,
+        sessionId: "session-wait",
+        provider: "codex",
+        providerSessionId: "native-wait",
+        turnId: "turn-wait",
+        itemId: null,
+        emittedAt: new Date(1_000).toISOString(),
+        type: "turn.started",
+        payload: { prompt: "Inspect" },
+      },
+      {
+        schemaVersion: 1,
+        sequence: 2,
+        sessionId: "session-wait",
+        provider: "codex",
+        providerSessionId: "native-wait",
+        turnId: "turn-wait",
+        itemId: "approval-wait",
+        emittedAt: new Date(4_000).toISOString(),
+        type: "approval.requested",
+        payload: { requestId: "approval-wait", kind: "command", title: "Run" },
+      },
+      {
+        schemaVersion: 1,
+        sequence: 3,
+        sessionId: "session-wait",
+        provider: "codex",
+        providerSessionId: "native-wait",
+        turnId: "turn-wait",
+        itemId: "approval-wait",
+        emittedAt: new Date(9_000).toISOString(),
+        type: "approval.resolved",
+        payload: { requestId: "approval-wait", decision: "accept" },
+      },
+    ]);
+
+    expect(projection.turns[0]).toMatchObject({
+      userWaitStartedAtMs: null,
+      userWaitDurationMs: 5_000,
+    });
+    expect(agentRunActiveElapsedMs(projection.turns[0] ?? null, 12_000)).toBe(6_000);
+  });
+
   it("keeps an official non-transcript working pulse visible around native tool activity", () => {
     const projection = applyAgentEvents(createAgentProjection(), [
       {
@@ -513,9 +591,10 @@ describe("Desktop Agent renderer surfaces", () => {
       runtimeLabel: "Claude Agent",
     }));
     const indicator = container.querySelector(".desktop-agent-working-indicator");
-    expect(indicator?.textContent).toContain("Working through the request");
+    expect(indicator?.textContent).toContain("Working");
+    expect(indicator?.textContent).not.toContain("Working through the request");
     expect(indicator?.querySelector("[data-puppy-loader='dots']")).not.toBeNull();
-    expect(indicator?.querySelector(".desktop-agent-spin")).toBeNull();
+    expect(container.querySelector(".desktop-agent-spin")).toBeNull();
   });
 
   it("renders only the current connection state and removes its animation after recovery", () => {
@@ -1331,7 +1410,70 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.textContent).toContain("Compared the provider boundaries.");
   });
 
-  it("never renders a live reasoning spinner after the owning turn settles", () => {
+  it("keeps a streaming reasoning summary behind the single live-tail status", () => {
+    const events = [
+      {
+        schemaVersion: 1 as const,
+        sequence: 1,
+        sessionId: "session-reasoning",
+        provider: "codex",
+        providerSessionId: "native-reasoning",
+        turnId: "turn-reasoning",
+        itemId: null,
+        emittedAt: new Date(1_000).toISOString(),
+        type: "turn.started" as const,
+        payload: { prompt: "Inspect" },
+      },
+      {
+        schemaVersion: 1 as const,
+        sequence: 2,
+        sessionId: "session-reasoning",
+        provider: "codex",
+        providerSessionId: "native-reasoning",
+        turnId: "turn-reasoning",
+        itemId: "reasoning-summary",
+        emittedAt: new Date(2_000).toISOString(),
+        type: "reasoning.summary.delta" as const,
+        payload: { delta: "Inspecting the project structure." },
+      },
+    ];
+    const running = applyAgentEvents(createAgentProjection(), events);
+    const container = render(React.createElement(AgentTranscript, {
+      projection: running,
+      loading: false,
+      working: true,
+      runtimeLabel: "Codex",
+    }));
+
+    expect(container.querySelector(".desktop-agent-reasoning")).toBeNull();
+    expect(container.querySelectorAll(".desktop-agent-working-indicator")).toHaveLength(1);
+    expect(container.querySelectorAll("[data-puppy-loader='dots']")).toHaveLength(1);
+    expect(container.textContent).not.toContain("Working through the request");
+    expect(container.textContent).not.toContain("Inspecting the project structure.");
+    expect(container.querySelector(".desktop-agent-run-status-toggle")).not.toBeNull();
+    act(() => (container.querySelector(".desktop-agent-run-status-toggle") as HTMLButtonElement).click());
+    expect(container.textContent).toContain("Inspecting the project structure.");
+
+    const settled = applyAgentEvents(running, [{
+      ...events[0],
+      sequence: 3,
+      itemId: null,
+      emittedAt: new Date(3_000).toISOString(),
+      type: "turn.completed",
+      payload: { status: "completed" },
+    }]);
+    act(() => root?.render(withTestLocalization(React.createElement(AgentTranscript, {
+      projection: settled,
+      loading: false,
+      working: false,
+      runtimeLabel: "Codex",
+    }))));
+    expect(container.querySelector(".desktop-agent-working-indicator")).toBeNull();
+    expect(container.querySelector(".desktop-agent-reasoning")).not.toBeNull();
+    expect(container.querySelector(".desktop-agent-reasoning .desktop-agent-spin")).toBeNull();
+  });
+
+  it("omits empty reasoning boundaries after the owning turn settles", () => {
     const base = {
       schemaVersion: 1 as const,
       sessionId: "session-cursor",
@@ -1353,10 +1495,9 @@ describe("Desktop Agent renderer surfaces", () => {
       runtimeLabel: "Cursor Agent",
     }));
 
-    expect(container.querySelector(".desktop-agent-reasoning")).not.toBeNull();
-    expect(container.querySelector(".desktop-agent-reasoning .desktop-agent-spin")).toBeNull();
+    expect(container.querySelector(".desktop-agent-reasoning")).toBeNull();
     expect(container.querySelector(".desktop-agent-working-indicator")).toBeNull();
-    expect(container.textContent).toContain("Thought briefly");
+    expect(container.textContent).not.toContain("Thought briefly");
     expect(container.textContent).not.toContain("Working through the request");
   });
 
