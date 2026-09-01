@@ -94,11 +94,42 @@ function resolveCssColor(element: HTMLElement, color: string) {
 
 function parseResolvedRgb(value: string | undefined, fallback: TerminalRgbColor): TerminalRgbColor {
   if (typeof value !== "string") return fallback;
-  const match = value.match(
-    /^rgba?\(\s*([\d.]+)\s*[, ]\s*([\d.]+)\s*[, ]\s*([\d.]+)(?:\s*[,/]\s*[\d.]+)?\s*\)$/iu,
+  const legacyRgb = value.match(
+    /^rgba?\(\s*([\d.]+%?)\s*[, ]\s*([\d.]+%?)\s*[, ]\s*([\d.]+%?)(?:\s*[,/]\s*[\d.]+%?)?\s*\)$/iu,
   );
-  if (!match) return fallback;
-  const channels = match.slice(1, 4).map((channel) => Number(channel));
-  if (channels.some((channel) => !Number.isFinite(channel))) return fallback;
-  return channels.map((channel) => Math.min(Math.max(Math.round(channel), 0), 255)) as TerminalRgbColor;
+  if (legacyRgb) {
+    const channels = legacyRgb.slice(1, 4).map(parseLegacyRgbChannel);
+    if (channels.every((channel): channel is number => channel !== null)) {
+      return channels as TerminalRgbColor;
+    }
+  }
+
+  // Chromium serializes computed color-mix() values with CSS Color 4 syntax.
+  // xterm accepts that syntax directly, but OSC 10/11 need concrete 8-bit RGB.
+  const srgb = value.match(
+    /^color\(\s*srgb\s+([+-]?(?:\d+(?:\.\d*)?|\.\d+)%?)\s+([+-]?(?:\d+(?:\.\d*)?|\.\d+)%?)\s+([+-]?(?:\d+(?:\.\d*)?|\.\d+)%?)(?:\s*\/\s*[\d.]+%?)?\s*\)$/iu,
+  );
+  if (!srgb) return fallback;
+  const channels = srgb.slice(1, 4).map(parseSrgbChannel);
+  return channels.every((channel): channel is number => channel !== null)
+    ? channels as TerminalRgbColor
+    : fallback;
+}
+
+function parseLegacyRgbChannel(value: string) {
+  const percentage = value.endsWith("%");
+  const numeric = Number.parseFloat(value);
+  if (!Number.isFinite(numeric)) return null;
+  return clampRgbChannel(percentage ? numeric * 2.55 : numeric);
+}
+
+function parseSrgbChannel(value: string) {
+  const percentage = value.endsWith("%");
+  const numeric = Number.parseFloat(value);
+  if (!Number.isFinite(numeric)) return null;
+  return clampRgbChannel(percentage ? numeric * 2.55 : numeric * 255);
+}
+
+function clampRgbChannel(value: number) {
+  return Math.min(Math.max(Math.round(value), 0), 255);
 }

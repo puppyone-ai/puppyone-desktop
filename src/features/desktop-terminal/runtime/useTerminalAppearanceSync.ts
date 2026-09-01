@@ -24,6 +24,7 @@ export function useTerminalAppearanceSync(
         "class",
         "style",
         "data-theme-mode",
+        "data-sub-theme-id",
         "data-light-theme-preset",
         "data-dark-theme-preset",
         "data-font-terminal",

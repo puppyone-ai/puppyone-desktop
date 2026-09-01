@@ -439,6 +439,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   createTerminal: (request) => ipcRenderer.invoke("terminal:create", request),
   writeTerminal: (request) => ipcRenderer.send("terminal:input", request),
   resizeTerminal: (request) => ipcRenderer.send("terminal:resize", request),
+  updateTerminalAppearance: (request) => ipcRenderer.send("terminal:appearance", request),
   closeTerminal: (id) => ipcRenderer.invoke("terminal:close", id),
   onTerminalData: (callback) => {
     const listener = (_event, payload) => callback(payload);

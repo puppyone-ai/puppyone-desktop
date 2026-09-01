@@ -232,6 +232,7 @@ describe("typography architecture", () => {
     expect(terminalAppearance).toContain('getPropertyValue("--po-font-terminal")');
     expect(terminalAppearance).toContain('getPropertyValue("--po-terminal-font-size")');
     expect(terminalAppearanceSync).toContain("subscribeTypographyChanges(document, applyAppearance)");
+    expect(terminalAppearanceSync).toContain('"data-sub-theme-id"');
     expect(markdownEditor).toContain("subscribeTypographyChanges(host.ownerDocument");
     expect(markdownEditor).toContain('data-po-typography-role="content"');
     expect(markdownEditor).toContain("lang={contentLanguage.language}");

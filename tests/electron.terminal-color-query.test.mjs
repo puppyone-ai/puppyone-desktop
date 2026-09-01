@@ -41,4 +41,20 @@ describe("terminal default-color query responder", () => {
       background: [251, 250, 247],
     })).toBeNull();
   });
+
+  it("answers later probes with the current renderer theme", () => {
+    const responder = createTerminalDefaultColorResponder(colors);
+
+    expect(responder.updateColors({
+      foreground: [209, 206, 198],
+      background: [22, 20, 19],
+    })).toBe(true);
+    expect(responder.process("\u001b]10;?\u001b\\\u001b]11;?\u001b\\")).toEqual({
+      data: "",
+      replies: [
+        "\u001b]10;rgb:d1d1/cece/c6c6\u001b\\",
+        "\u001b]11;rgb:1616/1414/1313\u001b\\",
+      ],
+    });
+  });
 });

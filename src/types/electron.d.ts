@@ -394,6 +394,14 @@ export type TerminalCreateRequest = {
   };
 };
 
+export type TerminalAppearanceRequest = {
+  id: string;
+  defaultColors: {
+    foreground: [number, number, number];
+    background: [number, number, number];
+  };
+};
+
 export type TerminalAgentId = Exclude<DesktopTerminalLauncherId, "shell">;
 
 export type TerminalAgentLocationSnapshot = {
@@ -1426,6 +1434,7 @@ declare global {
       createTerminal: (request: TerminalCreateRequest) => Promise<TerminalCreateResult>;
       writeTerminal: (request: TerminalInputRequest) => void;
       resizeTerminal: (request: TerminalResizeRequest) => void;
+      updateTerminalAppearance: (request: TerminalAppearanceRequest) => void;
       closeTerminal: (id: string) => Promise<void>;
       onTerminalData: (callback: (event: TerminalDataEvent) => void) => () => void;
       onTerminalExit: (callback: (event: TerminalExitEvent) => void) => () => void;

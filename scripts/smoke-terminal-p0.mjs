@@ -21,6 +21,7 @@ const userDataPath = path.join(tempRoot, "user-data");
 const windows = [];
 const ptyRecords = [];
 const createEvents = [];
+const appearanceEvents = [];
 
 await Promise.all([
   fsp.mkdir(userDataPath, { recursive: true }),
@@ -52,6 +53,11 @@ const terminalService = {
   },
   input: coreTerminalService.input,
   resize: coreTerminalService.resize,
+  appearance: (sender, request) => {
+    const updated = coreTerminalService.appearance(sender, request);
+    if (updated) appearanceEvents.push(structuredClone(request));
+    return updated;
+  },
   close: coreTerminalService.close,
 };
 
@@ -214,6 +220,43 @@ async function runProductionTerminalLayout(window) {
   assert(baseline.length === 3, "Production UI did not create three tracked PTYs.");
   assert(new Set(baseline.map(({ pid }) => pid)).size === 3, "Production UI PTY PIDs are not unique.");
   assertPtyIdentity(sessionIds, baseline, "initial three-Session layout");
+  await waitFor(
+    () => sessionIds.every((id) => appearanceEvents.some((event) => event.id === id)),
+    "Production terminals did not synchronize their renderer colors to Main.",
+  );
+  const renderedBackground = await window.webContents.executeJavaScript(`(() => {
+    const terminal = document.querySelector('.desktop-terminal-xterm');
+    if (!(terminal instanceof HTMLElement)) return null;
+    const css = getComputedStyle(terminal).backgroundColor;
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+    context.fillStyle = css;
+    context.fillRect(0, 0, 1, 1);
+    return {
+      css,
+      rgb: [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)],
+    };
+  })()`, true);
+  assert(renderedBackground, "Unable to resolve the production terminal background.");
+  for (const { id, pid } of baseline) {
+    const record = ptyRecords.find((candidate) => candidate.pid === pid);
+    const appearance = appearanceEvents.findLast((event) => event.id === id);
+    const dark = isDarkRgb(appearance?.defaultColors?.background);
+    assert(
+      record?.colorFgBg === (dark ? "15;0" : "0;15"),
+      `PTY ${id} received inconsistent COLORFGBG: ${record?.colorFgBg}`,
+    );
+    assert(
+      JSON.stringify(appearance?.defaultColors?.background) === JSON.stringify(renderedBackground.rgb),
+      `PTY ${id} OSC background disagrees with Chromium: ${JSON.stringify({
+        appearance,
+        renderedBackground,
+      })}`,
+    );
+  }
   await assertTerminalNewButtonContract(window);
 
   const uiLifecycle = sessionIds.map((id, index) => ({
@@ -395,6 +438,7 @@ function createTrackedPtyService() {
         file,
         args: [...args],
         cwd: options.cwd,
+        colorFgBg: options.env?.COLORFGBG ?? null,
         resizes: [],
         kills: 0,
       };
@@ -666,6 +710,17 @@ function delay(milliseconds) {
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function isDarkRgb(value) {
+  if (!Array.isArray(value) || value.length !== 3) return false;
+  const channels = value.map((channel) => {
+    const normalized = Number(channel) / 255;
+    return normalized <= 0.04045
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4;
+  });
+  return ((0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2])) < 0.5;
 }
 
 async function finish() {
