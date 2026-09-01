@@ -277,7 +277,7 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
   });
 
   it("uses one centered product loader for startup without a duplicate status loader", () => {
-    expect(transcript).toContain('import { PageLoading } from "../../../components/loading"');
+    expect(transcript).toContain('import { InlineLoading, PageLoading } from "../../../components/loading"');
     expect(transcript).toContain('className="desktop-agent-startup-loading"');
     expect(transcript).toContain("label={null}");
     expect(css).toMatch(/\.desktop-agent-startup-loading\s*\{[^}]*min-height:\s*100%[^}]*pointer-events:\s*none/s);

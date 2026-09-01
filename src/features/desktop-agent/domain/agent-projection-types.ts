@@ -10,7 +10,10 @@ export type AgentTranscriptMessage = {
   promptMentions?: AgentPromptReferenceMention[];
   streaming: boolean;
   terminalState: AgentTurnTerminalState | null;
+  /** Immutable first-observed position in the canonical event ledger. */
   sequence: number;
+  /** Latest event that revised this message without changing its position. */
+  updatedSequence?: number;
 };
 
 export type AgentActivityStatus =
@@ -52,7 +55,10 @@ export type AgentActivity<TKind extends AgentActivityKind = AgentActivityKind> =
   status: AgentActivityStatus;
   detail: Record<string, unknown>;
   output: string;
+  /** Immutable first-observed position in the canonical event ledger. */
   sequence: number;
+  /** Latest event that revised this activity without changing its position. */
+  updatedSequence?: number;
 } : never;
 
 /**
@@ -108,7 +114,10 @@ type AgentPartBase = {
   id: string;
   turnId: string | null;
   itemId: string | null;
+  /** Immutable first-observed position in the canonical event ledger. */
   sequence: number;
+  /** Latest event that revised this part without changing its position. */
+  updatedSequence?: number;
 };
 
 export type AgentPart =
@@ -136,7 +145,10 @@ export type TimelineRow = {
   partId: string;
   turnId: string | null;
   kind: AgentPart["kind"];
+  /** Immutable visual order. Never replace this on an upsert. */
   sequence: number;
+  /** Latest content revision, used for freshness and render recovery. */
+  updatedSequence?: number;
   estimatedHeight: number;
 };
 

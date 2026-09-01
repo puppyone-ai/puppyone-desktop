@@ -18,6 +18,7 @@ import { AgentSurfaceHeader } from "../src/features/desktop-agent/ui/AgentSurfac
 import { agentPickerLimits } from "../src/features/desktop-agent/ui/agent-picker-limits";
 import {
   AgentTranscript,
+  agentRunStatusCode,
   agentSubmissionStatusLabel,
   shouldShowAgentThinking,
 } from "../src/features/desktop-agent/ui/AgentTranscript";
@@ -474,6 +475,47 @@ describe("Desktop Agent renderer surfaces", () => {
     act(() => root?.render(withTestLocalization(React.createElement(AgentTranscript, { projection: streaming, loading: false, working: true, runtimeLabel: "Codex" }))));
     expect(container.querySelector(".desktop-agent-working-indicator")).toBeNull();
     expect(container.querySelector(".desktop-agent-stream-caret")).not.toBeNull();
+  });
+
+  it("keeps an official non-transcript working pulse visible around native tool activity", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      {
+        schemaVersion: 1,
+        sequence: 1,
+        sessionId: "session-working",
+        provider: "claude",
+        providerSessionId: "native-working",
+        turnId: "turn-working",
+        itemId: null,
+        emittedAt: new Date(1_000).toISOString(),
+        type: "turn.started",
+        payload: { prompt: "List files" },
+      },
+      {
+        schemaVersion: 1,
+        sequence: 2,
+        sessionId: "session-working",
+        provider: "claude",
+        providerSessionId: "native-working",
+        turnId: "turn-working",
+        itemId: "tool-list",
+        emittedAt: new Date(2_000).toISOString(),
+        type: "tool.started",
+        payload: { kind: "command", tool: "list", label: "List", status: "running" },
+      },
+    ]);
+
+    expect(agentRunStatusCode(projection, true)).toBe("working");
+    const container = render(React.createElement(AgentTranscript, {
+      projection,
+      loading: false,
+      working: true,
+      runtimeLabel: "Claude Agent",
+    }));
+    const indicator = container.querySelector(".desktop-agent-working-indicator");
+    expect(indicator?.textContent).toContain("Working through the request");
+    expect(indicator?.querySelector("[data-puppy-loader='dots']")).not.toBeNull();
+    expect(indicator?.querySelector(".desktop-agent-spin")).toBeNull();
   });
 
   it("renders only the current connection state and removes its animation after recovery", () => {

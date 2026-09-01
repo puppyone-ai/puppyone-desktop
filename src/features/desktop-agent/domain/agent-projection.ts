@@ -36,6 +36,20 @@ export type * from "./agent-projection-types";
 const MAX_COMMAND_OUTPUT = 64 * 1024;
 const MAX_MESSAGE_TEXT = 128 * 1024;
 const MAX_ACTIVITY_TEXT = 64 * 1024;
+const ASSISTANT_SEGMENT_BOUNDARY_EVENTS = new Set<AgentEvent["type"]>([
+  "reasoning.summary.delta",
+  "plan.updated",
+  "tool.started",
+  "tool.progress",
+  "tool.completed",
+  "command.output.delta",
+  "file.change.updated",
+  "approval.requested",
+  "question.requested",
+  "provider.activity",
+  "provider.warning",
+  "provider.error",
+]);
 const CONNECTION_RECOVERY_PROGRESS_EVENTS = new Set<AgentEvent["type"]>([
   "session.started",
   "session.resumed",
@@ -135,6 +149,9 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
   }
   next.lastSequence = event.sequence;
   const payload = event.payload ?? {};
+  if (ASSISTANT_SEGMENT_BOUNDARY_EVENTS.has(event.type)) {
+    sealStreamingAssistantSegments(next, event.turnId);
+  }
   if (event.type !== "provider.connection.updated" && CONNECTION_RECOVERY_PROGRESS_EVENTS.has(event.type)) {
     next.connectionStatus = null;
   }
@@ -170,6 +187,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
           streaming: false,
           terminalState: null,
           sequence: event.sequence,
+          updatedSequence: event.sequence,
         });
         indexes.messages.set(`user:${event.turnId ?? event.sequence}`, messageIndex);
         if (event.turnId) indexes.messagesByTurn.set(event.turnId, [...turnMessages, messageIndex]);
@@ -231,6 +249,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
           detail: {},
           output: "",
           sequence: event.sequence,
+          updatedSequence: event.sequence,
         };
         indexes.activities.set(id, next.activities.length);
         next.activities.push(activity);
@@ -239,7 +258,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
         next.activities[existingIndex] = {
           ...activity,
           output: `${activity.output}${readString(payload.delta)}`.slice(-MAX_COMMAND_OUTPUT),
-          sequence: event.sequence,
+          updatedSequence: event.sequence,
         };
       }
       return next;
@@ -362,7 +381,8 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
         status: kind === "error" ? "failed" : "warning",
         detail: pickSafeActivityDetail(payload),
         output: "",
-        sequence: event.sequence,
+        sequence: existingActivity?.sequence ?? event.sequence,
+        updatedSequence: event.sequence,
       };
       if (existingActivityIndex === undefined) {
         activityIndexes.set(activity.id, next.activities.length);
@@ -408,18 +428,42 @@ function upsertAssistant(
   streaming: boolean,
   authoritative: boolean,
 ) {
-  const id = `assistant:${event.itemId ?? event.turnId ?? event.sequence}`;
   const indexes = projectionIndexes(projection);
-  const existingIndex = indexes.messages.get(id);
+  const nativeIdentity = event.itemId ?? event.turnId ?? String(event.sequence);
+  const baseId = `assistant:${nativeIdentity}`;
+  const matchingIndexes = projection.messages.flatMap((message, index) => (
+    message.role === "assistant"
+    && message.turnId === event.turnId
+    && (event.itemId ? message.itemId === event.itemId : message.id === baseId)
+      ? [index]
+      : []
+  ));
+  const latestIndex = matchingIndexes.at(-1);
+  const latest = latestIndex === undefined ? null : projection.messages[latestIndex];
+  const boundaryAfterLatest = Boolean(latest && projection.rows.some((row) => (
+    row.turnId === event.turnId
+    && row.kind !== "assistant"
+    && row.kind !== "user"
+    && row.kind !== "usage"
+    && row.sequence > (latest.updatedSequence ?? latest.sequence)
+  )));
+  const segmentedText = boundaryAfterLatest
+    ? textAfterAssistantBoundary(projection, matchingIndexes, text, authoritative)
+    : authoritative && matchingIndexes.length > 1
+      ? textForExistingAssistantSegment(projection, matchingIndexes, text)
+      : text;
+  const createSegment = boundaryAfterLatest && segmentedText.length > 0;
+  const id = createSegment ? `${baseId}:segment:${event.sequence}` : baseId;
+  const existingIndex = createSegment ? undefined : latestIndex;
   if (existingIndex !== undefined) {
     const existing = projection.messages[existingIndex];
     projection.messages[existingIndex] = {
       ...existing,
       text: authoritative
-        ? text.slice(0, MAX_MESSAGE_TEXT)
-        : appendBounded(existing.text, text, MAX_MESSAGE_TEXT),
+        ? (boundaryAfterLatest && !createSegment ? existing.text : segmentedText.slice(0, MAX_MESSAGE_TEXT))
+        : appendBounded(existing.text, segmentedText, MAX_MESSAGE_TEXT),
       streaming,
-      sequence: event.sequence,
+      updatedSequence: event.sequence,
     };
   } else {
     const messageIndex = projection.messages.length;
@@ -428,10 +472,11 @@ function upsertAssistant(
       role: "assistant",
       turnId: event.turnId,
       itemId: event.itemId,
-      text: text.slice(0, MAX_MESSAGE_TEXT),
+      text: segmentedText.slice(0, MAX_MESSAGE_TEXT),
       streaming,
       terminalState: null,
       sequence: event.sequence,
+      updatedSequence: event.sequence,
     });
     indexes.messages.set(id, messageIndex);
     if (event.turnId) {
@@ -439,6 +484,47 @@ function upsertAssistant(
     }
   }
   return projection;
+}
+
+function sealStreamingAssistantSegments(projection: AgentProjection, turnId: string | null) {
+  if (!turnId) return;
+  projection.messages = projection.messages.map((message) => (
+    message.role === "assistant" && message.turnId === turnId && message.streaming
+      ? { ...message, streaming: false }
+      : message
+  ));
+  projection.parts = projection.parts.map((part) => (
+    part.kind === "assistant" && part.turnId === turnId && part.streaming
+      ? { ...part, streaming: false }
+      : part
+  ));
+}
+
+function textAfterAssistantBoundary(
+  projection: AgentProjection,
+  matchingIndexes: number[],
+  incoming: string,
+  authoritative: boolean,
+) {
+  if (!authoritative) return incoming;
+  const previousText = matchingIndexes.map((index) => projection.messages[index]?.text ?? "").join("");
+  if (!incoming || incoming === previousText) return "";
+  if (previousText && incoming.startsWith(previousText)) return incoming.slice(previousText.length);
+  const latestText = projection.messages[matchingIndexes.at(-1) ?? -1]?.text ?? "";
+  if (latestText && incoming.startsWith(latestText)) return incoming.slice(latestText.length);
+  return incoming;
+}
+
+function textForExistingAssistantSegment(
+  projection: AgentProjection,
+  matchingIndexes: number[],
+  incoming: string,
+) {
+  const priorSegments = matchingIndexes.slice(0, -1)
+    .map((index) => projection.messages[index]?.text ?? "")
+    .join("");
+  if (priorSegments && incoming.startsWith(priorSegments)) return incoming.slice(priorSegments.length);
+  return incoming;
 }
 
 function upsertActivity(
@@ -474,7 +560,7 @@ function upsertActivity(
       labelCode: value.label ? undefined : value.labelCode ?? existing.labelCode,
       status: value.status,
       detail,
-      sequence: event.sequence,
+      updatedSequence: event.sequence,
     };
   } else {
     indexes.activities.set(id, projection.activities.length);
@@ -486,6 +572,7 @@ function upsertActivity(
       detail: safeDetail,
       output: "",
       sequence: event.sequence,
+      updatedSequence: event.sequence,
     });
   }
   return projection;

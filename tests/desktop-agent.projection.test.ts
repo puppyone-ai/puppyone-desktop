@@ -6,6 +6,7 @@ import {
   createAgentProjection,
 } from "../src/features/desktop-agent/agentProjection";
 import type { AgentEvent, AgentEventType } from "../src/features/desktop-agent/agentTypes";
+import { buildAgentTimeline } from "../src/features/desktop-agent/ui/agent-timeline-presentation";
 
 describe("Desktop Agent transcript projection", () => {
   it("concatenates assistant deltas and lets completed content finalize authoritatively", () => {
@@ -30,6 +31,91 @@ describe("Desktop Agent transcript projection", () => {
       startedAtMs: 1_000,
       durationMs: 4_000,
     });
+  });
+
+  it("keeps first-observed timeline order immutable while blocks stream and settle", () => {
+    const events = [
+      event(1, "turn.started", { prompt: "Inspect it" }, "turn-order"),
+      event(2, "assistant.delta", { delta: "I will inspect it." }, "turn-order", "assistant-order"),
+      event(3, "tool.started", { kind: "command", label: "List", status: "running" }, "turn-order", "tool-order"),
+      event(4, "approval.requested", {
+        requestId: "approval-order",
+        kind: "command",
+        title: "List files",
+      }, "turn-order", "tool-order"),
+      event(5, "approval.resolved", { requestId: "approval-order", decision: "accept" }, "turn-order", "tool-order"),
+      event(6, "tool.completed", { kind: "command", label: "List", status: "completed" }, "turn-order", "tool-order"),
+      event(7, "assistant.completed", { text: "Inspection complete." }, "turn-order", "assistant-order"),
+      event(8, "turn.completed", { status: "completed" }, "turn-order"),
+    ] satisfies AgentEvent[];
+
+    const live = applyAgentEvents(createAgentProjection(), events.slice(0, 7));
+    const settled = applyAgentEvent(live, events[7]);
+    const replayed = applyAgentEvents(createAgentProjection(), events);
+    const visibleKinds = (projection: typeof settled) => buildAgentTimeline(projection).rows
+      .filter((row) => row.kind !== "turn-summary")
+      .map((row) => row.kind);
+
+    expect(visibleKinds(live)).toEqual(["user", "assistant", "command", "permission", "assistant"]);
+    expect(visibleKinds(settled)).toEqual(["user", "assistant", "command", "permission", "assistant"]);
+    expect(visibleKinds(replayed)).toEqual(["user", "assistant", "command", "permission", "assistant"]);
+    expect(live.parts.filter((part) => part.kind === "assistant")).toEqual([
+      expect.objectContaining({
+        sequence: 2,
+        updatedSequence: 2,
+        text: "I will inspect it.",
+        streaming: false,
+      }),
+      expect.objectContaining({
+        sequence: 7,
+        updatedSequence: 7,
+        text: "Inspection complete.",
+      }),
+    ]);
+    expect(live.parts.find((part) => part.kind === "command")).toMatchObject({
+      sequence: 3,
+      updatedSequence: 6,
+      status: "completed",
+    });
+    expect(live.parts.find((part) => part.kind === "permission")).toMatchObject({
+      sequence: 4,
+      updatedSequence: 5,
+      state: "resolved",
+    });
+    expect(JSON.stringify(replayed)).toBe(JSON.stringify(settled));
+  });
+
+  it("keeps a native assistant item segmented when its authoritative completion spans a tool", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Inspect" }, "turn-segments"),
+      event(2, "assistant.delta", { delta: "Before tool. " }, "turn-segments", "native-message"),
+      event(3, "tool.started", { kind: "command", label: "List", status: "running" }, "turn-segments", "tool"),
+      event(4, "tool.completed", { kind: "command", label: "List", status: "completed" }, "turn-segments", "tool"),
+      event(5, "assistant.delta", { delta: "After " }, "turn-segments", "native-message"),
+      event(6, "assistant.delta", { delta: "tool." }, "turn-segments", "native-message"),
+      event(7, "assistant.completed", { text: "Before tool. After tool." }, "turn-segments", "native-message"),
+    ]);
+
+    expect(projection.messages.filter((message) => message.role === "assistant").map((message) => message.text))
+      .toEqual(["Before tool. ", "After tool."]);
+    expect(buildAgentTimeline(projection).rows.map((row) => row.kind))
+      .toEqual(["user", "assistant", "command", "assistant"]);
+  });
+
+  it("seals rather than erases assistant text when a late completion adds nothing after a tool", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Inspect" }, "turn-seal"),
+      event(2, "assistant.delta", { delta: "I will inspect." }, "turn-seal", "native-message"),
+      event(3, "tool.started", { kind: "command", label: "List", status: "running" }, "turn-seal", "tool"),
+      event(4, "tool.completed", { kind: "command", label: "List", status: "completed" }, "turn-seal", "tool"),
+      event(5, "assistant.completed", { text: "I will inspect." }, "turn-seal", "native-message"),
+    ]);
+
+    expect(projection.messages.filter((message) => message.role === "assistant")).toEqual([
+      expect.objectContaining({ text: "I will inspect.", streaming: false, sequence: 2, updatedSequence: 5 }),
+    ]);
+    expect(buildAgentTimeline(projection).rows.map((row) => row.kind))
+      .toEqual(["user", "assistant", "command"]);
   });
 
   it("prefers the provider's normalized turn duration over envelope timing", () => {
