@@ -121,6 +121,32 @@ describe("Sub Theme CSS compiler", () => {
     })).rejects.toThrow("must declare explicit dark root tokens");
   });
 
+  it("prevents static shell surfaces from leaking from light into dark mode", async () => {
+    await expect(compileThemeCss({
+      css: [
+        ":root { --po-canvas: #ffffff; --po-surface-chrome: #f8f8f8; --po-header: #f5f5f5; --po-sidebar: #eeeeee }",
+        ".dark .theme-root { --po-canvas: #111111 }",
+      ].join("\n"),
+      themeId: "com.example.leaking-shell",
+      target: "application",
+      supportedModes: ["light", "dark"],
+    })).rejects.toThrow(
+      "must override static shell surface tokens in its dark variant: --po-header, --po-sidebar, --po-surface-chrome",
+    );
+
+    const result = await compileThemeCss({
+      css: [
+        ":root { --po-canvas: #ffffff; --po-header: var(--po-surface-chrome); --po-sidebar: color-mix(in srgb, var(--po-surface-chrome) 40%, var(--po-surface-editor)) }",
+        ".dark .theme-root { --po-canvas: #111111 }",
+      ].join("\n"),
+      themeId: "com.example.adaptive-shell",
+      target: "application",
+      supportedModes: ["light", "dark"],
+    });
+    expect(result.css).toContain("--po-header: var(--po-surface-chrome)");
+    expect(result.css).toContain("--po-sidebar: color-mix(");
+  });
+
   it.each([
     ":root h1 { --po-md-content-color: red }",
     ".cm-editor { --po-md-content-color: red }",

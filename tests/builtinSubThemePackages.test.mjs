@@ -106,6 +106,29 @@ describe("built-in Sub Theme package architecture", () => {
     expect(result.css).toContain("--po-text: #fafafa");
   });
 
+  it("keeps Warm's light shell surfaces from leaking into Dark mode", async () => {
+    const sourcePath = "sub-themes/default-warm/theme.css";
+    const theme = parseSingleFileThemeCss(
+      readFileSync(path.join(repoRoot, sourcePath), "utf8"),
+      {
+        sourcePath,
+        allowReservedBuiltinId: true,
+        allowBuiltinCompatibilityMetadata: true,
+      },
+    );
+    const result = await compileThemeCss({
+      css: theme.stylesheets.application,
+      themeId: theme.id,
+      target: "application",
+      supportedModes: theme.modes,
+      allowReservedBuiltinId: true,
+    });
+    const darkHost = `[data-po-appearance-root][data-sub-theme-id="default.warm"]:where(.dark)`;
+    expect(result.css).toContain(`${darkHost} {`);
+    expect(result.css).toContain("--po-header: color-mix(in srgb, var(--po-surface-chrome) 40%, var(--po-surface-editor))");
+    expect(result.css).toContain("--po-sidebar: color-mix(in srgb, var(--po-surface-chrome) 40%, var(--po-surface-editor))");
+  });
+
   it("removes legacy preset palettes from the global token layer", () => {
     const globalTokens = readFileSync(path.join(repoRoot, "src/styles/tokens.css"), "utf8");
     const fallback = readFileSync(path.join(repoRoot, "src/styles/fallback-theme.generated.css"), "utf8");

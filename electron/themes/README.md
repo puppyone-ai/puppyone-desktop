@@ -138,6 +138,14 @@ both modes, while `.dark` declarations provide Dark overrides. A light-only
 theme may not contain hidden `.dark` selectors, and themes may not use
 `prefers-color-scheme` to bypass the selected Color Mode.
 
+Dual-mode Application themes must keep static shell surface tokens isolated by
+mode. If a common root rule assigns a literal value to a `--po-surface-*` token
+or to a semantic shell surface such as `--po-canvas`, `--po-header`, or
+`--po-sidebar`, the Dark variant must override that token explicitly. Adaptive
+values derived with `var()` or `light-dark()` may remain shared because they
+continue to resolve against the active mode's primitives. The compiler rejects
+static common values that would otherwise leak a Light surface into Dark mode.
+
 For an Application target, declare `--po-canvas` as an opaque three- or
 six-digit hex literal in every supported mode. PuppyOne compiles this token
 into the synchronous browser and native-window first-paint value. Other CSS
