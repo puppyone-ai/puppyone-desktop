@@ -7,11 +7,12 @@ import {
 } from "../application/controllerRegistry";
 import type { AgentChatTabPresentation } from "../domain/agent-chat-tabs";
 import type { AgentRoutePreference } from "../domain/agent-route-preference";
-import { getElectronAgentClient } from "../infrastructure/electron/electronAgentClient";
+import { getElectronAgentClient, openExternalAgentUrl } from "../infrastructure/electron/electronAgentClient";
 import { AgentChatTabPanel } from "./AgentChatTabPanel";
 import { scheduleAgentStreamFrame } from "./agent-stream-frame-scheduler";
 import { AgentSessionTabs, agentPanelId, agentTabId } from "./AgentSessionTabs";
 import { useAgentChatTabs } from "./useAgentChatTabs";
+import { AgentMarkdownEnvironmentProvider } from "./markdown/AgentMarkdownEnvironment";
 import "./desktop-agent.css";
 
 export type RightAgentPanelHandle = { newSession: () => void };
@@ -63,44 +64,46 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   }, [onRunningChange, tabs.running]);
 
   return (
-    <section className="desktop-agent-workspace" aria-label={t("agent.panel.chat", { agent: t("agent.name") })}>
-      <AgentSessionTabs
-        tabs={tabs.tabs}
-        activeTabId={tabs.activeTabId}
-        onActivate={tabs.activateTab}
-        onClose={(tabId) => { void tabs.closeTab(tabId); }}
-        onCreate={tabs.createTab}
-        createDisabled={!tabs.canCreate}
-      />
-      <div className="desktop-agent-tabpanels">
-        {tabs.tabs.map((tab) => (
-          <div
-            key={tab.id}
-            id={agentPanelId(tab.id)}
-            className="desktop-agent-tabpanel"
-            role="tabpanel"
-            aria-labelledby={agentTabId(tab.id)}
-            hidden={tab.id !== tabs.activeTabId}
-          >
-            <AgentTabHost
-              tabId={tab.id}
-              active={active && tab.id === tabs.activeTabId}
-              workspace={workspace}
-              onPresentationChange={tabs.presentTab}
-              onViewChanges={onViewChanges}
-              onOpenFile={onOpenFile}
-              preferredRuntimeId={preferredRuntimeId}
-              onPreferredRuntimeChange={onPreferredRuntimeChange}
-              preferredRoute={preferredRoute}
-              onPreferredRouteChange={onPreferredRouteChange}
-              preferredModel={preferredModel}
-              onPreferredModelChange={onPreferredModelChange}
-              hiddenRuntimeIds={hiddenRuntimeIds}
-            />
-          </div>
-        ))}
-      </div>
-    </section>
+    <AgentMarkdownEnvironmentProvider openExternalUrl={openExternalAgentUrl}>
+      <section className="desktop-agent-workspace" aria-label={t("agent.panel.chat", { agent: t("agent.name") })}>
+        <AgentSessionTabs
+          tabs={tabs.tabs}
+          activeTabId={tabs.activeTabId}
+          onActivate={tabs.activateTab}
+          onClose={(tabId) => { void tabs.closeTab(tabId); }}
+          onCreate={tabs.createTab}
+          createDisabled={!tabs.canCreate}
+        />
+        <div className="desktop-agent-tabpanels">
+          {tabs.tabs.map((tab) => (
+            <div
+              key={tab.id}
+              id={agentPanelId(tab.id)}
+              className="desktop-agent-tabpanel"
+              role="tabpanel"
+              aria-labelledby={agentTabId(tab.id)}
+              hidden={tab.id !== tabs.activeTabId}
+            >
+              <AgentTabHost
+                tabId={tab.id}
+                active={active && tab.id === tabs.activeTabId}
+                workspace={workspace}
+                onPresentationChange={tabs.presentTab}
+                onViewChanges={onViewChanges}
+                onOpenFile={onOpenFile}
+                preferredRuntimeId={preferredRuntimeId}
+                onPreferredRuntimeChange={onPreferredRuntimeChange}
+                preferredRoute={preferredRoute}
+                onPreferredRouteChange={onPreferredRouteChange}
+                preferredModel={preferredModel}
+                onPreferredModelChange={onPreferredModelChange}
+                hiddenRuntimeIds={hiddenRuntimeIds}
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+    </AgentMarkdownEnvironmentProvider>
   );
 });
 

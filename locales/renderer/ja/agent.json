@@ -283,5 +283,8 @@
   "changes.ariaLabel": "変更を表示：追加 {additions, number}、削除 {deletions, number}",
   "changes.label": "変更",
   "markdown.collapse": "長い回答を折りたたむ",
-  "markdown.showFull": "回答をすべて表示"
+  "markdown.showFull": "回答をすべて表示",
+  "markdown.diagram": "Mermaid",
+  "markdown.diagramRendering": "図をレンダリング中",
+  "markdown.image": "画像"
 }

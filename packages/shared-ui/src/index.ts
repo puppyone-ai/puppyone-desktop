@@ -78,6 +78,18 @@ export {
   dispatchTypographyChange,
   subscribeTypographyChanges,
 } from "./core/typography";
+export {
+  getMermaidThemeSnapshot,
+  mountSanitizedMermaidSvg,
+  renderMermaidDiagram,
+  subscribeMermaidThemeChanges,
+} from "./editor/markdown";
+export type {
+  MermaidRenderRequest,
+  MermaidRenderResult,
+  MermaidSvgMount,
+  MermaidThemeSnapshot,
+} from "./editor/markdown";
 export type {
   TypographyChangeDetail,
   TypographyChangePhase,

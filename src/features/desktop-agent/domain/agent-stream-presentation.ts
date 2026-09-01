@@ -15,7 +15,7 @@ export function nextAgentStreamText(displayed: string, authoritative: string) {
 /** Keeps incomplete Markdown in a plain-text tail so syntax completion cannot remount the live line. */
 export function splitStreamingMarkdown(text: string) {
   const normalized = text.replace(/\r\n?/g, "\n");
-  let inFence = false;
+  let openFence: OpenMarkdownFence | null = null;
   let safeBoundary = 0;
   let cursor = 0;
 
@@ -23,19 +23,47 @@ export function splitStreamingMarkdown(text: string) {
     if (!line) continue;
     cursor += line.length;
     const content = line.endsWith("\n") ? line.slice(0, -1) : line;
-    const fence = /^```/.test(content.trimStart());
-    if (fence) {
-      inFence = !inFence;
-      if (!inFence) safeBoundary = cursor;
+    const nextFence = advanceOpenMarkdownFence(openFence, content);
+    if (nextFence !== openFence) {
+      openFence = nextFence;
+      if (!openFence) safeBoundary = cursor;
       continue;
     }
-    if (!inFence && content.trim() === "") safeBoundary = cursor;
+    if (!openFence && content.trim() === "") safeBoundary = cursor;
   }
 
   return {
     stable: normalized.slice(0, safeBoundary),
     tail: normalized.slice(safeBoundary),
   };
+}
+
+export type OpenMarkdownFence = Readonly<{
+  marker: "`" | "~";
+  length: number;
+  info: string;
+}>;
+
+/** CommonMark fence scanner shared by streaming and bounded head/tail windows. */
+export function findOpenMarkdownFence(source: string): OpenMarkdownFence | null {
+  let openFence: OpenMarkdownFence | null = null;
+  for (const line of source.replace(/\r\n?/g, "\n").split("\n")) {
+    openFence = advanceOpenMarkdownFence(openFence, line);
+  }
+  return openFence;
+}
+
+export function advanceOpenMarkdownFence(openFence: OpenMarkdownFence | null, line: string) {
+  const match = /^\s{0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+  if (!match) return openFence;
+  const marker = match[1][0] as "`" | "~";
+  const remainder = match[2];
+  if (!openFence) {
+    if (marker === "`" && remainder.includes("`")) return openFence;
+    return { marker, length: match[1].length, info: remainder.trim() } satisfies OpenMarkdownFence;
+  }
+  if (openFence.marker !== marker || match[1].length < openFence.length || remainder.trim()) return openFence;
+  return null;
 }
 
 function splitGraphemes(value: string) {

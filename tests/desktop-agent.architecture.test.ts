@@ -45,6 +45,9 @@ describe("Desktop Agent architecture boundaries", () => {
     const timelinePresentation = source("src/features/desktop-agent/ui/agent-timeline-presentation.ts");
     const emptyState = source("src/features/desktop-agent/ui/AgentEmptyState.tsx");
     const markdown = source("src/features/desktop-agent/ui/SafeMarkdown.tsx");
+    const markdownDocument = source("src/features/desktop-agent/ui/markdown/AgentMarkdownDocument.tsx");
+    const markdownPolicy = source("src/features/desktop-agent/ui/markdown/agentMarkdownPolicy.ts");
+    const markdownRegistry = source("src/features/desktop-agent/ui/markdown/agentMarkdownBlockRegistry.tsx");
     const composer = source("src/features/desktop-agent/ui/AgentComposer.tsx");
     const promptEditor = source("src/features/desktop-agent/ui/composer/AgentPromptEditor.tsx");
     const composerToolbar = source("src/features/desktop-agent/ui/composer/AgentComposerToolbar.tsx");
@@ -85,7 +88,13 @@ describe("Desktop Agent architecture boundaries", () => {
       "const showReadyEmptyState = routingReady",
     );
     expect(markdown).not.toContain("dangerouslySetInnerHTML");
-    expect(markdown).toContain('["https:", "http:", "mailto:"]');
+    expect(markdownDocument).not.toContain("dangerouslySetInnerHTML");
+    expect(markdownDocument).toContain("remarkGfm");
+    expect(markdownDocument).toContain("createAgentMarkdownComponents");
+    expect(markdownPolicy).toContain('new Set(["https:", "http:", "mailto:"])');
+    expect(markdownPolicy).toContain('if (key === "src" || key === "srcSet") return null');
+    expect(markdownRegistry).toContain("createAgentMarkdownBlockRegistry");
+    expect(markdownRegistry).toContain('id: "mermaid"');
     expect(cssEntry).toContain('@import "./styles/theme.css"');
     expect(cssEntry).toContain('@import "./styles/foundation.css"');
     expect(cssEntry.indexOf('styles/theme.css')).toBeLessThan(cssEntry.indexOf('styles/foundation.css'));
@@ -127,8 +136,8 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(sessionControls).toContain("deriveAgentSessionControls");
     expect(sessionControls).not.toMatch(/codex|cursor|opencode|claude/i);
     expect(sessionControls).toContain('id: "mode"');
-    expect(markdown).not.toContain("useDeferredValue");
-    expect(markdown).toContain("splitStreamingMarkdown");
+    expect(markdownDocument).not.toContain("useDeferredValue");
+    expect(markdownDocument).toContain("splitStreamingMarkdown");
     expect(streamPresentation).toContain("nextAgentStreamText");
     expect(streamPresentation).not.toContain("useDeferredValue");
     expect(streamPolicy).toContain("TARGET_CATCH_UP_FRAMES");

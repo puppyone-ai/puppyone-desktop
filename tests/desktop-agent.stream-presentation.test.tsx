@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentStreamFlushScheduler } from "../src/features/desktop-agent/application/AgentEventSynchronizer";
 import { SafeMarkdown } from "../src/features/desktop-agent/ui/SafeMarkdown";
+import { splitStreamingMarkdown } from "../src/features/desktop-agent/domain/agent-stream-presentation";
 import { useAgentStreamPresentation } from "../src/features/desktop-agent/ui/useAgentStreamPresentation";
 import { withTestLocalization } from "./testLocalization";
 
@@ -54,6 +55,21 @@ describe("Agent stream presentation", () => {
     expect(container.querySelector("strong")?.textContent).toBe("done");
     expect(container.querySelector(".desktop-agent-markdown-stream-tail")).toBeNull();
     expect(container.querySelector(".desktop-agent-stream-caret")).toBeNull();
+  });
+
+  it("keeps backtick and tilde fences inert until their matching close fence arrives", () => {
+    expect(splitStreamingMarkdown("Before\n\n~~~mermaid\ngraph TD; A-->B")).toEqual({
+      stable: "Before\n\n",
+      tail: "~~~mermaid\ngraph TD; A-->B",
+    });
+    expect(splitStreamingMarkdown("Before\n\n~~~~mermaid\ngraph TD; A-->B\n~~~\n")).toEqual({
+      stable: "Before\n\n",
+      tail: "~~~~mermaid\ngraph TD; A-->B\n~~~\n",
+    });
+    expect(splitStreamingMarkdown("Before\n\n~~~~mermaid\ngraph TD; A-->B\n~~~~\n")).toEqual({
+      stable: "Before\n\n~~~~mermaid\ngraph TD; A-->B\n~~~~\n",
+      tail: "",
+    });
   });
 });
 

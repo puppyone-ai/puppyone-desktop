@@ -28,7 +28,7 @@ const commandActivity = fs.readFileSync(path.join(root, "src/features/desktop-ag
 const fileQueryActivity = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/activity/AgentFileQueryActivity.tsx"), "utf8");
 const evidenceTree = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/activity/AgentToolEvidenceTree.tsx"), "utf8");
 const evidenceModel = fs.readFileSync(path.join(root, "src/features/desktop-agent/domain/agent-tool-evidence.ts"), "utf8");
-const safeMarkdown = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/SafeMarkdown.tsx"), "utf8");
+const markdownSourceBlock = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/markdown/AgentMarkdownSourceBlock.tsx"), "utf8");
 const panelStatus = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentPanelStatus.tsx"), "utf8");
 const dataSidebarCss = fs.readFileSync(path.join(root, "src/features/data-workspace/data-shell.css"), "utf8");
 const tokensCss = fs.readFileSync(path.join(root, "src/styles/tokens.css"), "utf8");
@@ -356,14 +356,14 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(picker).toContain('boundarySelector: ".desktop-agent-boundary"');
   });
 
-  it("keeps fenced results compact and makes Copy a quiet icon action", () => {
-    expect(safeMarkdown).toContain('className="desktop-agent-code-copy"');
-    expect(safeMarkdown).toContain("aria-label={copyLabel}");
-    expect(safeMarkdown).toContain('data-language={language || "text"}');
-    expect(safeMarkdown).not.toContain("<span>{language || \"text\"}</span>");
+  it("keeps fenced results compact with a visible language and quiet Copy action", () => {
+    expect(markdownSourceBlock).toContain('className="desktop-agent-code-copy"');
+    expect(markdownSourceBlock).toContain("aria-label={copyLabel}");
+    expect(markdownSourceBlock).toContain('data-language={language || "text"}');
+    expect(markdownSourceBlock).toContain('className="desktop-agent-code-language"');
     expect(css).toMatch(/\.desktop-agent-code-block\s*\{[^}]*position:\s*relative[^}]*margin:\s*10px 0[^}]*border-radius:\s*10px/s);
-    expect(css).toMatch(/\.desktop-agent-code-copy\s*\{[^}]*position:\s*absolute[^}]*width:\s*26px[^}]*height:\s*26px[^}]*background:\s*transparent[^}]*color:\s*var\(--agent-text-subtle\)/s);
-    expect(css).toMatch(/\.desktop-agent-code-block pre\s*\{[^}]*padding:\s*9px 38px 9px 12px[^}]*color:\s*var\(--agent-text-muted\)[^}]*line-height:\s*1\.5/s);
+    expect(css).toMatch(/\.desktop-agent-code-copy\s*\{[^}]*width:\s*26px[^}]*height:\s*26px[^}]*background:\s*transparent[^}]*color:\s*var\(--agent-text-subtle\)/s);
+    expect(css).toMatch(/\.desktop-agent-code-block pre\s*\{[^}]*padding:\s*10px 12px[^}]*color:\s*var\(--agent-text-muted\)[^}]*line-height:\s*1\.5/s);
   });
 
   it("renders file mentions as quiet accent-colored atomic references without a drag overlay", () => {
