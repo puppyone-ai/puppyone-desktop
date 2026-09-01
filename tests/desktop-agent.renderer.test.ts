@@ -22,6 +22,7 @@ import {
   shouldShowAgentThinking,
 } from "../src/features/desktop-agent/ui/AgentTranscript";
 import { registerAgentToolRenderer } from "../src/features/desktop-agent/ui/AgentToolRendererRegistry";
+import { registerAgentPartRenderer } from "../src/features/desktop-agent/ui/AgentPartRenderer";
 import { agentToolEvidenceLimits } from "../src/features/desktop-agent/domain/agent-tool-evidence";
 import { resolveAnchoredOverlayPosition } from "../src/features/app-shell/useAnchoredOverlayPosition";
 import { applyAgentEvents, createAgentProjection } from "../src/features/desktop-agent/agentProjection";
@@ -1166,6 +1167,47 @@ describe("Desktop Agent renderer surfaces", () => {
     } finally {
       dispose();
       error.mockRestore();
+    }
+  });
+
+  it("registers semantic part extensions by kind and restores the previous renderer on dispose", () => {
+    const projection = createAgentProjection();
+    projection.parts = [{
+      id: "future-part",
+      turnId: "turn-1",
+      itemId: "future-item",
+      kind: "unknown",
+      eventType: "future.semantic.part",
+      label: "Future semantic part",
+      sequence: 1,
+    }];
+    projection.rows = [{
+      id: "row:future-part",
+      partId: "future-part",
+      turnId: "turn-1",
+      kind: "unknown",
+      sequence: 1,
+      estimatedHeight: 36,
+    }];
+    const dispose = registerAgentPartRenderer("unknown", ({ part }) => React.createElement(
+      "output",
+      { "data-testid": "semantic-extension" },
+      part.eventType,
+    ));
+
+    try {
+      const container = render(React.createElement(AgentTranscript, { projection, loading: false }));
+      expect(container.querySelector("[data-testid='semantic-extension']")?.textContent).toBe("future.semantic.part");
+
+      dispose();
+      act(() => root?.render(withTestLocalization(React.createElement(AgentTranscript, {
+        projection: { ...projection, parts: projection.parts.map((part) => ({ ...part })) },
+        loading: false,
+      }))));
+      expect(container.querySelector("[data-testid='semantic-extension']")).toBeNull();
+      expect(container.textContent).toContain("Future semantic part");
+    } finally {
+      dispose();
     }
   });
 

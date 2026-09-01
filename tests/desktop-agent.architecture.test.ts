@@ -231,6 +231,25 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(claude).toContain('event("provider.connection.updated"');
   });
 
+  it("uses one terminal lifecycle authority and a provider-neutral semantic Renderer registry", () => {
+    const lifecycle = source("src/features/desktop-agent/domain/agent-turn-lifecycle.ts");
+    const projection = source("src/features/desktop-agent/domain/agent-projection.ts");
+    const typedProjection = source("src/features/desktop-agent/domain/agent-typed-part-projection.ts");
+    const renderer = source("src/features/desktop-agent/ui/AgentPartRenderer.tsx");
+    const registry = source("src/features/desktop-agent/ui/AgentPartRendererRegistry.tsx");
+
+    expect(lifecycle).toContain("reconcileTerminalAgentTurn");
+    expect(lifecycle).toContain("LIVE_AGENT_ACTIVITY_STATUSES");
+    expect(projection).toContain("reconcileTerminalAgentTurn(next, event)");
+    expect(projection).not.toContain("LIVE_ACTIVITY_STATUSES");
+    expect(typedProjection).toContain("agentTurnTerminalState(event)");
+    expect(typedProjection).not.toContain("isLiveActivityStatus");
+    expect(registry).toContain("AgentPartByKind");
+    expect(registry).toContain("registerAgentPartRenderer");
+    expect(renderer).toContain("resolveAgentPartRenderer(props.part.kind)");
+    expect(renderer).not.toMatch(/provider\s*===|switch\s*\(.*provider/i);
+  });
+
   it("keeps Core backend-neutral and concrete backends in the single production composition root", () => {
     const registry = source("electron/main/agent/runtime/agent-runtime-registry.mjs");
     const bootstrap = source("electron/main/agent/bootstrap/create-agent-runtime-host.mjs");

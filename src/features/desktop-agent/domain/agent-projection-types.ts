@@ -39,18 +39,21 @@ export type AgentActivityLabelCode =
   | "provider-error"
   | "provider-warning";
 
-export type AgentActivity = {
+export type AgentActivityKind = "tool" | "command" | "file-change" | "plan" | "reasoning" | "warning" | "error";
+
+/** Discriminated semantic activity type shared by projection and Renderer registries. */
+export type AgentActivity<TKind extends AgentActivityKind = AgentActivityKind> = TKind extends AgentActivityKind ? {
   id: string;
   turnId: string | null;
   itemId: string | null;
-  kind: "tool" | "command" | "file-change" | "plan" | "reasoning" | "warning" | "error";
+  kind: TKind;
   label: string;
   labelCode?: AgentActivityLabelCode;
   status: AgentActivityStatus;
   detail: Record<string, unknown>;
   output: string;
   sequence: number;
-};
+} : never;
 
 /**
  * Replaceable, live provider transport state. It is deliberately not an
@@ -112,7 +115,7 @@ export type AgentPart =
   | (AgentPartBase & { kind: "user"; text: string; references?: AgentReferenceDisplay[]; promptMentions?: AgentPromptReferenceMention[]; streaming: boolean; terminalState: AgentTurnTerminalState | null })
   | (AgentPartBase & { kind: "assistant"; text: string; streaming: boolean; terminalState: AgentTurnTerminalState | null })
   | (AgentPartBase & { kind: "turn-summary"; durationMs: number; status: AgentTurnTerminalState })
-  | (AgentPartBase & { kind: "reasoning" | "plan" | "tool" | "command" | "file-change" | "warning" | "error"; label: string; labelCode?: AgentActivityLabelCode; status: AgentActivityStatus; output: string; detail: Record<string, unknown> })
+  | AgentActivity
   | (AgentPartBase & { kind: "usage"; usage: Record<string, unknown> })
   | (AgentPartBase & { kind: "permission"; requestId: string; state: "pending" | "resolved" })
   | (AgentPartBase & { kind: "question"; requestId: string; state: "pending" | "resolved" })

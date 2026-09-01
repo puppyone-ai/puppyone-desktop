@@ -81,6 +81,46 @@ const retiredProviderPicker = path.join(rendererUiRoot, "AgentProviderPicker.tsx
 if (existsSync(retiredProviderPicker)) {
   errors.push(`${relative(retiredProviderPicker)} is retired; Agent selection must use AgentRuntimePicker`);
 }
+const retiredActivityDispatcher = path.join(rendererUiRoot, "AgentActivityItem.tsx");
+if (existsSync(retiredActivityDispatcher)) {
+  errors.push(`${relative(retiredActivityDispatcher)} is retired; semantic parts must dispatch through AgentPartRendererRegistry`);
+}
+
+const semanticRendererRegistry = path.join(rendererUiRoot, "AgentPartRendererRegistry.tsx");
+const semanticPartRenderer = path.join(rendererUiRoot, "AgentPartRenderer.tsx");
+if (!existsSync(semanticRendererRegistry)) {
+  errors.push(`${relative(semanticRendererRegistry)} is required; semantic Renderer extension must use one typed registry`);
+} else {
+  const registrySource = readFileSync(semanticRendererRegistry, "utf8");
+  for (const requiredText of ["AgentPartKind", "AgentPartByKind", "registerAgentPartRenderer", "resolveAgentPartRenderer"]) {
+    if (!registrySource.includes(requiredText)) errors.push(`${relative(semanticRendererRegistry)} is missing ${requiredText}`);
+  }
+}
+if (existsSync(semanticPartRenderer)) {
+  const rendererSource = stripComments(readFileSync(semanticPartRenderer, "utf8"));
+  if (providerNamePattern.test(rendererSource)) {
+    errors.push(`${relative(semanticPartRenderer)} dispatches by Provider; render only canonical semantic part kinds`);
+  }
+}
+
+const turnLifecyclePolicy = path.join(rendererDomainRoot, "agent-turn-lifecycle.ts");
+if (!existsSync(turnLifecyclePolicy)) {
+  errors.push(`${relative(turnLifecyclePolicy)} is required; terminal reconciliation needs one domain authority`);
+} else {
+  const lifecycleSource = readFileSync(turnLifecyclePolicy, "utf8");
+  for (const requiredText of ["LIVE_AGENT_ACTIVITY_STATUSES", "agentTurnTerminalState", "reconcileTerminalAgentTurn"]) {
+    if (!lifecycleSource.includes(requiredText)) errors.push(`${relative(turnLifecyclePolicy)} is missing ${requiredText}`);
+  }
+}
+for (const projectionPath of [
+  path.join(rendererDomainRoot, "agent-projection.ts"),
+  path.join(rendererDomainRoot, "agent-typed-part-projection.ts"),
+]) {
+  const projectionSource = readFileSync(projectionPath, "utf8");
+  if (/function\s+(?:activityTerminalStatus|isLiveActivityStatus|isTerminalTurnEvent)\b|const\s+LIVE_ACTIVITY_STATUSES\b/.test(projectionSource)) {
+    errors.push(`${relative(projectionPath)} duplicates terminal lifecycle policy; use agent-turn-lifecycle.ts`);
+  }
+}
 
 for (const filePath of walkSourceFiles(mainRoot)) {
   const source = readFileSync(filePath, "utf8");

@@ -1,7 +1,6 @@
-import type { AgentEvent, AgentPromptReferenceMention, AgentReferenceDisplay, AgentTurnTerminalState } from "./agent-contract";
+import type { AgentEvent, AgentPromptReferenceMention, AgentReferenceDisplay } from "./agent-contract";
 import type {
   AgentActivity,
-  AgentActivityStatus,
   AgentProjection,
 } from "./agent-projection-types";
 import { clearProjectedFileChange, hasRenderableFileChange } from "./agent-file-change-projection";
@@ -22,7 +21,6 @@ import {
 } from "./agent-projection-readers";
 import {
   cloneAgentProjection,
-  invalidateProjectionIndexes,
   projectionIndexes,
 } from "./agent-projection-indexes";
 import {
@@ -31,6 +29,7 @@ import {
   providerActivityIdentity,
 } from "./agent-provider-notice-policy";
 import { projectTypedPart } from "./agent-typed-part-projection";
+import { reconcileTerminalAgentTurn } from "./agent-turn-lifecycle";
 
 export type * from "./agent-projection-types";
 
@@ -60,14 +59,6 @@ const CONNECTION_RECOVERY_PROGRESS_EVENTS = new Set<AgentEvent["type"]>([
   "provider.activity",
   "provider.error",
 ]);
-const LIVE_ACTIVITY_STATUSES = new Set<AgentActivityStatus>([
-  "queued",
-  "running",
-  "pending",
-  "in-progress",
-  "waiting-for-user",
-]);
-
 function readPromptMentions(value: unknown, prompt: string, references: AgentReferenceDisplay[]) {
   if (!Array.isArray(value)) return [];
   const referenceIds = new Set(references.map((reference) => reference.id));
@@ -119,6 +110,7 @@ export function applyAgentEvents(
     if (event.sequence <= next.lastSequence) continue;
     applyLegacyAgentEvent(next, event);
     projectTypedPart(next, event);
+    reconcileTerminalAgentTurn(next, event);
   }
   return next;
 }
@@ -128,6 +120,7 @@ export function applyAgentEvent(previous: AgentProjection, event: AgentEvent): A
   const next = cloneAgentProjection(previous);
   applyLegacyAgentEvent(next, event);
   projectTypedPart(next, event);
+  reconcileTerminalAgentTurn(next, event);
   return next;
 }
 
@@ -186,24 +179,8 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
     case "turn.completed":
     case "turn.failed":
     case "turn.interrupted": {
-      const terminalState = event.type.slice("turn.".length) as AgentTurnTerminalState;
-      next.runningTurnId = null;
-      next.terminalState = terminalState;
-      const indexes = projectionIndexes(next);
-      for (const index of event.turnId ? indexes.messagesByTurn.get(event.turnId) ?? [] : []) {
-        const message = next.messages[index];
-        if (message?.role === "assistant") next.messages[index] = { ...message, streaming: false, terminalState };
-      }
-      const settledStatus = activityTerminalStatus(terminalState);
-      next.activities = next.activities.map((activity) => (
-        activity.turnId === event.turnId && LIVE_ACTIVITY_STATUSES.has(activity.status)
-          ? { ...activity, status: settledStatus }
-          : activity
-      ));
-      next.approvals = next.approvals.filter((approval) => approval.turnId !== event.turnId);
-      next.questions = next.questions.filter((question) => question.turnId !== event.turnId);
-      // Rebuild indexes lazily after replacing turn-scoped collections.
-      invalidateProjectionIndexes(next);
+      // The typed turn record is updated before the shared terminal reconciler
+      // settles every compatibility collection and semantic part exactly once.
       return next;
     }
     case "assistant.delta":
@@ -402,11 +379,6 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
 
 function readPositiveInteger(value: unknown) {
   return Number.isSafeInteger(value) && Number(value) > 0 ? Number(value) : null;
-}
-
-function activityTerminalStatus(terminalState: AgentTurnTerminalState): AgentActivityStatus {
-  if (terminalState === "completed") return "completed";
-  return terminalState;
 }
 
 function readReferenceDisplays(value: unknown): AgentReferenceDisplay[] {
