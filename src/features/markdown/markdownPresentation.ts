@@ -123,23 +123,6 @@ export function serializeMarkdownPresentationSettings(
   return JSON.stringify({ version: 2, ...settings });
 }
 
-export function hasMarkdownPresentationOverrides(
-  settings: MarkdownPresentationSettings,
-): boolean {
-  return settings.headingScale !== "theme"
-    || settings.strongColor !== "theme"
-    || settings.strongWeight !== "theme";
-}
-
-/** Retire stored overrides after the settings UI was removed. */
-export function retireStoredMarkdownPresentationSettings(
-  settings: MarkdownPresentationSettings,
-): MarkdownPresentationSettings {
-  return hasMarkdownPresentationOverrides(settings)
-    ? DEFAULT_MARKDOWN_PRESENTATION_SETTINGS
-    : settings;
-}
-
 export function resolveMarkdownPresentationStyle(
   settings: MarkdownPresentationSettings,
 ): CSSProperties {

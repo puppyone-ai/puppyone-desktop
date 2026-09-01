@@ -2,10 +2,7 @@ import { isFileIconThemeId, type FileIconThemeId } from "@puppyone/shared-ui";
 import type { PuppyoneWorkspaceConfig } from "../../types/electron";
 import {
   DEFAULT_MARKDOWN_PRESENTATION_SETTINGS,
-  hasMarkdownPresentationOverrides,
   parseMarkdownPresentationSettings,
-  retireStoredMarkdownPresentationSettings,
-  serializeMarkdownPresentationSettings,
   type MarkdownPresentationSettings,
 } from "../markdown/markdownPresentation";
 import {
@@ -146,15 +143,7 @@ export function readInitialMarkdownPresentationSettings(): MarkdownPresentationS
   if (typeof window === "undefined") return DEFAULT_MARKDOWN_PRESENTATION_SETTINGS;
   const stored = window.localStorage.getItem(MARKDOWN_PRESENTATION_STORAGE_KEY)
     ?? window.localStorage.getItem(MARKDOWN_EMPHASIS_STORAGE_KEY);
-  const parsed = parseMarkdownPresentationSettings(stored);
-  const retired = retireStoredMarkdownPresentationSettings(parsed);
-  if (hasMarkdownPresentationOverrides(parsed)) {
-    window.localStorage.setItem(
-      MARKDOWN_PRESENTATION_STORAGE_KEY,
-      serializeMarkdownPresentationSettings(retired),
-    );
-  }
-  return retired;
+  return parseMarkdownPresentationSettings(stored);
 }
 
 export function readInitialFileIconTheme(): FileIconThemeId {

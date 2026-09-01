@@ -17,7 +17,6 @@ import {
 import {
   DEFAULT_MARKDOWN_PRESENTATION_SETTINGS,
   parseMarkdownPresentationSettings,
-  retireStoredMarkdownPresentationSettings,
   type MarkdownPresentationSettings,
 } from "../markdown/markdownPresentation";
 import {
@@ -334,9 +333,7 @@ function readMarkdownOverrides(
   fallback = DEFAULT_MARKDOWN_PRESENTATION_SETTINGS,
 ): MarkdownPresentationSettings {
   if (!isRecord(input)) return fallback;
-  return retireStoredMarkdownPresentationSettings(
-    parseMarkdownPresentationSettings(JSON.stringify({ version: 2, ...input })),
-  );
+  return parseMarkdownPresentationSettings(JSON.stringify({ version: 2, ...input }));
 }
 
 function resolveLegacyDefaultSubThemes(
