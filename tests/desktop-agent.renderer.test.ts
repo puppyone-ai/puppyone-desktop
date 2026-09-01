@@ -793,6 +793,7 @@ describe("Desktop Agent renderer surfaces", () => {
 
     const modelTrigger = container.querySelector('button[aria-label="Agent model"]') as HTMLButtonElement;
     expect(modelTrigger.textContent).toContain("Claude Sonnet");
+    expect(modelTrigger.querySelector("svg")).toBeNull();
     act(() => modelTrigger.click());
     const opus = Array.from(document.querySelectorAll('[role="option"]'))
       .find((option) => option.textContent?.includes("Claude Opus")) as HTMLButtonElement;

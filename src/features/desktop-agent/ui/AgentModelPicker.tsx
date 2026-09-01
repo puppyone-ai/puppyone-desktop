@@ -38,6 +38,7 @@ export const AgentModelPicker = memo(function AgentModelPicker({
       valueLabel={selected?.displayName}
       groups={groups}
       disabled={disabled}
+      indicator="none"
       width="medium"
       onSelect={onSelectModel}
     />

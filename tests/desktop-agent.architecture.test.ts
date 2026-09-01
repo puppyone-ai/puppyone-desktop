@@ -106,6 +106,7 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(composerToolbar).toContain("<AgentModelPicker");
     expect(composerToolbar).toContain("<AgentEffortPicker");
     expect(modelPicker).not.toContain("AgentEffortPicker");
+    expect(modelPicker).toContain('indicator="none"');
     expect(modelPicker).toContain('width="medium"');
     expect(effortPicker).toContain('indicator="none"');
     expect(effortPicker).toContain('width="narrow"');
