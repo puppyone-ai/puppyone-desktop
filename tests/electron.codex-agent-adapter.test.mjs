@@ -264,6 +264,29 @@ describe("Codex app-server normalization", () => {
     expect(normalizeCodexNotification({
       method: "error",
       params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        error: { message: "Reconnecting… 2/5" },
+        willRetry: true,
+        attempt: 2,
+        maxAttempts: 5,
+      },
+    })[0]).toMatchObject({
+      type: "provider.connection.updated",
+      payload: { state: "reconnecting", message: "Reconnecting… 2/5", attempt: 2, maxAttempts: 5 },
+    });
+
+    expect(normalizeCodexNotification({
+      method: "warning",
+      params: { threadId: "thread-1", turnId: "turn-1", message: "Falling back to HTTPS transport." },
+    })[0]).toMatchObject({
+      type: "provider.connection.updated",
+      payload: { state: "fallback", message: "Falling back to HTTPS transport." },
+    });
+
+    expect(normalizeCodexNotification({
+      method: "error",
+      params: {
         error: {
           message: JSON.stringify({
             type: "error",

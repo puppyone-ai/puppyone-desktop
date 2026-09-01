@@ -229,6 +229,8 @@
   "activity.thoughtFor": "{duration} 동안 생각함",
   "activity.thoughtBriefly": "잠시 생각함",
   "activity.workingThroughRequest": "요청을 검토하는 중",
+  "connection.reconnecting": "재연결 중…",
+  "connection.fallback": "연결 방식을 전환하는 중…",
   "plan.pending": "대기 중",
   "plan.inProgress": "진행 중",
   "plan.completed": "완료됨",

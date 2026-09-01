@@ -404,36 +404,17 @@
 .desktop-agent-notice {
   display: flex;
   min-width: 0;
-  align-items: flex-start;
-  gap: 9px;
-  margin: 3px 4px 10px;
-  padding: 10px 12px;
-  border-inline-start: 2px solid var(--po-warning);
-  border-start-start-radius: 0;
-  border-start-end-radius: 10px;
-  border-end-start-radius: 0;
-  border-end-end-radius: 10px;
-  background: color-mix(in srgb, var(--po-warning) 6%, transparent);
-  color: var(--agent-text-muted);
-  font-size: var(--agent-font-size);
-  line-height: 1.5;
-}
-.desktop-agent-notice.is-error { border-inline-start-color: var(--po-danger); background: color-mix(in srgb, var(--po-danger) 6%, transparent); }
-.desktop-agent-notice.is-error > svg { color: var(--po-danger); }
-.desktop-agent-notice.is-connection {
   align-items: center;
-  margin: 0 4px 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--agent-border-subtle);
-  border-radius: var(--agent-radius-message);
-  background: var(--agent-connection-surface);
-  color: var(--agent-text-muted);
+  gap: 7px;
+  margin: 2px 0 10px;
+  padding: 3px var(--agent-message-content-inset);
+  color: var(--agent-text-subtle);
+  font-size: var(--agent-font-size-meta);
   line-height: 1.45;
 }
-.desktop-agent-notice.is-connection > svg {
-  flex: 0 0 auto;
-  color: var(--agent-text-subtle);
-}
+.desktop-agent-notice > svg { flex: 0 0 auto; }
+.desktop-agent-notice.is-error { color: color-mix(in srgb, var(--po-danger) 72%, var(--agent-text-muted)); }
+.desktop-agent-notice.is-error > svg { color: var(--po-danger); }
 
 .desktop-agent-jump-latest {
   position: absolute;

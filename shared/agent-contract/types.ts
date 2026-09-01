@@ -272,6 +272,7 @@ export type AgentEventType =
   | "question.requested"
   | "question.resolved"
   | "provider.activity"
+  | "provider.connection.updated"
   | "provider.warning"
   | "provider.error";
 
@@ -306,6 +307,12 @@ export type AgentEventPayloadMap = {
   "question.requested": AgentEventPayloadBase & AgentBlockingPayload & { questions: unknown[] };
   "question.resolved": AgentEventPayloadBase & AgentBlockingPayload & { rejected?: boolean };
   "provider.activity": AgentEventPayloadBase & AgentActivityPayload;
+  "provider.connection.updated": AgentEventPayloadBase & {
+    state: "reconnecting" | "fallback" | "connected";
+    message?: string;
+    attempt?: number;
+    maxAttempts?: number;
+  };
   "provider.warning": AgentEventPayloadBase & { message?: string };
   "provider.error": AgentEventPayloadBase & { message?: string };
 };

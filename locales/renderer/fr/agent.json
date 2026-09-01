@@ -229,6 +229,8 @@
   "activity.thoughtFor": "Réflexion pendant {duration}",
   "activity.thoughtBriefly": "Brève réflexion",
   "activity.workingThroughRequest": "Traitement de la demande",
+  "connection.reconnecting": "Reconnexion…",
+  "connection.fallback": "Changement de connexion…",
   "plan.pending": "en attente",
   "plan.inProgress": "en cours",
   "plan.completed": "terminé",

@@ -229,6 +229,8 @@
   "activity.thoughtFor": "{duration} 思考しました",
   "activity.thoughtBriefly": "短時間思考しました",
   "activity.workingThroughRequest": "リクエストを検討中",
+  "connection.reconnecting": "再接続中…",
+  "connection.fallback": "接続方法を切り替えています…",
   "plan.pending": "未着手",
   "plan.inProgress": "進行中",
   "plan.completed": "完了",

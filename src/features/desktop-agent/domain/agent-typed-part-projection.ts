@@ -1,6 +1,7 @@
 import type { AgentEvent, AgentTurnTerminalState } from "./agent-contract";
 import type {
   AgentActivity,
+  AgentActivityStatus,
   AgentPart,
   AgentProjection,
   AgentTranscriptMessage,
@@ -16,11 +17,13 @@ import {
 } from "./agent-projection-readers";
 import {
   isNonDiagnosticProviderStatusMessage,
+  legacyProviderConnectionUpdate,
   providerActivityIdentity,
 } from "./agent-provider-notice-policy";
 import { parseAgentEventTime, readAgentTurnDurationMs } from "./agent-turn-timing";
 
 export function projectTypedPart(projection: AgentProjection, event: AgentEvent) {
+  if (event.type === "provider.connection.updated") return;
   const turn = updateTurn(projection, event);
   if (isTerminalTurnEvent(event)) {
     const terminalState = event.type.slice("turn.".length) as AgentTurnTerminalState;
@@ -30,6 +33,10 @@ export function projectTypedPart(projection: AgentProjection, event: AgentEvent)
       const part = partIndex === undefined ? null : projection.parts[partIndex];
       if (partIndex !== undefined && part?.kind === "assistant") {
         projection.parts[partIndex] = { ...part, streaming: false, terminalState };
+      } else if (partIndex !== undefined && part && isActivityPart(part) && isLiveActivityStatus(part.status)) {
+        projection.parts[partIndex] = { ...part, status: activityTerminalStatus(terminalState) };
+      } else if (partIndex !== undefined && part && (part.kind === "permission" || part.kind === "question") && part.state === "pending") {
+        projection.parts[partIndex] = { ...part, state: "resolved" };
       }
     }
   }
@@ -117,6 +124,7 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
   }
   if (event.type === "provider.warning" || event.type === "provider.error") {
     const label = readProviderMessage(event.payload.message);
+    if (legacyProviderConnectionUpdate(event, label)) return null;
     if (label && isNonDiagnosticProviderStatusMessage(label)) return null;
     const activityIndex = projectionIndexes(projection).activities.get(providerActivityIdentity(
       projection,
@@ -195,4 +203,16 @@ function isTerminalTurnEvent(event: AgentEvent) {
   return event.type === "turn.completed"
     || event.type === "turn.failed"
     || event.type === "turn.interrupted";
+}
+
+function isLiveActivityStatus(status: AgentActivityStatus) {
+  return ["queued", "running", "pending", "in-progress", "waiting-for-user"].includes(status);
+}
+
+function isActivityPart(part: AgentPart): part is Extract<AgentPart, { status: AgentActivityStatus; detail: Record<string, unknown> }> {
+  return ["reasoning", "plan", "tool", "command", "file-change", "warning", "error"].includes(part.kind);
+}
+
+function activityTerminalStatus(terminalState: AgentTurnTerminalState): AgentActivityStatus {
+  return terminalState === "completed" ? "completed" : terminalState;
 }

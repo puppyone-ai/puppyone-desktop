@@ -175,17 +175,86 @@ describe("Desktop Agent transcript projection", () => {
     expect(projection.parts.find((part) => part.kind === "tool")).toMatchObject({ status: "unknown" });
   });
 
-  it("preserves recoverable provider status metadata for connection-state presentation", () => {
-    const projection = applyAgentEvent(createAgentProjection(), event(1, "provider.warning", {
-      message: "Reconnecting… 2/5",
-      recoverable: true,
-    }, "turn-1", "retry-1"));
+  it("keeps connection recovery as one replaceable live state outside transcript history", () => {
+    const recovering = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Hello" }, "turn-1"),
+      event(2, "provider.connection.updated", {
+        state: "reconnecting",
+        message: "Reconnecting… 2/5",
+        attempt: 2,
+        maxAttempts: 5,
+      }, "turn-1"),
+      event(3, "provider.connection.updated", {
+        state: "reconnecting",
+        message: "Reconnecting… 3/5",
+        attempt: 3,
+        maxAttempts: 5,
+      }, "turn-1"),
+      event(4, "provider.connection.updated", {
+        state: "fallback",
+        message: "Switching connection transport.",
+      }, "turn-1"),
+    ]);
 
-    expect(projection.activities[0]).toMatchObject({
-      kind: "warning",
-      label: "Reconnecting… 2/5",
-      detail: { recoverable: true },
+    expect(recovering.connectionStatus).toMatchObject({
+      state: "fallback",
+      message: "Switching connection transport.",
+      turnId: "turn-1",
+      sequence: 4,
     });
+    expect(recovering.activities).toHaveLength(0);
+    expect(recovering.parts.filter((part) => part.kind === "warning")).toHaveLength(0);
+    expect(recovering.rows.filter((row) => row.kind === "warning")).toHaveLength(0);
+
+    const progressed = applyAgentEvent(recovering, event(5, "assistant.delta", { delta: "Recovered" }, "turn-1", "assistant-1"));
+    expect(progressed.connectionStatus).toBeNull();
+    expect(progressed.messages.find((message) => message.role === "assistant")?.text).toBe("Recovered");
+  });
+
+  it("migrates legacy retry and transport-fallback warnings without retaining historical cards", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Hello" }, "turn-1"),
+      event(2, "provider.warning", { message: "Reconnecting… 2/5", recoverable: true }, "turn-1", "retry-2"),
+      event(3, "provider.warning", { message: "Reconnecting… 3/5", recoverable: true }, "turn-1", "retry-3"),
+      event(4, "provider.warning", {
+        message: "Falling back from WebSockets to HTTPS transport. request timed out",
+      }, "turn-1", "fallback"),
+    ]);
+
+    expect(projection.connectionStatus).toMatchObject({ state: "fallback", sequence: 4 });
+    expect(projection.activities).toHaveLength(0);
+    expect(projection.parts.filter((part) => part.kind === "warning")).toHaveLength(0);
+    expect(projection.rows.filter((row) => row.kind === "warning")).toHaveLength(0);
+  });
+
+  it.each(["turn.completed", "turn.failed", "turn.interrupted"] as const)("clears live connection state on %s", (type) => {
+    const recovering = applyAgentEvent(createAgentProjection(), event(1, "provider.connection.updated", {
+      state: "reconnecting",
+      message: "Reconnecting… 5/5",
+    }, "turn-1"));
+
+    expect(applyAgentEvent(recovering, event(2, type, { status: type.slice(5) }, "turn-1")).connectionStatus).toBeNull();
+  });
+
+  it.each([
+    ["turn.completed", "completed"],
+    ["turn.failed", "failed"],
+    ["turn.interrupted", "interrupted"],
+  ] as const)("settles orphaned live activity and blocking state on %s", (type, expectedStatus) => {
+    const running = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Run it" }, "turn-1"),
+      event(2, "tool.started", { kind: "command", label: "Long command", status: "running" }, "turn-1", "tool-1"),
+      event(3, "approval.requested", { requestId: "approval-1", kind: "command" }, "turn-1", "tool-1"),
+      event(4, "question.requested", { requestId: "question-1", questions: [] }, "turn-1", "question-1"),
+    ]);
+
+    const settled = applyAgentEvent(running, event(5, type, { status: expectedStatus }, "turn-1"));
+    expect(settled.activities[0]?.status).toBe(expectedStatus);
+    expect(settled.parts.find((part) => part.kind === "command")).toMatchObject({ status: expectedStatus });
+    expect(settled.parts.find((part) => part.kind === "permission")).toMatchObject({ state: "resolved" });
+    expect(settled.parts.find((part) => part.kind === "question")).toMatchObject({ state: "resolved" });
+    expect(settled.approvals).toHaveLength(0);
+    expect(settled.questions).toHaveLength(0);
   });
 
   it("collapses duplicate provider terminal errors for the same turn", () => {

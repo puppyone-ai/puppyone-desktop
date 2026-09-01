@@ -259,7 +259,6 @@ if (themeImportIndex < 0 || foundationImportIndex < 0 || themeImportIndex > foun
 }
 for (const token of [
   "--agent-prompt-surface: var(--po-active)",
-  "--agent-connection-surface: var(--agent-prompt-surface)",
   "--agent-reference-surface:",
   "--agent-reference-error-surface:",
 ]) {
@@ -269,13 +268,15 @@ for (const token of [
 }
 for (const token of [
   "--agent-prompt-surface:",
-  "--agent-connection-surface:",
   "--agent-reference-surface:",
   "--agent-reference-error-surface:",
 ]) {
   if (foundationStyleSource.includes(token)) {
     errors.push(`${relative(foundationStylePath)} declares ${token}; visual roles belong to theme.css`);
   }
+}
+if (themeStyleSource.includes("--agent-connection-surface") || foundationStyleSource.includes("--agent-connection-surface")) {
+  errors.push("Connection recovery is transient inline state and must not own a card-surface token");
 }
 if (!composerStyleSource.includes("background: var(--agent-prompt-surface)")
   || !transcriptStyleSource.includes("background: var(--agent-prompt-surface)")) {

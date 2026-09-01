@@ -428,6 +428,56 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.querySelector(".desktop-agent-stream-caret")).not.toBeNull();
   });
 
+  it("renders only the current connection state and removes its animation after recovery", () => {
+    const reconnecting = createAgentProjection();
+    reconnecting.connectionStatus = {
+      state: "reconnecting",
+      message: "Reconnecting… 4/5",
+      attempt: 4,
+      maxAttempts: 5,
+      turnId: "turn-live",
+      sequence: 4,
+    };
+    const container = render(React.createElement(AgentTranscript, {
+      projection: reconnecting,
+      loading: false,
+      working: true,
+      runtimeLabel: "Codex",
+    }));
+
+    expect(container.querySelectorAll(".desktop-agent-connection-status")).toHaveLength(1);
+    expect(container.querySelector(".desktop-agent-connection-status")?.textContent).toBe("Reconnecting… 4/5");
+    expect(container.querySelector(".desktop-agent-connection-status .desktop-agent-spin")).not.toBeNull();
+    expect(container.querySelector(".desktop-agent-working-indicator")).toBeNull();
+    expect(container.querySelector(".desktop-agent-notice")).toBeNull();
+
+    const fallback = createAgentProjection();
+    fallback.connectionStatus = {
+      state: "fallback",
+      message: "Switching connection transport.",
+      attempt: null,
+      maxAttempts: null,
+      turnId: "turn-live",
+      sequence: 5,
+    };
+    act(() => root?.render(withTestLocalization(React.createElement(AgentTranscript, {
+      projection: fallback,
+      loading: false,
+      working: true,
+      runtimeLabel: "Codex",
+    }))));
+    expect(container.querySelectorAll(".desktop-agent-connection-status")).toHaveLength(1);
+    expect(container.querySelector(".desktop-agent-connection-status .desktop-agent-spin")).toBeNull();
+
+    act(() => root?.render(withTestLocalization(React.createElement(AgentTranscript, {
+      projection: createAgentProjection(),
+      loading: false,
+      working: false,
+      runtimeLabel: "Codex",
+    }))));
+    expect(container.querySelector(".desktop-agent-connection-status")).toBeNull();
+  });
+
   it("leaves composer auto-sizing to CSS while controlled draft text changes", () => {
     const OriginalResizeObserver = globalThis.ResizeObserver;
     let constructions = 0;

@@ -10,7 +10,6 @@
   --agent-canvas: var(--po-editor-bg);
   --agent-report-surface: color-mix(in srgb, var(--po-panel-raised) 90%, var(--po-canvas));
   --agent-prompt-surface: var(--po-active);
-  --agent-connection-surface: var(--agent-prompt-surface);
   --agent-reference-surface: color-mix(in srgb, var(--agent-prompt-surface) 92%, transparent);
   --agent-reference-error-surface: color-mix(in srgb, var(--po-danger) 12%, var(--agent-prompt-surface));
   --agent-control-surface: color-mix(in srgb, var(--po-header) 82%, var(--po-panel-raised));

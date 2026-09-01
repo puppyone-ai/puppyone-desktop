@@ -1,6 +1,7 @@
 import type { AgentEvent, AgentPromptReferenceMention, AgentReferenceDisplay, AgentTurnTerminalState } from "./agent-contract";
 import type {
   AgentActivity,
+  AgentActivityStatus,
   AgentProjection,
 } from "./agent-projection-types";
 import { clearProjectedFileChange, hasRenderableFileChange } from "./agent-file-change-projection";
@@ -21,10 +22,12 @@ import {
 } from "./agent-projection-readers";
 import {
   cloneAgentProjection,
+  invalidateProjectionIndexes,
   projectionIndexes,
 } from "./agent-projection-indexes";
 import {
   isNonDiagnosticProviderStatusMessage,
+  legacyProviderConnectionUpdate,
   providerActivityIdentity,
 } from "./agent-provider-notice-policy";
 import { projectTypedPart } from "./agent-typed-part-projection";
@@ -34,6 +37,36 @@ export type * from "./agent-projection-types";
 const MAX_COMMAND_OUTPUT = 64 * 1024;
 const MAX_MESSAGE_TEXT = 128 * 1024;
 const MAX_ACTIVITY_TEXT = 64 * 1024;
+const CONNECTION_RECOVERY_PROGRESS_EVENTS = new Set<AgentEvent["type"]>([
+  "session.started",
+  "session.resumed",
+  "session.closed",
+  "turn.started",
+  "turn.completed",
+  "turn.failed",
+  "turn.interrupted",
+  "assistant.delta",
+  "assistant.completed",
+  "reasoning.summary.delta",
+  "plan.updated",
+  "tool.started",
+  "tool.progress",
+  "tool.completed",
+  "command.output.delta",
+  "file.change.updated",
+  "usage.updated",
+  "approval.requested",
+  "question.requested",
+  "provider.activity",
+  "provider.error",
+]);
+const LIVE_ACTIVITY_STATUSES = new Set<AgentActivityStatus>([
+  "queued",
+  "running",
+  "pending",
+  "in-progress",
+  "waiting-for-user",
+]);
 
 function readPromptMentions(value: unknown, prompt: string, references: AgentReferenceDisplay[]) {
   if (!Array.isArray(value)) return [];
@@ -64,6 +97,7 @@ export function createAgentProjection(options: { partialHistory?: boolean } = {}
     turns: [],
     parts: [],
     rows: [],
+    connectionStatus: null,
     runningTurnId: null,
     terminalState: null,
     usage: null,
@@ -108,6 +142,9 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
   }
   next.lastSequence = event.sequence;
   const payload = event.payload ?? {};
+  if (event.type !== "provider.connection.updated" && CONNECTION_RECOVERY_PROGRESS_EVENTS.has(event.type)) {
+    next.connectionStatus = null;
+  }
 
   switch (event.type) {
     case "session.started":
@@ -157,6 +194,16 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
         const message = next.messages[index];
         if (message?.role === "assistant") next.messages[index] = { ...message, streaming: false, terminalState };
       }
+      const settledStatus = activityTerminalStatus(terminalState);
+      next.activities = next.activities.map((activity) => (
+        activity.turnId === event.turnId && LIVE_ACTIVITY_STATUSES.has(activity.status)
+          ? { ...activity, status: settledStatus }
+          : activity
+      ));
+      next.approvals = next.approvals.filter((approval) => approval.turnId !== event.turnId);
+      next.questions = next.questions.filter((question) => question.turnId !== event.turnId);
+      // Rebuild indexes lazily after replacing turn-scoped collections.
+      invalidateProjectionIndexes(next);
       return next;
     }
     case "assistant.delta":
@@ -292,10 +339,36 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
         status: normalizeAgentActivityStatus(payload.status, "running"),
         detail: pickSafeActivityDetail(payload),
       });
+    case "provider.connection.updated": {
+      if (payload.state === "connected") {
+        next.connectionStatus = null;
+        return next;
+      }
+      if (payload.state !== "reconnecting" && payload.state !== "fallback") return next;
+      next.connectionStatus = {
+        state: payload.state,
+        message: readProviderMessage(payload.message),
+        attempt: readPositiveInteger(payload.attempt),
+        maxAttempts: readPositiveInteger(payload.maxAttempts),
+        turnId: event.turnId,
+        sequence: event.sequence,
+      };
+      return next;
+    }
     case "provider.warning":
     case "provider.error": {
       const kind = event.type === "provider.error" ? "error" : "warning";
       const label = readProviderMessage(payload.message);
+      const legacyConnection = legacyProviderConnectionUpdate(event, label);
+      if (legacyConnection) {
+        next.connectionStatus = {
+          ...legacyConnection,
+          message: label,
+          turnId: event.turnId,
+          sequence: event.sequence,
+        };
+        return next;
+      }
       if (label && isNonDiagnosticProviderStatusMessage(label)) return next;
       const identity = providerActivityIdentity(next, event, label || kind);
       const activityIndexes = projectionIndexes(next).activities;
@@ -325,6 +398,15 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
     default:
       return next;
   }
+}
+
+function readPositiveInteger(value: unknown) {
+  return Number.isSafeInteger(value) && Number(value) > 0 ? Number(value) : null;
+}
+
+function activityTerminalStatus(terminalState: AgentTurnTerminalState): AgentActivityStatus {
+  if (terminalState === "completed") return "completed";
+  return terminalState;
 }
 
 function readReferenceDisplays(value: unknown): AgentReferenceDisplay[] {

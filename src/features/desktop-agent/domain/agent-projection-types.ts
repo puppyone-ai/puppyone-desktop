@@ -52,6 +52,20 @@ export type AgentActivity = {
   sequence: number;
 };
 
+/**
+ * Replaceable, live provider transport state. It is deliberately not an
+ * activity or timeline part: connection attempts describe the current turn,
+ * not durable conversation history.
+ */
+export type AgentConnectionStatus = {
+  state: "reconnecting" | "fallback";
+  message: string;
+  attempt: number | null;
+  maxAttempts: number | null;
+  turnId: string | null;
+  sequence: number;
+};
+
 export type AgentApproval = {
   requestId: string;
   turnId: string;
@@ -135,6 +149,7 @@ export type AgentProjection = {
   turns: AgentTurn[];
   parts: AgentPart[];
   rows: TimelineRow[];
+  connectionStatus: AgentConnectionStatus | null;
   runningTurnId: string | null;
   terminalState: AgentTurnTerminalState | null;
   usage: Record<string, unknown> | null;

@@ -18,6 +18,8 @@ const picker = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/Ag
 const brandMark = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentBrandMark.tsx"), "utf8");
 const messagePart = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentMessagePart.tsx"), "utf8");
 const transcript = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentTranscript.tsx"), "utf8");
+const connectionStatus = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentConnectionStatus.tsx"), "utf8");
+const noticeActivity = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/activity/AgentNoticeActivity.tsx"), "utf8");
 const commandActivity = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/activity/AgentCommandActivity.tsx"), "utf8");
 const fileQueryActivity = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/activity/AgentFileQueryActivity.tsx"), "utf8");
 const evidenceTree = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/activity/AgentToolEvidenceTree.tsx"), "utf8");
@@ -54,7 +56,13 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-virtual-row\[data-kind="tool"\],[^{]*\[data-kind="command"\],[^{]*\[data-kind="file-change"\]\s*\{[^}]*padding-bottom:\s*0/s);
     expect(css).toMatch(/\.desktop-agent-tool-row\s*\{[^}]*min-height:\s*30px[^}]*grid-template-columns:\s*auto auto minmax\(0, 1fr\) auto[^}]*padding:\s*0 4px/s);
     expect(css).toMatch(/\.desktop-agent-tool-call\.has-detail \.desktop-agent-tool-row\s*\{[^}]*grid-template-columns:\s*auto auto auto minmax\(0, 1fr\) auto/s);
-    expect(css).toMatch(/\.desktop-agent-notice\.is-connection\s*\{[^}]*border:\s*1px solid var\(--agent-border-subtle\)[^}]*border-radius:\s*var\(--agent-radius-message\)[^}]*background:\s*var\(--agent-connection-surface\)[^}]*color:\s*var\(--agent-text-muted\)/s);
+    expect(css).toMatch(/\.desktop-agent-connection-status\s*\{[^}]*width:\s*fit-content[^}]*padding:\s*0 var\(--agent-message-content-inset\)[^}]*color:\s*var\(--agent-text-subtle\)[^}]*font-size:\s*var\(--agent-font-size-meta\)/s);
+    expect(css).not.toContain(".desktop-agent-notice.is-connection");
+    expect(css).not.toContain("--agent-connection-surface");
+    expect(connectionStatus).toContain('data-state={status.state}');
+    expect(connectionStatus).toContain('reconnecting ? "desktop-agent-spin" : undefined');
+    expect(noticeActivity).not.toContain("recoverable");
+    expect(noticeActivity).not.toContain("desktop-agent-spin");
     expect(css).toMatch(/\.desktop-agent-message\.is-assistant\s*\{[^}]*box-sizing:\s*border-box[^}]*width:\s*100%[^}]*padding:\s*0 var\(--agent-message-content-inset\)[^}]*border:\s*0[^}]*background:\s*transparent[^}]*box-shadow:\s*none/s);
     expect(css).not.toContain(".desktop-agent-message-actions");
     expect(messagePart).not.toContain("Copy response");

@@ -631,12 +631,25 @@ export function normalizeCodexNotification(message) {
       return [{ type: "usage.updated", providerSessionId: threadId, turnId, payload: boundRendererValue(params.tokenUsage ?? {}) }];
     case "error":
       return [{
-        type: params.willRetry ? "provider.warning" : "provider.error",
+        type: params.willRetry ? "provider.connection.updated" : "provider.error",
         providerSessionId: threadId,
         turnId,
-        payload: { message: formatCodexErrorMessage(params.error, "Codex reported an error."), recoverable: Boolean(params.willRetry) },
+        payload: params.willRetry
+          ? {
+            state: "reconnecting",
+            message: formatCodexErrorMessage(params.error, "Codex is reconnecting."),
+            ...(Number.isSafeInteger(params.attempt) ? { attempt: params.attempt } : {}),
+            ...(Number.isSafeInteger(params.maxAttempts) ? { maxAttempts: params.maxAttempts } : {}),
+          }
+          : { message: formatCodexErrorMessage(params.error, "Codex reported an error."), recoverable: false },
       }];
     case "warning":
+      return [{
+        type: "provider.connection.updated",
+        providerSessionId: threadId,
+        turnId,
+        payload: { state: "fallback", message: formatProviderWarning(params) },
+      }];
     case "configWarning":
     case "deprecationNotice":
       return [{ type: "provider.warning", providerSessionId: threadId, turnId, payload: { message: formatProviderWarning(params) } }];

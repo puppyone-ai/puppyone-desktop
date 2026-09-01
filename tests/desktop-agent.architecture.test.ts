@@ -85,7 +85,7 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(foundation).toContain("--agent-composer-input-min-height: calc(var(--agent-composer-line-height) + var(--agent-composer-input-padding) + var(--agent-composer-input-padding));");
     expect(foundation).not.toContain("--agent-composer-input-min-height: 70px");
     expect(theme).toContain("--agent-prompt-surface: var(--po-active)");
-    expect(theme).toContain("--agent-connection-surface: var(--agent-prompt-surface)");
+    expect(theme).not.toContain("--agent-connection-surface");
     expect(theme).not.toMatch(/--agent-(?:composer|user-message)-surface:/);
     expect(foundation).not.toContain("--agent-prompt-surface:");
     expect(pickers).toMatch(
@@ -213,6 +213,22 @@ describe("Desktop Agent architecture boundaries", () => {
     ].join("\n");
     expect(preload).not.toMatch(/spawnAgent|agentStdin|OpenCodeHttpClient|OPENCODE_SERVER_PASSWORD/);
     expect(renderer).not.toMatch(/OpenCodeHttpClient|OPENCODE_SERVER_PASSWORD|\/global\/event/);
+  });
+
+  it("models provider recovery as replaceable live state rather than transcript history", () => {
+    const projection = source("src/features/desktop-agent/domain/agent-projection.ts");
+    const typedProjection = source("src/features/desktop-agent/domain/agent-typed-part-projection.ts");
+    const notice = source("src/features/desktop-agent/ui/activity/AgentNoticeActivity.tsx");
+    const connection = source("src/features/desktop-agent/ui/AgentConnectionStatus.tsx");
+    const codex = source("electron/main/agent/runtimes/codex/codex-app-server-adapter.mjs");
+    const claude = source("electron/main/agent/runtimes/claude/claude-events.mjs");
+    expect(projection).toContain('case "provider.connection.updated"');
+    expect(typedProjection).toContain('event.type === "provider.connection.updated"');
+    expect(notice).not.toContain("recoverable");
+    expect(notice).not.toContain("desktop-agent-spin");
+    expect(connection).toContain('data-state={status.state}');
+    expect(codex).toContain('type: params.willRetry ? "provider.connection.updated" : "provider.error"');
+    expect(claude).toContain('event("provider.connection.updated"');
   });
 
   it("keeps Core backend-neutral and concrete backends in the single production composition root", () => {

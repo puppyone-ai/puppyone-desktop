@@ -7,6 +7,7 @@ import { PageLoading } from "../../../components/loading";
 import type { AgentSubmissionStage } from "../application/agent-controller-state";
 import type { AgentDraftReference, AgentPromptReferenceMention, AgentReferenceDisplay } from "../domain/agent-contract";
 import type { AgentPart, AgentProjection, TimelineRow } from "../domain/agent-projection-types";
+import { AgentConnectionStatus } from "./AgentConnectionStatus";
 import { AgentMessagePart } from "./AgentMessagePart";
 import { AgentPartRenderer } from "./AgentPartRenderer";
 import {
@@ -75,9 +76,14 @@ function AgentTranscriptView({
   const visibleRows = timeline.rows.slice(range.start, range.end);
   const latestSequence = timeline.rows.at(-1)?.sequence ?? 0;
   const submissionStatus = agentSubmissionStatusLabel(submissionStage, runtimeLabel, t);
-  const showThinking = !submissionStatus && shouldShowAgentThinking(projection, working);
-  const workingStatus = submissionStatus || (showThinking ? t("agent.activity.thinking") : null);
-  const hasLiveTail = Boolean(pendingPrompt) || pendingReferences.length > 0 || Boolean(workingStatus);
+  const showThinking = !projection.connectionStatus && !submissionStatus && shouldShowAgentThinking(projection, working);
+  const workingStatus = projection.connectionStatus
+    ? null
+    : submissionStatus || (showThinking ? t("agent.activity.thinking") : null);
+  const hasLiveTail = Boolean(pendingPrompt)
+    || pendingReferences.length > 0
+    || Boolean(projection.connectionStatus)
+    || Boolean(workingStatus);
   const showEmptyState = Boolean(emptyState)
     && !loading
     && timeline.rows.length === 0
@@ -225,6 +231,7 @@ function AgentTranscriptView({
               terminalState: null,
               sequence: Number.MAX_SAFE_INTEGER,
             }} runtimeLabel={runtimeLabel} />}
+            {projection.connectionStatus && <AgentConnectionStatus status={projection.connectionStatus} />}
             {workingStatus && (
               <div
                 className="desktop-agent-working-indicator"
