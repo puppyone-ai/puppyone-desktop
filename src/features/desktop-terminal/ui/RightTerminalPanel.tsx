@@ -14,14 +14,21 @@ import type {
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
 import type {
+  AuxiliaryWorkbenchCloseDecision,
   AuxiliaryWorkbenchContribution,
   AuxiliaryWorkbenchCreationRecipe,
   AuxiliaryWorkbenchHistoryTarget,
 } from "../../app-shell/auxiliary-workbench/types";
 import { filterAgentChatCreationRecipesByLocalAgentIds } from "../../app-shell/auxiliary-workbench/agentChatCreationRecipes";
+import { AuxiliaryWorkbenchCloseDialog } from "../../app-shell/auxiliary-workbench/AuxiliaryWorkbenchCloseDialog";
 import { useAuxiliaryWorkbenchContributions } from "../../app-shell/auxiliary-workbench/useAuxiliaryWorkbenchContributions";
+import {
+  useAuxiliaryWorkbenchCloseCoordinator,
+  type AuxiliaryWorkbenchCloseTarget,
+} from "../../app-shell/auxiliary-workbench/useAuxiliaryWorkbenchCloseCoordinator";
 import { useTerminalAgentLocator } from "../controller/useTerminalAgentLocator";
 import { useTerminalTabMoveDrag } from "../interactions/useTerminalTabMoveDrag";
+import { getTerminalClosePolicy } from "../model/terminalClosePolicy";
 import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
 import {
   canPlaceTerminalSplit,
@@ -38,7 +45,6 @@ import { TerminalContributionItemHost } from "../workbench/TerminalContributionI
 import { TerminalWorkbenchCreationFailure } from "../workbench/TerminalWorkbenchCreationFailure";
 import { useTerminalWorkbenchSnapshots } from "../workbench/useTerminalWorkbenchSnapshots";
 import { TerminalWorkbenchViewport } from "../workbench/TerminalWorkbenchViewport";
-import { TerminalCloseConfirmationDialog } from "./TerminalCloseConfirmationDialog";
 import { TerminalLauncher } from "./TerminalLauncher";
 import { TerminalSessionHost } from "./TerminalSessionHost";
 import "@xterm/xterm/css/xterm.css";
@@ -53,6 +59,7 @@ type RightTerminalPanelProps = Readonly<{
 }>;
 
 const EMPTY_CHAT_RECIPES: readonly AuxiliaryWorkbenchCreationRecipe[] = Object.freeze([]);
+const CLOSE_NOW: AuxiliaryWorkbenchCloseDecision = Object.freeze({ kind: "close" });
 
 export function RightTerminalPanel({
   workspace,
@@ -63,7 +70,6 @@ export function RightTerminalPanel({
 }: RightTerminalPanelProps) {
   const { t } = useLocalization();
   const panelRef = useRef<HTMLElement>(null);
-  const closingItemIdsRef = useRef(new Set<string>());
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const workbench = useTerminalWorkbench({ messageFormatter: t });
   const currentRoot = useMemo(
@@ -174,6 +180,41 @@ export function RightTerminalPanel({
       )
     )
   ), [agentLauncherMode, terminalEnabled, visibleAgentIds]);
+  const resolveCloseTarget = useCallback((itemId: string): AuxiliaryWorkbenchCloseTarget | null => {
+    const item = itemById.get(itemId);
+    const snapshot = snapshotById.get(itemId);
+    if (!item || !snapshot) return null;
+    const context = Object.freeze({ item, snapshot });
+    if (item.kind === TERMINAL_WORKBENCH_ITEM_KIND) {
+      const session = workbench.terminalById.get(itemId);
+      if (!session) return null;
+      return Object.freeze({
+        context,
+        adapter: Object.freeze({
+          decide: (): AuxiliaryWorkbenchCloseDecision => (
+            getTerminalClosePolicy(session.status) === "close"
+              ? CLOSE_NOW
+              : Object.freeze({
+                  kind: "confirm",
+                  tone: "danger",
+                  dialog: Object.freeze({
+                    title: t("terminal.closeDialog.title", { title: snapshot.title }),
+                    detail: t("terminal.closeDialog.detail"),
+                    actionLabel: t("terminal.closeDialog.confirm"),
+                  }),
+                })
+          ),
+          commit: () => workbench.commitCloseTerminal(itemId),
+        }),
+      });
+    }
+    const contribution = contributionByKind.get(item.kind);
+    return contribution ? Object.freeze({ context, adapter: contribution.close }) : null;
+  }, [contributionByKind, itemById, snapshotById, t, workbench]);
+  const closeCoordinator = useAuxiliaryWorkbenchCloseCoordinator({
+    resolveTarget: resolveCloseTarget,
+    onClosed: workbench.removeItem,
+  });
   const createDetectedTerminal = useCallback((launcherId: DesktopTerminalLauncherId) => {
     if (terminalEnabled && canLaunch(launcherId)) {
       workbench.createTerminal(currentRoot, launcherId);
@@ -206,8 +247,8 @@ export function RightTerminalPanel({
       targetGroupId,
       recipe,
     );
-    if (createdItemId) workbench.requestCloseTerminal(launcherItemId);
-  }, [agentChatContribution, createContributionItem, workbench]);
+    if (createdItemId) await closeCoordinator.requestClose(launcherItemId);
+  }, [agentChatContribution, closeCoordinator, createContributionItem, workbench.groups]);
   const restoreChat = useCallback(async (
     target: AuxiliaryWorkbenchHistoryTarget,
     targetGroupId: string | null,
@@ -221,9 +262,9 @@ export function RightTerminalPanel({
       target,
     );
     if (!createdItemId) return false;
-    if (launcherItemId) workbench.requestCloseTerminal(launcherItemId);
+    if (launcherItemId) await closeCoordinator.requestClose(launcherItemId);
     return true;
-  }, [agentChatContribution, createContributionItem, workbench]);
+  }, [agentChatContribution, closeCoordinator, createContributionItem]);
 
   useEffect(() => {
     if (!presentedTerminalSessions.some((session) => session.launchError)) return;
@@ -287,23 +328,6 @@ export function RightTerminalPanel({
     }
   }, [canDropItem, workbench]);
 
-  const requestCloseItem = useCallback(async (itemId: string) => {
-    const item = itemById.get(itemId);
-    if (!item || closingItemIdsRef.current.has(itemId)) return;
-    if (item.kind === TERMINAL_WORKBENCH_ITEM_KIND) {
-      workbench.requestCloseTerminal(itemId);
-      return;
-    }
-    const contribution = contributionByKind.get(item.kind);
-    if (!contribution) return;
-    closingItemIdsRef.current.add(itemId);
-    try {
-      if (await contribution.requestClose(item)) workbench.removeItem(itemId);
-    } finally {
-      closingItemIdsRef.current.delete(itemId);
-    }
-  }, [contributionByKind, itemById, workbench]);
-
   useTerminalAppearanceSync(panelRef, workbench.runtimeRegistry);
   return (
     <section ref={panelRef} className="desktop-terminal-panel" aria-label={t("terminal.title")}>
@@ -345,7 +369,7 @@ export function RightTerminalPanel({
             root={workbench.root}
             itemMove={itemMove}
             onActivateItem={workbench.activateItem}
-            onCloseItem={(itemId) => { void requestCloseItem(itemId); }}
+            onCloseItem={(itemId) => { void closeCoordinator.requestClose(itemId); }}
             onCreateItem={(groupId) => workbench.createTerminalLauncher(currentRoot, groupId)}
             onMoveByKeyboard={moveItemByKeyboard}
             onResizeSplit={workbench.resizeSplit}
@@ -405,11 +429,12 @@ export function RightTerminalPanel({
           item.id,
         ))}
       </div>
-      {workbench.pendingCloseTerminal && (
-        <TerminalCloseConfirmationDialog
-          title={t("terminal.sessionTitle", { number: workbench.pendingCloseTerminal.ordinal })}
-          onCancel={workbench.cancelCloseTerminal}
-          onConfirm={workbench.confirmCloseTerminal}
+      {closeCoordinator.pending && (
+        <AuxiliaryWorkbenchCloseDialog
+          pending={closeCoordinator.pending}
+          committing={closeCoordinator.committing}
+          onDismiss={closeCoordinator.dismiss}
+          onConfirm={() => { void closeCoordinator.confirm(); }}
         />
       )}
     </section>

@@ -278,7 +278,10 @@ function createContribution(
     prepare,
     discardPreparedItem,
     renderItem: () => null,
-    requestClose: async () => true,
+    close: Object.freeze({
+      decide: () => Object.freeze({ kind: "close" as const }),
+      commit: async () => true,
+    }),
   });
 }
 

@@ -70,6 +70,42 @@ export type AuxiliaryWorkbenchPreparationContext = Readonly<{
   historyTarget: AuxiliaryWorkbenchHistoryTarget | null;
 }>;
 
+export type AuxiliaryWorkbenchCloseContext = Readonly<{
+  item: AuxiliaryWorkbenchItem;
+  snapshot: AuxiliaryWorkbenchItemSnapshot;
+}>;
+
+export type AuxiliaryWorkbenchCloseDialogCopy = Readonly<{
+  title: string;
+  detail: string;
+  actionLabel: string;
+}>;
+
+/**
+ * A close request is evaluated before native ownership is released. Keeping
+ * this decision explicit prevents lifecycle state from leaking into generic
+ * Tab chrome and gives every contribution the same confirmation boundary.
+ */
+export type AuxiliaryWorkbenchCloseDecision =
+  | Readonly<{ kind: "close" }>
+  | Readonly<{
+    kind: "confirm";
+    tone: "danger" | "primary";
+    dialog: AuxiliaryWorkbenchCloseDialogCopy;
+  }>
+  | Readonly<{
+    kind: "blocked";
+    dialog: AuxiliaryWorkbenchCloseDialogCopy;
+  }>;
+
+export type AuxiliaryWorkbenchCloseAdapter = Readonly<{
+  decide: (
+    context: AuxiliaryWorkbenchCloseContext,
+  ) => AuxiliaryWorkbenchCloseDecision | Promise<AuxiliaryWorkbenchCloseDecision>;
+  /** Returns true only after feature-owned resources are safe to detach. */
+  commit: (context: AuxiliaryWorkbenchCloseContext) => boolean | Promise<boolean>;
+}>;
+
 export type AuxiliaryWorkbenchContribution = Readonly<{
   kind: string;
   label: string;
@@ -85,5 +121,5 @@ export type AuxiliaryWorkbenchContribution = Readonly<{
   /** Dispose feature state prepared for an Item that admission never committed. */
   discardPreparedItem?: (context: AuxiliaryWorkbenchPreparationContext) => void | Promise<void>;
   renderItem: (context: AuxiliaryWorkbenchItemRenderContext) => ReactNode;
-  requestClose: (item: AuxiliaryWorkbenchItem) => Promise<boolean>;
+  close: AuxiliaryWorkbenchCloseAdapter;
 }>;

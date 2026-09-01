@@ -72,7 +72,6 @@ export function useTerminalWorkbench({ messageFormatter }: UseTerminalWorkbenchO
     sessions: Object.freeze([]),
     nextOrdinal: 1,
   });
-  const [pendingCloseItemId, setPendingCloseItemId] = useState<string | null>(null);
   const pendingLauncherByGroupRef = useRef(new Map<string, string>());
   const messageFormatterRef = useRef(messageFormatter);
   const topologyRef = useRef(topology);
@@ -195,28 +194,12 @@ export function useTerminalWorkbench({ messageFormatter }: UseTerminalWorkbenchO
     dispatchTopology({ type: "close", itemId });
   }, []);
 
-  const closeTerminal = useCallback((itemId: string) => {
+  const commitCloseTerminal = useCallback((itemId: string) => {
+    if (!terminalState.sessions.some((session) => session.id === itemId)) return false;
     runtimeRegistry.close(itemId);
     dispatchTerminal({ type: "close", itemId });
-    removeItem(itemId);
-  }, [removeItem, runtimeRegistry]);
-
-  const requestCloseTerminal = useCallback((itemId: string) => {
-    const session = terminalState.sessions.find((candidate) => candidate.id === itemId);
-    if (!session) return;
-    if (session.status === "selecting") {
-      closeTerminal(itemId);
-      return;
-    }
-    setPendingCloseItemId(itemId);
-  }, [closeTerminal, terminalState.sessions]);
-
-  const cancelCloseTerminal = useCallback(() => setPendingCloseItemId(null), []);
-  const confirmCloseTerminal = useCallback(() => {
-    if (!pendingCloseItemId) return;
-    closeTerminal(pendingCloseItemId);
-    setPendingCloseItemId(null);
-  }, [closeTerminal, pendingCloseItemId]);
+    return true;
+  }, [runtimeRegistry, terminalState.sessions]);
 
   const splitItem = useCallback((
     sourceItemId: string,
@@ -310,9 +293,6 @@ export function useTerminalWorkbench({ messageFormatter }: UseTerminalWorkbenchO
     () => new Map(terminalState.sessions.map((session) => [session.id, session])),
     [terminalState.sessions],
   );
-  const pendingCloseTerminal = pendingCloseItemId
-    ? terminalById.get(pendingCloseItemId) ?? null
-    : null;
   const groupCanMerge = useCallback((
     sourceGroupId: string,
     targetGroupId: string,
@@ -339,8 +319,7 @@ export function useTerminalWorkbench({ messageFormatter }: UseTerminalWorkbenchO
     activeGroup,
     activeItemId,
     activateItem,
-    cancelCloseTerminal,
-    confirmCloseTerminal,
+    commitCloseTerminal,
     createTerminal,
     createTerminalLauncher,
     groups: topology.groups,
@@ -353,12 +332,10 @@ export function useTerminalWorkbench({ messageFormatter }: UseTerminalWorkbenchO
     mergeGroup,
     mergeItem,
     moveGroup,
-    pendingCloseTerminal,
     presentedItemIds,
     removeItem,
     reserveContributionItem,
     commitContributionItem,
-    requestCloseTerminal,
     resizeSplit,
     root: topology.root,
     runtimeRegistry,

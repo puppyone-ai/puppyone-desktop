@@ -6,7 +6,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DesktopTitlebarActions } from "../src/features/app-shell/DesktopTitlebarActions";
-import { TerminalCloseConfirmationDialog } from "../src/features/desktop-terminal/ui/TerminalCloseConfirmationDialog";
+import { AuxiliaryWorkbenchCloseDialog } from "../src/features/app-shell/auxiliary-workbench/AuxiliaryWorkbenchCloseDialog";
 import type { TerminalRuntimeHandle } from "../src/features/desktop-terminal/runtime/terminalRuntime";
 import { TerminalSessionHeader } from "../src/features/desktop-terminal/ui/session-header/TerminalSessionHeader";
 import type { TerminalTabMoveDragController } from "../src/features/desktop-terminal/interactions/useTerminalTabMoveDrag";
@@ -537,9 +537,21 @@ describe("Desktop Terminal tab session manager", () => {
     root = createRoot(container);
 
     act(() => root?.render(withTestLocalization(
-      <TerminalCloseConfirmationDialog
-        title="Terminal 2"
-        onCancel={onCancel}
+      <AuxiliaryWorkbenchCloseDialog
+        pending={{
+          itemId: "terminal-2",
+          decision: {
+            kind: "confirm",
+            tone: "danger",
+            dialog: {
+              title: "Close Terminal 2?",
+              detail: "This will stop the shell and any command running in this terminal.",
+              actionLabel: "Close terminal",
+            },
+          },
+        }}
+        committing={false}
+        onDismiss={onCancel}
         onConfirm={onConfirm}
       />,
     )));
@@ -554,8 +566,7 @@ describe("Desktop Terminal tab session manager", () => {
     );
     const confirmButton = Array.from(dialog?.querySelectorAll("button") ?? [])
       .find((button) => button.textContent?.trim() === "Close terminal");
-    expect(confirmButton?.classList.contains("primary")).toBe(true);
-    expect(confirmButton?.classList.contains("destructive")).toBe(true);
+    expect(confirmButton?.classList.contains("po-button--danger")).toBe(true);
     expect(document.activeElement?.textContent).toBe("Cancel");
 
     clickButton(overlayRoot!, "Cancel");
