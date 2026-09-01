@@ -2,6 +2,7 @@
 :root[data-interface-style="windows-xp"]
   :where(
     .po-button--neutral,
+    .po-button--danger,
     .desktop-dialog-button,
     .desktop-settings-action,
     .desktop-settings-row-action,
@@ -19,6 +20,7 @@
 :root[data-interface-style="windows-xp"]
   :where(
     .po-button--neutral,
+    .po-button--danger,
     .desktop-dialog-button,
     .desktop-settings-action,
     .desktop-settings-row-action,
@@ -30,7 +32,12 @@
 }
 
 :root[data-interface-style="windows-xp"]
-  :where(.po-button--primary, .desktop-dialog-button.primary, .desktop-settings-action.primary) {
+  :where(
+    .po-button--primary,
+    .po-button--danger,
+    .desktop-dialog-button.primary,
+    .desktop-settings-action.primary
+  ) {
   border-color: #003c74;
   background: linear-gradient(180deg, var(--xp-button-start), var(--xp-button-mid) 54%, var(--xp-button-end));
   color: #000000;

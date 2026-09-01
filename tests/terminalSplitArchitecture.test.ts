@@ -23,7 +23,7 @@ describe("Terminal native split architecture", () => {
 
   it("keeps Group geometry outside Runtime and PTY ownership", () => {
     const controller = source(
-      "src/features/desktop-terminal/controller/useTerminalSessions.ts",
+      "src/features/desktop-terminal/workbench/useTerminalWorkbench.ts",
     );
     const model = source("src/features/desktop-terminal/model/terminalSessions.ts");
     const runtime = source("src/features/desktop-terminal/runtime/terminalRuntime.ts");
@@ -38,8 +38,8 @@ describe("Terminal native split architecture", () => {
     expect(model).toContain('type: "move-group"');
     expect(model).toContain('type: "merge-group"');
     expect(model).not.toContain("TerminalRuntimeRegistry");
-    expect(controller).toContain('type: "split-tab"');
-    expect(controller).toContain('type: "merge-tab"');
+    expect(controller).toContain('type: "split-item"');
+    expect(controller).toContain('type: "merge-item"');
     expect(controller).toContain('type: "move-group"');
     expect(controller).toContain('type: "merge-group"');
     expect(runtime).toContain("setPresented(presented: boolean)");

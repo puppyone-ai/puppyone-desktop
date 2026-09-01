@@ -8,7 +8,7 @@ const FEATURE_OWNED_WINDOW_DIALOGS = [
   "src/features/cloud/access-points/components/AccessPointManageDialog.tsx",
   "src/features/cloud/initialization/CloudPublishConfirmationDialog.tsx",
   "src/features/cloud/sections/access/CreateAccessDialog.tsx",
-  "src/features/desktop-terminal/ui/TerminalCloseConfirmationDialog.tsx",
+  "src/features/app-shell/auxiliary-workbench/AuxiliaryWorkbenchCloseDialog.tsx",
 ] as const;
 
 describe("global dialog overlay architecture", () => {

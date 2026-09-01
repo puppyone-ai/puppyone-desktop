@@ -5,7 +5,13 @@ describe("Desktop Terminal architecture boundaries", () => {
   it("keeps terminal processes user-owned and the content free of overlapping chrome", () => {
     const panel = source("src/features/desktop-terminal/ui/RightTerminalPanel.tsx");
     const closeDialog = source(
-      "src/features/desktop-terminal/ui/TerminalCloseConfirmationDialog.tsx",
+      "src/features/app-shell/auxiliary-workbench/AuxiliaryWorkbenchCloseDialog.tsx",
+    );
+    const closeCoordinator = source(
+      "src/features/app-shell/auxiliary-workbench/useAuxiliaryWorkbenchCloseCoordinator.ts",
+    );
+    const closePolicy = source(
+      "src/features/desktop-terminal/model/terminalClosePolicy.ts",
     );
     const launcher = source("src/features/desktop-terminal/ui/TerminalLauncher.tsx");
     const launchers = source("src/features/desktop-terminal/model/terminalLaunchers.ts");
@@ -105,11 +111,15 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(controller).toContain('dispatchTopology({ type: "close"');
     expect(controller).toContain("runtimeRegistry.ensure(itemId, launcherId, root.path)");
     expect(controller).toContain("runtimeRegistry.close(itemId)");
-    expect(controller).toContain("pendingCloseItemId");
+    expect(controller).not.toContain("pendingCloseItemId");
     expect(panel).not.toContain("useImperativeHandle");
     expect(panel).toContain("onCloseItem={(itemId)");
     expect(groupViewport).toContain("onClose={onCloseItem}");
-    expect(panel).toContain("<TerminalCloseConfirmationDialog");
+    expect(panel).toContain("<AuxiliaryWorkbenchCloseDialog");
+    expect(panel).toContain("useAuxiliaryWorkbenchCloseCoordinator");
+    expect(panel).toContain("getTerminalClosePolicy(session.status)");
+    expect(closePolicy).toContain('status === "starting" || status === "running"');
+    expect(closeCoordinator).toContain("activeItemIdsRef");
     expect(closeDialog).toContain("<DesktopOverlayLayer>");
     expect(closeDialog).toContain("<DesktopDialogRoot");
     expect(panel).toContain("<TerminalLauncher");

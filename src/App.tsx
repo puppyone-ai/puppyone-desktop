@@ -103,6 +103,7 @@ import {
 } from "./features/typography";
 import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
 import type {
+  AuxiliaryWorkbenchCloseAdapter,
   AuxiliaryWorkbenchContribution,
   AuxiliaryWorkbenchHistoryBrowserContext,
 } from "./features/app-shell/auxiliary-workbench/types";
@@ -1027,7 +1028,19 @@ function AppContent() {
           />
         </Suspense>
       ),
-      requestClose: (item) => closeAgentChatWorkbenchItem(item.rootId, item.id),
+      close: Object.freeze<AuxiliaryWorkbenchCloseAdapter>({
+        decide: ({ snapshot }) => snapshot.running
+          ? Object.freeze({
+              kind: "blocked" as const,
+              dialog: Object.freeze({
+                title: t("agent.closeDialog.activeTitle", { title: snapshot.title }),
+                detail: t("agent.closeDialog.activeDetail"),
+                actionLabel: t("agent.closeDialog.keepOpen"),
+              }),
+            })
+          : Object.freeze({ kind: "close" as const }),
+        commit: ({ item }) => closeAgentChatWorkbenchItem(item.rootId, item.id),
+      }),
     });
   }, [
     agentPreferredModel,
