@@ -148,7 +148,7 @@ describe("Desktop Agent renderer surfaces", () => {
   it("renders the structural regions and applies the real layout CSS contract", () => {
     const style = document.createElement("style");
     style.dataset.agentLayoutTest = "true";
-    style.textContent = ["foundation.css", "composer.css", "pickers.css"]
+    style.textContent = ["theme.css", "foundation.css", "composer.css", "pickers.css"]
       .map((file) => readFileSync(`${process.cwd()}/src/features/desktop-agent/ui/styles/${file}`, "utf8"))
       .join("\n");
     document.head.appendChild(style);

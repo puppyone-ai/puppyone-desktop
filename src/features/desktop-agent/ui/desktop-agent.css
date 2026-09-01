@@ -3,6 +3,7 @@
  * semantic PuppyOne tokens. Third-party source provenance and license records
  * live outside runtime styles in the repository's audited notice ledger.
  */
+@import "./styles/theme.css";
 @import "./styles/foundation.css";
 @import "./styles/tabs.css";
 @import "./styles/launcher.css";

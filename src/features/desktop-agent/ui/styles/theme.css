@@ -1,0 +1,48 @@
+/*
+ * Agent Chat theme contract.
+ *
+ * Feature modules consume these semantic roles and never derive competing
+ * component colors. A user prompt has one surface whether it is being drafted
+ * in the Composer or rendered later in the transcript.
+ */
+.desktop-agent-boundary,
+.desktop-agent-overlay {
+  --agent-canvas: var(--po-editor-bg);
+  --agent-report-surface: color-mix(in srgb, var(--po-panel-raised) 90%, var(--po-canvas));
+  --agent-prompt-surface: var(--po-active);
+  --agent-connection-surface: var(--agent-prompt-surface);
+  --agent-reference-surface: color-mix(in srgb, var(--agent-prompt-surface) 92%, transparent);
+  --agent-reference-error-surface: color-mix(in srgb, var(--po-danger) 12%, var(--agent-prompt-surface));
+  --agent-control-surface: color-mix(in srgb, var(--po-header) 82%, var(--po-panel-raised));
+  --agent-border: var(--po-border-strong);
+  --agent-border-subtle: var(--po-divider);
+  --agent-sidebar-border: var(--po-divider);
+  --agent-config-border: var(--po-border-subtle);
+  --agent-config-surface: var(--po-control);
+  --agent-config-surface-hover: var(--po-control-hover);
+  --agent-text: var(--po-text);
+  --agent-text-muted: var(--po-text-muted);
+  --agent-text-subtle: var(--po-text-subtle);
+  --agent-tool-foreground: var(--agent-text-subtle);
+  --agent-accent: var(--po-accent);
+  --agent-accent-soft: color-mix(in srgb, var(--po-accent) 16%, transparent);
+}
+
+.dark .desktop-agent-boundary,
+.dark .desktop-agent-overlay {
+  --agent-canvas: var(--po-editor-bg);
+  --agent-report-surface: #18181b;
+  --agent-control-surface: color-mix(in srgb, var(--po-header) 82%, var(--po-panel-raised));
+  --agent-border: #3a3a3a;
+  --agent-border-subtle: rgba(255, 255, 255, 0.08);
+  --agent-text: #e5e5e5;
+  --agent-text-muted: #a0a0a0;
+  --agent-text-subtle: #737373;
+  --agent-accent: #4a90e2;
+  --agent-accent-soft: rgba(74, 144, 226, 0.15);
+}
+
+/* Agent Chat becomes application chrome inside the auxiliary sidebar. */
+.desktop-right-sidebar .desktop-agent-boundary {
+  --agent-canvas: var(--po-terminal-bg);
+}

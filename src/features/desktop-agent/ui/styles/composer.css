@@ -29,7 +29,7 @@
   padding: 0;
   border: 1px solid var(--agent-border-subtle);
   border-radius: var(--agent-radius-composer);
-  background: var(--agent-composer-surface);
+  background: var(--agent-prompt-surface);
   box-shadow: none;
   transition: border-color 180ms ease, box-shadow 180ms ease;
 }
@@ -40,12 +40,12 @@
 
 .desktop-agent-composer:hover:not([data-input-disabled="true"]) {
   border-color: var(--agent-border);
-  background: var(--agent-composer-surface);
+  background: var(--agent-prompt-surface);
 }
 
 .desktop-agent-composer:focus-within {
   border-color: var(--agent-border);
-  background: var(--agent-composer-surface);
+  background: var(--agent-prompt-surface);
   box-shadow: none;
 }
 
@@ -278,10 +278,10 @@
   height: 18px;
   place-items: center;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--agent-composer-surface) 92%, transparent);
+  background: var(--agent-reference-surface);
   color: var(--agent-text-muted);
 }
-.desktop-agent-reference-card-status.is-error { background: color-mix(in srgb, var(--po-danger) 12%, var(--agent-composer-surface)); color: var(--po-danger); }
+.desktop-agent-reference-card-status.is-error { background: var(--agent-reference-error-surface); color: var(--po-danger); }
 .desktop-agent-attachment-control { position: relative; display: grid; flex: 0 0 auto; }
 .desktop-agent-reference-trigger {
   display: grid;

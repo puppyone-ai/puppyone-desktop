@@ -57,6 +57,7 @@ describe("Desktop Agent architecture boundaries", () => {
     const streamScheduler = source("src/features/desktop-agent/ui/agent-stream-frame-scheduler.ts");
     const runtimeGeometry = source("src/features/desktop-agent/ui/agent-runtime-geometry.ts");
     const cssEntry = source("src/features/desktop-agent/ui/desktop-agent.css");
+    const theme = source("src/features/desktop-agent/ui/styles/theme.css");
     const foundation = source("src/features/desktop-agent/ui/styles/foundation.css");
     const pickers = source("src/features/desktop-agent/ui/styles/pickers.css");
     const css = agentStyles();
@@ -71,7 +72,9 @@ describe("Desktop Agent architecture boundaries", () => {
     );
     expect(markdown).not.toContain("dangerouslySetInnerHTML");
     expect(markdown).toContain('["https:", "http:", "mailto:"]');
+    expect(cssEntry).toContain('@import "./styles/theme.css"');
     expect(cssEntry).toContain('@import "./styles/foundation.css"');
+    expect(cssEntry.indexOf('styles/theme.css')).toBeLessThan(cssEntry.indexOf('styles/foundation.css'));
     expect(cssEntry).toContain('@import "./styles/pickers.css"');
     expect(cssEntry.split("\n").length).toBeLessThan(30);
     expect(foundation).toMatch(/\.desktop-agent-boundary\s*\{[^}]*container:\s*desktop-agent \/ inline-size/s);
@@ -81,6 +84,10 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(foundation).toContain("--agent-inline-inset: var(--desktop-sidebar-row-left-gap, 12px)");
     expect(foundation).toContain("--agent-composer-input-min-height: calc(var(--agent-composer-line-height) + var(--agent-composer-input-padding) + var(--agent-composer-input-padding));");
     expect(foundation).not.toContain("--agent-composer-input-min-height: 70px");
+    expect(theme).toContain("--agent-prompt-surface: var(--po-active)");
+    expect(theme).toContain("--agent-connection-surface: var(--agent-prompt-surface)");
+    expect(theme).not.toMatch(/--agent-(?:composer|user-message)-surface:/);
+    expect(foundation).not.toContain("--agent-prompt-surface:");
     expect(pickers).toMatch(
       /\.desktop-agent-picker\.is-header \.desktop-agent-picker-trigger\s*\{[^}]*color:\s*var\(--desktop-titlebar-text-muted, var\(--po-text-muted\)\);[^}]*font-size:\s*var\(--po-font-size-chrome, 13px\);[^}]*font-weight:\s*var\(--po-font-weight-chrome, 500\);[^}]*line-height:\s*18px;/s,
     );
@@ -280,7 +287,7 @@ function source(relativePath: string) {
 }
 
 function agentStyles() {
-  return ["foundation", "transcript", "activities", "blocking", "composer", "pickers", "responsive"]
+  return ["theme", "foundation", "transcript", "activities", "blocking", "composer", "pickers", "responsive"]
     .map((name) => source(`src/features/desktop-agent/ui/styles/${name}.css`))
     .join("\n");
 }

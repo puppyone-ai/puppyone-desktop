@@ -23,8 +23,6 @@
   --agent-font-size-caption: var(--po-text-size-caption, 11px);
   --agent-font-size-micro: var(--po-text-size-micro, 10px);
   --agent-code-font-size: var(--po-code-font-size, 13px);
-  --agent-canvas: var(--po-editor-bg);
-  --agent-report-surface: color-mix(in srgb, var(--po-panel-raised) 90%, var(--po-canvas));
   /* One-way visual mirror of the existing Data tree row states. */
   --agent-row-hover-surface: color-mix(in srgb, var(--po-hover) 86%, transparent);
   --agent-row-selected-surface: linear-gradient(
@@ -33,21 +31,6 @@
     color-mix(in srgb, var(--po-selected) 88%, transparent) calc(100% - 36px),
     color-mix(in srgb, var(--po-selected) 62%, transparent) 100%
   );
-  --agent-composer-surface: var(--po-active);
-  --agent-user-message-surface: var(--agent-composer-surface);
-  --agent-control-surface: color-mix(in srgb, var(--po-header) 82%, var(--po-panel-raised));
-  --agent-border: var(--po-border-strong);
-  --agent-border-subtle: var(--po-divider);
-  --agent-sidebar-border: var(--po-divider);
-  --agent-config-border: var(--po-border-subtle);
-  --agent-config-surface: var(--po-control);
-  --agent-config-surface-hover: var(--po-control-hover);
-  --agent-text: var(--po-text);
-  --agent-text-muted: var(--po-text-muted);
-  --agent-text-subtle: var(--po-text-subtle);
-  --agent-tool-foreground: var(--agent-text-subtle);
-  --agent-accent: var(--po-accent);
-  --agent-accent-soft: color-mix(in srgb, var(--po-accent) 16%, transparent);
   color: var(--agent-text);
   font-family: var(--po-font-sans);
   font-size: var(--agent-font-size);
@@ -66,16 +49,6 @@
 
 .dark .desktop-agent-boundary,
 .dark .desktop-agent-overlay {
-  --agent-canvas: var(--po-editor-bg);
-  --agent-report-surface: #18181b;
-  --agent-control-surface: color-mix(in srgb, var(--po-header) 82%, var(--po-panel-raised));
-  --agent-border: #3a3a3a;
-  --agent-border-subtle: rgba(255, 255, 255, 0.08);
-  --agent-text: #e5e5e5;
-  --agent-text-muted: #a0a0a0;
-  --agent-text-subtle: #737373;
-  --agent-accent: #4a90e2;
-  --agent-accent-soft: rgba(74, 144, 226, 0.15);
   --agent-row-hover-surface: color-mix(in srgb, rgba(211, 208, 197, 0.075) 86%, transparent);
   --agent-row-selected-surface: linear-gradient(
     90deg,
@@ -83,12 +56,6 @@
     color-mix(in srgb, rgba(211, 208, 197, 0.14) 88%, transparent) calc(100% - 36px),
     color-mix(in srgb, rgba(211, 208, 197, 0.14) 62%, transparent) 100%
   );
-}
-
-/* Agent Chat is document-like in a workbench tab, but becomes part of the
- * application chrome when hosted by the auxiliary sidebar. */
-.desktop-right-sidebar .desktop-agent-boundary {
-  --agent-canvas: var(--po-terminal-bg);
 }
 
 .desktop-agent-panel {

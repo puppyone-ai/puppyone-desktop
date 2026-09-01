@@ -426,7 +426,7 @@
   padding: 8px 10px;
   border: 1px solid var(--agent-border-subtle);
   border-radius: var(--agent-radius-message);
-  background: var(--agent-composer-surface);
+  background: var(--agent-connection-surface);
   color: var(--agent-text-muted);
   line-height: 1.45;
 }

@@ -7,7 +7,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const styleRoot = path.join(root, "src/features/desktop-agent/ui/styles");
 const css = [
   fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/desktop-agent.css"), "utf8"),
-  ...["foundation.css", "transcript.css", "activities.css", "tool-results.css", "blocking.css", "composer.css", "pickers.css", "responsive.css"]
+  ...["theme.css", "foundation.css", "transcript.css", "activities.css", "tool-results.css", "blocking.css", "composer.css", "pickers.css", "responsive.css"]
     .map((file) => fs.readFileSync(path.join(styleRoot, file), "utf8")),
 ].join("\n");
 const composer = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentComposer.tsx"), "utf8");
@@ -43,8 +43,9 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/--agent-radius-message:\s*var\(--agent-radius-composer\)/);
     expect(css).toMatch(/\.desktop-agent-transcript\s*\{[^}]*padding:\s*12px var\(--agent-inline-inset\) 24px/s);
     expect(css).toMatch(/\.desktop-agent-live-tail\s*\{[^}]*gap:\s*var\(--agent-message-turn-gap\)[^}]*padding:\s*0 0 20px/s);
-    expect(css).toMatch(/--agent-user-message-surface:\s*var\(--agent-composer-surface\)/);
-    expect(css).toMatch(/\.desktop-agent-message\.is-user\s*\{[^}]*box-sizing:\s*border-box[^}]*width:\s*100%[^}]*max-width:\s*none[^}]*margin:\s*0[^}]*padding:\s*8px var\(--agent-message-content-inset\)[^}]*border:\s*1px solid var\(--agent-border-subtle\)[^}]*background:\s*var\(--agent-user-message-surface\)[^}]*box-shadow:\s*none/s);
+    expect(css).toMatch(/--agent-prompt-surface:\s*var\(--po-active\)/);
+    expect(css).not.toMatch(/--agent-(?:composer|user-message)-surface:/);
+    expect(css).toMatch(/\.desktop-agent-message\.is-user\s*\{[^}]*box-sizing:\s*border-box[^}]*width:\s*100%[^}]*max-width:\s*none[^}]*margin:\s*0[^}]*padding:\s*8px var\(--agent-message-content-inset\)[^}]*border:\s*1px solid var\(--agent-border-subtle\)[^}]*background:\s*var\(--agent-prompt-surface\)[^}]*box-shadow:\s*none/s);
     expect(css).toMatch(/\.desktop-agent-virtual-row\s*\{[^}]*padding-bottom:\s*2px/s);
     expect(css).toMatch(/\.desktop-agent-virtual-row\[data-kind="user"\]\s*\{[^}]*padding-bottom:\s*var\(--agent-message-turn-gap\)/s);
     expect(css).toMatch(/\.desktop-agent-virtual-row\[data-kind="assistant"\]\s*\{[^}]*padding:\s*2px 0 var\(--agent-work-handoff-gap\)/s);
@@ -53,7 +54,7 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-virtual-row\[data-kind="tool"\],[^{]*\[data-kind="command"\],[^{]*\[data-kind="file-change"\]\s*\{[^}]*padding-bottom:\s*0/s);
     expect(css).toMatch(/\.desktop-agent-tool-row\s*\{[^}]*min-height:\s*30px[^}]*grid-template-columns:\s*auto auto minmax\(0, 1fr\) auto[^}]*padding:\s*0 4px/s);
     expect(css).toMatch(/\.desktop-agent-tool-call\.has-detail \.desktop-agent-tool-row\s*\{[^}]*grid-template-columns:\s*auto auto auto minmax\(0, 1fr\) auto/s);
-    expect(css).toMatch(/\.desktop-agent-notice\.is-connection\s*\{[^}]*border:\s*1px solid var\(--agent-border-subtle\)[^}]*border-radius:\s*var\(--agent-radius-message\)[^}]*background:\s*var\(--agent-composer-surface\)[^}]*color:\s*var\(--agent-text-muted\)/s);
+    expect(css).toMatch(/\.desktop-agent-notice\.is-connection\s*\{[^}]*border:\s*1px solid var\(--agent-border-subtle\)[^}]*border-radius:\s*var\(--agent-radius-message\)[^}]*background:\s*var\(--agent-connection-surface\)[^}]*color:\s*var\(--agent-text-muted\)/s);
     expect(css).toMatch(/\.desktop-agent-message\.is-assistant\s*\{[^}]*box-sizing:\s*border-box[^}]*width:\s*100%[^}]*padding:\s*0 var\(--agent-message-content-inset\)[^}]*border:\s*0[^}]*background:\s*transparent[^}]*box-shadow:\s*none/s);
     expect(css).not.toContain(".desktop-agent-message-actions");
     expect(messagePart).not.toContain("Copy response");
@@ -96,11 +97,11 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/--agent-row-hover-surface:\s*color-mix\(in srgb, var\(--po-hover\) 86%, transparent\)/);
     expect(css).toMatch(/--agent-row-selected-surface:\s*linear-gradient\(\s*90deg,\s*color-mix\(in srgb, var\(--po-selected\) 96%, transparent\) 0%,\s*color-mix\(in srgb, var\(--po-selected\) 88%, transparent\) calc\(100% - 36px\),\s*color-mix\(in srgb, var\(--po-selected\) 62%, transparent\) 100%\s*\)/s);
     expect(css).toMatch(/\.dark \.desktop-agent-boundary,[^{]*\{[^}]*--agent-row-hover-surface:\s*color-mix\(in srgb, rgba\(211, 208, 197, 0\.075\) 86%, transparent\)[^}]*--agent-row-selected-surface:\s*linear-gradient/s);
-    expect(css).toMatch(/\.desktop-agent-composer\s*\{[^}]*padding:\s*0[^}]*border:\s*1px solid var\(--agent-border-subtle\)[^}]*border-radius:\s*var\(--agent-radius-composer\)[^}]*background:\s*var\(--agent-composer-surface\)/s);
+    expect(css).toMatch(/\.desktop-agent-composer\s*\{[^}]*padding:\s*0[^}]*border:\s*1px solid var\(--agent-border-subtle\)[^}]*border-radius:\s*var\(--agent-radius-composer\)[^}]*background:\s*var\(--agent-prompt-surface\)/s);
     expect(css).not.toMatch(/\.desktop-agent-composer\s*\{[^}]*cursor:\s*text/s);
     expect(css).toMatch(/\.desktop-agent-composer\[data-input-disabled="true"\]\s*\{[^}]*cursor:\s*default/s);
-    expect(css).toMatch(/\.desktop-agent-composer:hover:not\(\[data-input-disabled="true"\]\)\s*\{[^}]*border-color:\s*var\(--agent-border\)[^}]*background:\s*var\(--agent-composer-surface\)/s);
-    expect(css).toMatch(/\.desktop-agent-composer:focus-within\s*\{[^}]*border-color:\s*var\(--agent-border\)[^}]*background:\s*var\(--agent-composer-surface\)/s);
+    expect(css).toMatch(/\.desktop-agent-composer:hover:not\(\[data-input-disabled="true"\]\)\s*\{[^}]*border-color:\s*var\(--agent-border\)[^}]*background:\s*var\(--agent-prompt-surface\)/s);
+    expect(css).toMatch(/\.desktop-agent-composer:focus-within\s*\{[^}]*border-color:\s*var\(--agent-border\)[^}]*background:\s*var\(--agent-prompt-surface\)/s);
     expect(css).not.toMatch(/\.desktop-agent-composer:(?:hover|focus-within)[^{]*\{[^}]*background:\s*var\(--agent-row-selected-surface\)/s);
     expect(picker).toContain("DesktopMenuItem");
     expect(menuCss).toMatch(/\.desktop-menu-item:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\),[^{]*\.desktop-menu-item\.selected\s*\{[^}]*background:\s*var\(--po-hover\)/s);
@@ -122,7 +123,7 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-composer-actions\s*\{[^}]*display:\s*flex[^}]*margin-inline-start:\s*auto/s);
     expect(css).toMatch(/\.desktop-agent-picker-trigger\.is-compact\s*\{[^}]*width:\s*var\(--agent-control-size\)/s);
     expect(css).toMatch(/\.desktop-agent-composer-action\s*\{[^}]*width:\s*var\(--agent-control-size\)[^}]*height:\s*var\(--agent-control-size\)[^}]*border-radius:\s*50%/s);
-    expect(css).toMatch(/--agent-composer-surface:\s*var\(--po-active\)/);
+    expect(css).toMatch(/--agent-prompt-surface:\s*var\(--po-active\)/);
     expect(css).toMatch(/\.desktop-agent-composer-action:disabled\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--agent-text\) 14%, transparent\)[^}]*color:\s*color-mix\(in srgb, var\(--agent-text\) 48%, transparent\)[^}]*opacity:\s*1/s);
     expect(composerToolbar).toContain('<ArrowUp size={17} strokeWidth={1.6} />');
     expect(attachmentButton).toContain('<Paperclip size={16} strokeWidth={1.7} aria-hidden="true" />');

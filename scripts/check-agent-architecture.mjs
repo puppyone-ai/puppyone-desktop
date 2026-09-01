@@ -244,6 +244,59 @@ const styleEntryBody = styleEntrySource
 if (!styleEntrySource.includes('@import "./styles/') || styleEntryBody !== "") {
   errors.push("src/features/desktop-agent/ui/desktop-agent.css must remain an import-only public style entry");
 }
+const themeStylePath = path.join(agentStyleRoot, "theme.css");
+const foundationStylePath = path.join(agentStyleRoot, "foundation.css");
+const transcriptStylePath = path.join(agentStyleRoot, "transcript.css");
+const composerStylePath = path.join(agentStyleRoot, "composer.css");
+const themeStyleSource = readFileSync(themeStylePath, "utf8");
+const foundationStyleSource = readFileSync(foundationStylePath, "utf8");
+const transcriptStyleSource = readFileSync(transcriptStylePath, "utf8");
+const composerStyleSource = readFileSync(composerStylePath, "utf8");
+const themeImportIndex = styleEntrySource.indexOf('@import "./styles/theme.css"');
+const foundationImportIndex = styleEntrySource.indexOf('@import "./styles/foundation.css"');
+if (themeImportIndex < 0 || foundationImportIndex < 0 || themeImportIndex > foundationImportIndex) {
+  errors.push("Agent theme.css must be the first feature style contract, before structural foundation.css");
+}
+for (const token of [
+  "--agent-prompt-surface: var(--po-active)",
+  "--agent-connection-surface: var(--agent-prompt-surface)",
+  "--agent-reference-surface:",
+  "--agent-reference-error-surface:",
+]) {
+  if (!themeStyleSource.includes(token)) {
+    errors.push(`${relative(themeStylePath)} is missing semantic role ${token}`);
+  }
+}
+for (const token of [
+  "--agent-prompt-surface:",
+  "--agent-connection-surface:",
+  "--agent-reference-surface:",
+  "--agent-reference-error-surface:",
+]) {
+  if (foundationStyleSource.includes(token)) {
+    errors.push(`${relative(foundationStylePath)} declares ${token}; visual roles belong to theme.css`);
+  }
+}
+if (!composerStyleSource.includes("background: var(--agent-prompt-surface)")
+  || !transcriptStyleSource.includes("background: var(--agent-prompt-surface)")) {
+  errors.push("Composer and transcript user prompts must consume one --agent-prompt-surface role");
+}
+const retiredPromptSurfacePattern = /--agent-(?:composer|user-message)-surface\b/;
+const xpAgentStyleSource = readFileSync(
+  path.join(repoRoot, "src", "styles", "interfaces", "windows-xp", "features", "agent.css"),
+  "utf8",
+);
+for (const [label, source] of [
+  ["Agent feature styles", [...readdirSync(agentStyleRoot)]
+    .filter((entry) => entry.endsWith(".css"))
+    .map((entry) => readFileSync(path.join(agentStyleRoot, entry), "utf8"))
+    .join("\n")],
+  ["Windows XP Agent adapter", xpAgentStyleSource],
+]) {
+  if (retiredPromptSurfacePattern.test(source)) {
+    errors.push(`${label} restores retired component-specific prompt surface tokens`);
+  }
+}
 for (const entry of readdirSync(agentStyleRoot)) {
   if (!entry.endsWith(".css")) continue;
   const stylePath = path.join(agentStyleRoot, entry);
