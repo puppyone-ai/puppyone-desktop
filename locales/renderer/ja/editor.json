@@ -358,6 +358,7 @@
   "panes.viewActions": "表示",
   "tabs.close": "{name} を閉じる",
   "tabs.openEditors": "開いているエディター",
+  "unavailable.resourceLimit": "このファイルは安全なプレビュー上限（{limit}）を超えています。",
   "unavailable.title": "エディターで開けません",
   "viewer.chooseFor": "{name} のビューアーを選択",
   "viewer.noHostSurface": "このビューアーパックはここでは表示できません。利用可能なホスト画面がありません。"

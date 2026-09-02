@@ -39,6 +39,18 @@ describe("preset viewer preload cache", () => {
     await expect(preloadPresetViewer(viewer)).resolves.toBeUndefined();
     expect(load).toHaveBeenCalledTimes(2);
   });
+
+  it("never evaluates an isolated Viewer implementation in the shell renderer", async () => {
+    const load = vi.fn(async () => ({ default: () => null }));
+    const viewer: LazyPresetViewerContribution = {
+      ...getPresetViewerDefinition("pdf-preview"),
+      match: () => true,
+      load,
+    };
+
+    await expect(preloadPresetViewer(viewer)).resolves.toBeUndefined();
+    expect(load).not.toHaveBeenCalled();
+  });
 });
 
 function createLazyViewer(

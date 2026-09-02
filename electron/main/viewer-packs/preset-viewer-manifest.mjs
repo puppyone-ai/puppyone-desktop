@@ -3,11 +3,13 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const manifestJson = require("../../../packages/shared-ui/src/editor/registry/presetViewerManifest.json");
 
-const CONTRACT_VERSION = 5;
+const CONTRACT_VERSION = 6;
 const CAPABILITIES = new Set(["edit", "preview", "placeholder"]);
 const SOURCES = new Set(["content", "resource", "content-and-resource", "none"]);
 const RUNTIMES = new Set(["eager", "lazy"]);
-const EXECUTION_ISOLATIONS = new Set(["inline", "worker-backed", "isolated-webcontents"]);
+const SURFACE_ISOLATIONS = new Set(["inline", "isolated-webcontents"]);
+const COMPUTE_ISOLATIONS = new Set(["main-thread", "worker"]);
+const CONTENT_SANDBOXES = new Set(["none", "sandboxed-frame"]);
 const MEMORY_CLASSES = new Set(["small", "medium", "large"]);
 const SURFACE_PREPARATIONS = new Set(["hidden-safe", "requires-visible"]);
 const READINESS_SIGNALS = new Set([
@@ -43,7 +45,9 @@ const DEFINITION_KEYS = new Set([
   "capability",
   "source",
   "runtime",
-  "executionIsolation",
+  "surfaceIsolation",
+  "computeIsolation",
+  "contentSandbox",
   "resourcePolicy",
   "recoveryPolicy",
   "surfacePreparation",
@@ -142,8 +146,14 @@ function parseDefinition(input, index) {
   if (!RUNTIMES.has(record.runtime)) {
     throw new TypeError(`Preset viewer ${record.id} has an unsupported runtime boundary.`);
   }
-  if (!EXECUTION_ISOLATIONS.has(record.executionIsolation)) {
-    throw new TypeError(`Preset viewer ${record.id} has an unsupported execution isolation boundary.`);
+  if (!SURFACE_ISOLATIONS.has(record.surfaceIsolation)) {
+    throw new TypeError(`Preset viewer ${record.id} has an unsupported surface isolation boundary.`);
+  }
+  if (!COMPUTE_ISOLATIONS.has(record.computeIsolation)) {
+    throw new TypeError(`Preset viewer ${record.id} has an unsupported compute isolation boundary.`);
+  }
+  if (!CONTENT_SANDBOXES.has(record.contentSandbox)) {
+    throw new TypeError(`Preset viewer ${record.id} has an unsupported content sandbox boundary.`);
   }
   const resourcePolicy = parseResourcePolicy(record.resourcePolicy, record.id);
   const recoveryPolicy = parseRecoveryPolicy(record.recoveryPolicy, record.id);
@@ -172,8 +182,29 @@ function parseDefinition(input, index) {
   if (record.capability === "placeholder" && record.source !== "none") {
     throw new TypeError(`Placeholder preset viewer ${record.id} must use source 'none'.`);
   }
-  if (record.executionIsolation === "worker-backed" && resourcePolicy.maxWorkers === 0) {
-    throw new TypeError(`Worker-backed preset viewer ${record.id} must declare at least one worker.`);
+  if (record.source === "none" && resourcePolicy.maxSourceBytes !== 0) {
+    throw new TypeError(`Metadata-only preset viewer ${record.id} cannot declare a source byte budget.`);
+  }
+  if (record.source !== "none" && resourcePolicy.maxSourceBytes === 0) {
+    throw new TypeError(`Preset viewer ${record.id} must declare a positive source byte budget.`);
+  }
+  if (record.computeIsolation === "worker" && resourcePolicy.maxWorkers === 0) {
+    throw new TypeError(`Worker-compute preset viewer ${record.id} must declare at least one worker.`);
+  }
+  if (record.computeIsolation === "main-thread" && resourcePolicy.maxWorkers !== 0) {
+    throw new TypeError(`Main-thread preset viewer ${record.id} cannot declare worker capacity.`);
+  }
+  if (record.computeIsolation === "worker" && record.runtime !== "lazy") {
+    throw new TypeError(`Worker-compute preset viewer ${record.id} must keep its runtime lazy.`);
+  }
+  if (record.contentSandbox === "sandboxed-frame" && !record.surfaceTraits.includes("sandboxed")) {
+    throw new TypeError(`Sandboxed-frame preset viewer ${record.id} must declare the sandboxed trait.`);
+  }
+  if (record.contentSandbox === "none" && record.surfaceTraits.includes("sandboxed")) {
+    throw new TypeError(`Preset viewer ${record.id} cannot claim a sandboxed trait without a sandbox boundary.`);
+  }
+  if (recoveryPolicy.supportsSafeMode && record.surfaceIsolation !== "isolated-webcontents") {
+    throw new TypeError(`Safe-mode preset viewer ${record.id} must use an isolated surface.`);
   }
   if (
     (record.surfaceFamily === "canvas" || record.surfaceTraits.includes("paginated"))
@@ -189,7 +220,9 @@ function parseDefinition(input, index) {
     capability: record.capability,
     source: record.source,
     runtime: record.runtime,
-    executionIsolation: record.executionIsolation,
+    surfaceIsolation: record.surfaceIsolation,
+    computeIsolation: record.computeIsolation,
+    contentSandbox: record.contentSandbox,
     resourcePolicy,
     recoveryPolicy,
     surfacePreparation: record.surfacePreparation,
@@ -204,19 +237,20 @@ function parseResourcePolicy(input, viewerId) {
   const record = assertRecord(input, label);
   assertExactKeys(
     record,
-    new Set(["memoryClass", "maxCanvasPixels", "maxActiveCanvases", "maxWorkers"]),
+    new Set(["memoryClass", "maxSourceBytes", "maxCanvasPixels", "maxActiveCanvases", "maxWorkers"]),
     label,
   );
   if (!MEMORY_CLASSES.has(record.memoryClass)) {
     throw new TypeError(`${label} has an unsupported memory class.`);
   }
-  for (const key of ["maxCanvasPixels", "maxActiveCanvases", "maxWorkers"]) {
+  for (const key of ["maxSourceBytes", "maxCanvasPixels", "maxActiveCanvases", "maxWorkers"]) {
     if (!Number.isSafeInteger(record[key]) || record[key] < 0) {
       throw new TypeError(`${label} ${key} must be a non-negative safe integer.`);
     }
   }
   return Object.freeze({
     memoryClass: record.memoryClass,
+    maxSourceBytes: record.maxSourceBytes,
     maxCanvasPixels: record.maxCanvasPixels,
     maxActiveCanvases: record.maxActiveCanvases,
     maxWorkers: record.maxWorkers,

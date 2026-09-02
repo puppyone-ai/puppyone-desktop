@@ -2,10 +2,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocalization } from "@puppyone/localization";
 import type { PresetViewerContribution, PresetViewerRenderContext } from "@puppyone/shared-ui";
 import { PageLoading } from "../../components/loading";
+import {
+  measureNativeSurfaceBounds,
+  useNativeSurfaceGeometry,
+  type NativeSurfaceGeometry,
+} from "../native-surfaces";
 import "./editor-surfaces.css";
 
 type SurfaceStatus = "activating" | "loading" | "ready" | "unresponsive" | "crashed" | "error";
-type Bounds = { x: number; y: number; width: number; height: number };
+const FALLBACK_GEOMETRY: NativeSurfaceGeometry = Object.freeze({
+  bounds: Object.freeze({ x: 0, y: 0, width: 640, height: 480 }),
+  revision: 0,
+  visible: true,
+});
 
 const APPEARANCE_ATTRIBUTES = [
   "data-interface-style",
@@ -46,28 +55,18 @@ export function BuiltInEditorSurfaceController({
   context: PresetViewerRenderContext;
 }) {
   const { direction, t } = useLocalization();
-  const hostRef = useRef<HTMLDivElement>(null);
+  const [hostElement, setHostElement] = useState<HTMLDivElement | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const latestGeometryRef = useRef<NativeSurfaceGeometry>(FALLBACK_GEOMETRY);
   const [status, setStatus] = useState<SurfaceStatus>("activating");
   const [error, setError] = useState<string | null>(null);
   const [retryGeneration, setRetryGeneration] = useState(0);
   const [safeMode, setSafeMode] = useState(false);
   const bridge = window.puppyoneDesktop?.editorSurfaces ?? null;
 
-  const measureBounds = useCallback((): Bounds | null => {
-    const rectangle = hostRef.current?.getBoundingClientRect();
-    if (!rectangle) return null;
-    return {
-      x: Math.max(0, Math.round(rectangle.left)),
-      y: Math.max(0, Math.round(rectangle.top)),
-      width: Math.max(1, Math.round(rectangle.width)),
-      height: Math.max(1, Math.round(rectangle.height)),
-    };
-  }, []);
-
   const collectAppearance = useCallback(() => {
     const root = document.documentElement;
-    const surface = hostRef.current?.closest(".po-viewer-surface-boundary") ?? root;
+    const surface = hostElement?.closest(".po-viewer-surface-boundary") ?? root;
     const computed = getComputedStyle(surface);
     return {
       dark: root.classList.contains("dark"),
@@ -81,7 +80,20 @@ export function BuiltInEditorSurfaceController({
         return value ? [[name, value]] : [];
       })),
     };
-  }, [direction]);
+  }, [direction, hostElement]);
+
+  const publishGeometry = useCallback((geometry: NativeSurfaceGeometry) => {
+    latestGeometryRef.current = geometry;
+    const sessionId = sessionIdRef.current;
+    if (!bridge || !sessionId) return;
+    void bridge.setBounds({
+      sessionId,
+      bounds: geometry.bounds,
+      geometryRevision: geometry.revision,
+      visible: geometry.visible,
+    }).catch(() => undefined);
+  }, [bridge]);
+  useNativeSurfaceGeometry(hostElement, publishGeometry);
 
   useEffect(() => {
     if (!bridge?.onState) return undefined;
@@ -104,9 +116,13 @@ export function BuiltInEditorSurfaceController({
   }, [bridge]);
 
   useEffect(() => {
-    if (!bridge || !context.fileUrl) return undefined;
+    if (!bridge || !context.fileUrl || !hostElement) return undefined;
     let cancelled = false;
-    const bounds = measureBounds() ?? { x: 0, y: 0, width: 640, height: 480 };
+    const measuredGeometry = {
+      ...latestGeometryRef.current,
+      bounds: measureNativeSurfaceBounds(hostElement),
+    };
+    latestGeometryRef.current = measuredGeometry;
     setStatus("activating");
     setError(null);
 
@@ -117,7 +133,9 @@ export function BuiltInEditorSurfaceController({
       resourceUrl: context.fileUrl,
       title: context.document.name,
       safeMode,
-      bounds,
+      bounds: measuredGeometry.bounds,
+      geometryRevision: measuredGeometry.revision,
+      visible: measuredGeometry.visible,
       appearance: collectAppearance(),
     }).then(async (session) => {
       if (cancelled) {
@@ -126,8 +144,13 @@ export function BuiltInEditorSurfaceController({
       }
       sessionIdRef.current = session.sessionId;
       setStatus(session.status === "ready" ? "ready" : "loading");
-      const currentBounds = measureBounds();
-      if (currentBounds) await bridge.setBounds({ sessionId: session.sessionId, bounds: currentBounds });
+      const currentGeometry = latestGeometryRef.current;
+      await bridge.setBounds({
+        sessionId: session.sessionId,
+        bounds: currentGeometry.bounds,
+        geometryRevision: currentGeometry.revision,
+        visible: currentGeometry.visible,
+      });
     }).catch((reason) => {
       if (cancelled) return;
       setStatus("error");
@@ -147,37 +170,11 @@ export function BuiltInEditorSurfaceController({
     context.document.path,
     context.document.version,
     context.fileUrl,
-    measureBounds,
+    hostElement,
     retryGeneration,
     safeMode,
     viewer.id,
   ]);
-
-  useEffect(() => {
-    if (!bridge) return undefined;
-    const host = hostRef.current;
-    if (!host) return undefined;
-    let frame: number | null = null;
-    const publishBounds = () => {
-      frame = null;
-      const sessionId = sessionIdRef.current;
-      const bounds = measureBounds();
-      if (sessionId && bounds) void bridge.setBounds({ sessionId, bounds });
-    };
-    const scheduleBounds = () => {
-      if (frame === null) frame = requestAnimationFrame(publishBounds);
-    };
-    const observer = new ResizeObserver(scheduleBounds);
-    observer.observe(host);
-    window.addEventListener("resize", scheduleBounds);
-    window.addEventListener("scroll", scheduleBounds, true);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", scheduleBounds);
-      window.removeEventListener("scroll", scheduleBounds, true);
-      if (frame !== null) cancelAnimationFrame(frame);
-    };
-  }, [bridge, measureBounds]);
 
   useEffect(() => {
     if (!bridge) return undefined;
@@ -227,7 +224,7 @@ export function BuiltInEditorSurfaceController({
       data-safe-mode={safeMode ? "true" : undefined}
       aria-busy={status !== "ready"}
     >
-      <div ref={hostRef} className="built-in-editor-surface-host" />
+      <div ref={setHostElement} className="built-in-editor-surface-host" />
       {(status === "activating" || status === "loading") && (
         <div className="built-in-editor-surface-state">
           <PageLoading variant="fill" label={null} ariaLabel={t("editor.loadingViewer")} />

@@ -189,6 +189,8 @@ async function run() {
       title: "sample_document.pdf",
       safeMode: false,
       bounds: { x: 0, y: 0, width: 900, height: 700 },
+      geometryRevision: 1,
+      visible: true,
       appearance: { dark: true, direction: "ltr", attributes: {}, variables: {} },
     });
     const activeEntry = manager.values().find((candidate) => candidate.sessionId === session.sessionId);
@@ -225,6 +227,24 @@ async function run() {
       session.sessionId,
       { x: 0, y: 0, width: 700, height: 700 },
       ownerWindow.webContents.id,
+      2,
+      false,
+    );
+    assert.equal(readyEntry.view.getBounds().width, 700, "Suspended layout bounds were not applied.");
+    manager.setBounds(
+      session.sessionId,
+      { x: 0, y: 0, width: 900, height: 700 },
+      ownerWindow.webContents.id,
+      1,
+      true,
+    );
+    assert.equal(readyEntry.view.getBounds().width, 700, "A stale geometry revision overwrote current bounds.");
+    manager.setBounds(
+      session.sessionId,
+      { x: 0, y: 0, width: 700, height: 700 },
+      ownerWindow.webContents.id,
+      3,
+      true,
     );
     const afterResize = await waitFor("resize render", async () => {
       const value = await childWebContents.executeJavaScript(`(() => {

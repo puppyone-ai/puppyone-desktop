@@ -1109,6 +1109,8 @@ declare global {
           title: string;
           safeMode?: boolean;
           bounds: EditorSurfaceBounds;
+          geometryRevision: number;
+          visible: boolean;
           appearance: EditorSurfaceAppearance;
         }) => Promise<{
           sessionId: string;
@@ -1120,7 +1122,9 @@ declare global {
         setBounds: (request: {
           sessionId: string;
           bounds: EditorSurfaceBounds;
-        }) => Promise<{ ok: boolean }>;
+          geometryRevision: number;
+          visible: boolean;
+        }) => Promise<{ ok: boolean; applied?: boolean; geometryRevision?: number }>;
         updateAppearance: (request: {
           sessionId: string;
           appearance: EditorSurfaceAppearance;
@@ -1506,8 +1510,11 @@ declare global {
         title: string;
         safeMode: boolean;
         resourcePolicy: Readonly<{
+          memoryClass: "small" | "medium" | "large";
+          maxSourceBytes: number;
           maxCanvasPixels: number;
           maxActiveCanvases: number;
+          maxWorkers: number;
         }>;
         appearance: EditorSurfaceAppearance;
       }>>;

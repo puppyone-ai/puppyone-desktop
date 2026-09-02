@@ -77,9 +77,12 @@ describe("preset viewer contribution contract", () => {
     ))).toBe(true);
     expect(resolveEditorViewer(document("report.pdf")).viewer).toMatchObject({
       runtime: "lazy",
-      executionIsolation: "isolated-webcontents",
+      surfaceIsolation: "isolated-webcontents",
+      computeIsolation: "worker",
+      contentSandbox: "none",
       resourcePolicy: {
         memoryClass: "large",
+        maxSourceBytes: 536_870_912,
         maxCanvasPixels: 8_388_608,
         maxActiveCanvases: 6,
         maxWorkers: 1,
@@ -96,6 +99,19 @@ describe("preset viewer contribution contract", () => {
       .toBe("hidden-safe");
     expect(PRESET_VIEWER_MANIFEST.viewers.every((viewer) => (
       Object.isFrozen(viewer.resourcePolicy) && Object.isFrozen(viewer.recoveryPolicy)
+    ))).toBe(true);
+    expect(PRESET_VIEWER_MANIFEST.viewers.every((viewer) => (
+      (viewer.source === "none") === (viewer.resourcePolicy.maxSourceBytes === 0)
+    ))).toBe(true);
+    expect(PRESET_VIEWER_MANIFEST.viewers.every((viewer) => (
+      viewer.computeIsolation === "worker"
+        ? viewer.resourcePolicy.maxWorkers > 0
+        : viewer.resourcePolicy.maxWorkers === 0
+    ))).toBe(true);
+    expect(PRESET_VIEWER_MANIFEST.viewers.every((viewer) => (
+      viewer.contentSandbox === "sandboxed-frame"
+        ? viewer.surfaceTraits.includes("sandboxed")
+        : !viewer.surfaceTraits.includes("sandboxed")
     ))).toBe(true);
   });
 

@@ -21,6 +21,7 @@ export function createEditorSurfaceSessionManager({
   configurePartition,
   nativeSurfaceOcclusion = null,
   nativeSurfacePointerPassthrough = null,
+  admitResource = null,
   navigationTimeoutMs = NAVIGATION_TIMEOUT_MS,
   bootstrapTimeoutMs = BOOTSTRAP_TIMEOUT_MS,
   firstFrameTimeoutMs = FIRST_FRAME_TIMEOUT_MS,
@@ -99,6 +100,7 @@ export function createEditorSurfaceSessionManager({
   function applyVisibility(entry) {
     const visible = entry.attached
       && entry.visible
+      && entry.geometryVisible
       && !entry.occluded
       && entry.status !== "crashed"
       && entry.status !== "unresponsive";
@@ -189,12 +191,18 @@ export function createEditorSurfaceSessionManager({
       }
       const viewerId = requireString(request?.viewerId, "Editor Surface Viewer id is required.", 100);
       const definition = getPresetViewerDefinitionForViewerId(viewerId);
-      if (definition.id !== viewerId || definition.executionIsolation !== "isolated-webcontents") {
+      if (definition.id !== viewerId || definition.surfaceIsolation !== "isolated-webcontents") {
         throw new Error(`Preset Viewer ${viewerId} is not admitted to an isolated runtime.`);
       }
       const resourceUrl = normalizeResourceUrl(request?.resourceUrl);
+      await admitResource?.({
+        resourceUrl,
+        ownerWebContentsId,
+        resourcePolicy: definition.resourcePolicy,
+      });
       const title = requireString(request?.title, "Editor Surface title is required.", 500);
       const bounds = normalizeBounds(request?.bounds, window);
+      const geometryRevision = normalizeGeometryRevision(request?.geometryRevision, 0);
       const appearance = normalizeAppearance(request?.appearance);
       const safeMode = request?.safeMode === true && definition.recoveryPolicy.supportsSafeMode;
       const sessionId = `bes_${randomUUID()}`;
@@ -241,6 +249,8 @@ export function createEditorSurfaceSessionManager({
         partitionSession,
         releasePartition,
         requestedBounds: bounds,
+        geometryRevision,
+        geometryVisible: request?.visible !== false,
         attached: false,
         visible: true,
         occluded: false,
@@ -340,13 +350,22 @@ export function createEditorSurfaceSessionManager({
       };
     },
 
-    setBounds(sessionId, bounds, ownerWebContentsId) {
+    setBounds(sessionId, bounds, ownerWebContentsId, geometryRevision, visible) {
       const entry = sessions.get(sessionId);
       if (!entry || entry.ownerWebContentsId !== ownerWebContentsId) return { ok: false };
+      const nextRevision = normalizeGeometryRevision(
+        geometryRevision,
+        entry.geometryRevision + 1,
+      );
+      if (nextRevision <= entry.geometryRevision) {
+        return { ok: true, applied: false, geometryRevision: entry.geometryRevision };
+      }
+      entry.geometryRevision = nextRevision;
       entry.requestedBounds = normalizeBounds(bounds, entry.window);
+      entry.geometryVisible = visible !== false;
       entry.view.setBounds(entry.requestedBounds);
       applyVisibility(entry);
-      return { ok: true };
+      return { ok: true, applied: true, geometryRevision: entry.geometryRevision };
     },
 
     updateAppearance(sessionId, appearance, ownerWebContentsId) {
@@ -463,6 +482,14 @@ function normalizeBounds(value, window) {
     width: clampInteger(value?.width, 1, Math.max(1, contentWidth - x)),
     height: clampInteger(value?.height, 1, Math.max(1, contentHeight - y)),
   };
+}
+
+function normalizeGeometryRevision(value, fallback) {
+  if (value === undefined || value === null) return fallback;
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new TypeError("Editor Surface geometry revision is invalid.");
+  }
+  return value;
 }
 
 function normalizeResourceUrl(value) {

@@ -358,6 +358,7 @@
   "panes.viewActions": "Ansicht",
   "tabs.close": "{name} schließen",
   "tabs.openEditors": "Geöffnete Editoren",
+  "unavailable.resourceLimit": "Diese Datei überschreitet das sichere Vorschaulimit ({limit}).",
   "unavailable.title": "Kann nicht im Editor geöffnet werden",
   "viewer.chooseFor": "Viewer für {name} auswählen",
   "viewer.noHostSurface": "Dieses Viewer Pack kann hier nicht dargestellt werden — es ist keine Host-Oberfläche verfügbar."

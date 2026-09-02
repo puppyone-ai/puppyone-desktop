@@ -13,11 +13,15 @@ for (const requiredPath of [
   "electron/main/native-surfaces/pointer-passthrough-coordinator.mjs",
   "electron/main/ipc/native-surface-pointer-passthrough-ipc.mjs",
   "electron/main/editor-surfaces/session-manager.mjs",
+  "electron/main/editor-surfaces/resource-admission.mjs",
   "electron/main/editor-surfaces/ipc.mjs",
   "electron/editor-surface-preload.cjs",
   "src/features/native-surfaces/nativeSurfaceOcclusion.ts",
   "src/features/native-surfaces/nativeSurfacePointerRoutingRegions.ts",
   "src/features/native-surfaces/useNativeSurfacePointerRoutingRegion.ts",
+  "src/features/native-surfaces/nativeSurfaceGeometry.ts",
+  "src/features/native-surfaces/useNativeSurfaceGeometry.ts",
+  "src/features/native-surfaces/useNativeSurfaceLayoutTransition.ts",
   "src/features/native-surfaces/index.ts",
 ]) {
   if (!existsSync(absolute(requiredPath))) {
@@ -136,6 +140,45 @@ for (const token of [
 ]) {
   if (!dataSurfaceSource.includes(token)) {
     errors.push(`Desktop explorer does not register its overlay sash with native pointer routing (${token})`);
+  }
+}
+const auxiliaryPanelSource = read("src/features/app-shell/auxiliary/AuxiliaryPanelHost.tsx");
+for (const token of [
+  'useNativeSurfacePointerRoutingRegion("auxiliary-panel-resize", resizerElement)',
+  "useNativeSurfaceLayoutTransition(",
+  "ref={setResizerElement}",
+]) {
+  if (!auxiliaryPanelSource.includes(token)) {
+    errors.push(`Desktop auxiliary panel does not close the native geometry/input contract (${token})`);
+  }
+}
+const builtInSurfaceController = read("src/features/editor-surfaces/BuiltInEditorSurfaceController.tsx");
+for (const token of [
+  "useNativeSurfaceGeometry",
+  "geometryRevision",
+  "visible: geometry.visible",
+]) {
+  if (!builtInSurfaceController.includes(token)) {
+    errors.push(`Built-in native Viewer does not publish authoritative geometry (${token})`);
+  }
+}
+const editorSurfaceManager = read("electron/main/editor-surfaces/session-manager.mjs");
+for (const token of [
+  "geometryRevision",
+  "geometryVisible",
+  "nextRevision <= entry.geometryRevision",
+  "await admitResource?.(",
+]) {
+  if (!editorSurfaceManager.includes(token)) {
+    errors.push(`Editor Surface manager does not reject stale geometry (${token})`);
+  }
+}
+for (const token of [
+  "createEditorSurfaceResourceAdmission",
+  "inspectLocalCapability: localFileCapabilities.inspect",
+]) {
+  if (!mainSource.includes(token)) {
+    errors.push(`Electron main does not install authoritative Editor Surface resource admission (${token})`);
   }
 }
 for (const relativePath of [

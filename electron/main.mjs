@@ -83,6 +83,7 @@ import { registerWindowLayoutIpcHandlers } from "./main/ipc/window-layout-ipc.mj
 import { registerGitMetadataWatchIpcHandlers } from "./main/ipc/git-metadata-watch-ipc.mjs";
 import { registerLocalFileProtocol } from "./main/local-file-protocol.mjs";
 import { createLocalFileCapabilityStore } from "./main/local-file-capabilities.mjs";
+import { createEditorSurfaceResourceAdmission } from "./main/editor-surfaces/resource-admission.mjs";
 import { installWindowNavigationSecurity, requireNonEmptyString } from "./main/security.mjs";
 import { createTerminalService } from "./main/terminal-service.mjs";
 import { createTerminalAgentLocator } from "./main/terminal-agent/terminal-agent-locator.mjs";
@@ -724,6 +725,12 @@ app.whenReady().then(async () => {
     },
     nativeSurfaceOcclusion,
     nativeSurfacePointerPassthrough,
+    admitResource: createEditorSurfaceResourceAdmission({
+      inspectLocalCapability: localFileCapabilities.inspect,
+      statWorkspaceFile,
+      canonicalizeWorkspacePath,
+      isOpenWorkspaceRoot,
+    }),
   });
   const appPreviewProcessRuntime = createAppPreviewRuntime({
     app,

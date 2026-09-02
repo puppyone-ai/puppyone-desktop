@@ -75,6 +75,8 @@ function request(ownerWebContentsId = 7) {
     title: "large.pdf",
     safeMode: false,
     bounds: { x: 20, y: 30, width: 800, height: 600 },
+    geometryRevision: 1,
+    visible: true,
     appearance: { dark: true, direction: "ltr", attributes: {}, variables: {} },
   };
 }
@@ -125,6 +127,7 @@ describe("built-in Editor Surface fault domain", () => {
       sessionId: session.sessionId,
       viewerId: "pdf-preview",
       resourcePolicy: {
+        maxSourceBytes: 536_870_912,
         maxCanvasPixels: 8_388_608,
         maxActiveCanvases: 6,
         maxWorkers: 1,
@@ -261,6 +264,44 @@ describe("built-in Editor Surface fault domain", () => {
     ]);
   });
 
+  it("applies only monotonic geometry and suspends the native child during shell layout", async () => {
+    const owner = new FakeOwnerWindow(7);
+    const { manager } = createHarness(owner);
+    const session = await manager.activate(request());
+    const view = createdViews[0];
+    manager.reportReady(session.sessionId, view.webContents.id);
+
+    expect(manager.setBounds(
+      session.sessionId,
+      { x: 20, y: 30, width: 620, height: 600 },
+      owner.webContents.id,
+      2,
+      false,
+    )).toEqual({ ok: true, applied: true, geometryRevision: 2 });
+    expect(view.bounds).toEqual({ x: 20, y: 30, width: 620, height: 600 });
+    expect(view.visible).toBe(false);
+
+    expect(manager.setBounds(
+      session.sessionId,
+      { x: 20, y: 30, width: 900, height: 600 },
+      owner.webContents.id,
+      1,
+      true,
+    )).toEqual({ ok: true, applied: false, geometryRevision: 2 });
+    expect(view.bounds.width).toBe(620);
+    expect(view.visible).toBe(false);
+
+    expect(manager.setBounds(
+      session.sessionId,
+      { x: 20, y: 30, width: 600, height: 600 },
+      owner.webContents.id,
+      3,
+      true,
+    )).toEqual({ ok: true, applied: true, geometryRevision: 3 });
+    expect(view.bounds.width).toBe(600);
+    expect(view.visible).toBe(true);
+  });
+
   it("rejects non-isolated Viewers and non-capability resource URLs", async () => {
     const owner = new FakeOwnerWindow(7);
     const { manager } = createHarness(owner);
@@ -269,6 +310,22 @@ describe("built-in Editor Surface fault domain", () => {
       .rejects.toThrow(/not admitted/i);
     await expect(manager.activate({ ...request(), resourceUrl: "file:///tmp/private.pdf" }))
       .rejects.toThrow(/not allowed/i);
+    expect(createdViews).toHaveLength(0);
+  });
+
+  it("runs authoritative resource admission before allocating a child view", async () => {
+    const owner = new FakeOwnerWindow(7);
+    const admitResource = vi.fn(async () => {
+      throw new Error("source budget exceeded");
+    });
+    const { manager } = createHarness(owner, { admitResource });
+
+    await expect(manager.activate(request())).rejects.toThrow("source budget exceeded");
+    expect(admitResource).toHaveBeenCalledWith(expect.objectContaining({
+      ownerWebContentsId: 7,
+      resourceUrl: request().resourceUrl,
+      resourcePolicy: expect.objectContaining({ maxSourceBytes: 536_870_912 }),
+    }));
     expect(createdViews).toHaveLength(0);
   });
 });
