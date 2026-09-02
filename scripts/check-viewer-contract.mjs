@@ -114,10 +114,32 @@ for (const token of [
   '"render-process-gone"',
   '"unresponsive"',
   'forcefullyCrashRenderer',
+  'getBootstrapForChild',
+  '"navigation-timeout"',
+  '"bootstrap-timeout"',
+  '"first-frame-timeout"',
 ]) {
   if (!editorSurfaceManagerSource.includes(token)) {
     errors.push(`Built-in Editor Surface fault domain is missing ${token}`);
   }
+}
+if (editorSurfaceManagerSource.includes('send("editor-surface:initialize"')) {
+  errors.push("Built-in Editor Surface bootstrap regressed to a lossy one-shot push event");
+}
+
+const editorSurfacePreloadSource = readFileSync(
+  path.join(repoRoot, "electron/editor-surface-preload.cjs"),
+  "utf8",
+);
+const isolatedEditorSource = readFileSync(
+  path.join(repoRoot, "src/isolated-editor.tsx"),
+  "utf8",
+);
+if (
+  !editorSurfacePreloadSource.includes('ipcRenderer.invoke("editor-surface:bootstrap")')
+  || !isolatedEditorSource.includes("bridge.getBootstrap()")
+) {
+  errors.push("Isolated Editor bootstrap must remain a replayable child-pull request");
 }
 
 const documentSurfaceConsumers = [

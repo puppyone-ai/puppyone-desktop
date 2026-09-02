@@ -37,11 +37,23 @@ function IsolatedEditorSurface() {
   const [bootstrap, setBootstrap] = useState<SurfaceBootstrap | null>(null);
   const [ready, setReady] = useState(false);
 
-  useEffect(() => bridge.onInitialize((next) => {
-    applyAppearance(next.appearance);
-    setReady(false);
-    setBootstrap(next);
-  }), []);
+  useEffect(() => {
+    let cancelled = false;
+    void bridge.getBootstrap().then((next) => {
+      if (cancelled) return;
+      applyAppearance(next.appearance);
+      setReady(false);
+      setBootstrap(next);
+    }).catch((error) => {
+      if (cancelled) return;
+      bridge.reportError({
+        message: error instanceof Error ? error.message : String(error),
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => bridge.onAppearance((appearance) => {
     applyAppearance(appearance);

@@ -77,6 +77,7 @@
     "smoke:viewer-pack": "electron scripts/smoke-viewer-pack.mjs",
     "smoke:app-preview": "electron scripts/smoke-app-preview-iframe.mjs",
     "smoke:pdf-preview": "electron scripts/smoke-pdf-preview.mjs",
+    "smoke:pdf-isolated": "electron scripts/smoke-isolated-pdf-surface.mjs",
     "audit:viewer-gpu": "electron scripts/audit-viewer-gpu.mjs",
     "smoke:renderer-performance": "npm run build && node scripts/run-renderer-performance-smoke.mjs",
     "smoke:renderer-cold-performance": "npm run build && node scripts/run-renderer-performance-smoke.mjs --cold --visible --with-link-index",

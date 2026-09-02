@@ -5,6 +5,9 @@ const ALLOWED_RESOURCE_PROTOCOLS = new Set(["puppyone-local:", "https:"]);
 const APPEARANCE_ATTRIBUTE_PATTERN = /^data-[a-z0-9-]{1,80}$/;
 const APPEARANCE_VARIABLE_PATTERN = /^--po-[a-z0-9-]{1,80}$/;
 const UNRESPONSIVE_TIMEOUT_MS = 12_000;
+const NAVIGATION_TIMEOUT_MS = 15_000;
+const BOOTSTRAP_TIMEOUT_MS = 10_000;
+const FIRST_FRAME_TIMEOUT_MS = 60_000;
 const MAX_SESSIONS_PER_OWNER = 8;
 const MAX_SESSIONS_TOTAL = 24;
 
@@ -18,19 +21,29 @@ export function createEditorSurfaceSessionManager({
   configurePartition,
   nativeSurfaceOcclusion = null,
   nativeSurfacePointerPassthrough = null,
+  navigationTimeoutMs = NAVIGATION_TIMEOUT_MS,
+  bootstrapTimeoutMs = BOOTSTRAP_TIMEOUT_MS,
+  firstFrameTimeoutMs = FIRST_FRAME_TIMEOUT_MS,
+  onStateChange = null,
   logger = console,
 }) {
   const sessions = new Map();
 
   function publish(entry, status, details = {}) {
     entry.status = status;
-    if (entry.window?.isDestroyed?.() || entry.window?.webContents?.isDestroyed?.()) return;
-    entry.window.webContents.send("editor-surface:state", {
+    const event = {
       sessionId: entry.sessionId,
       viewerId: entry.viewerId,
       status,
       ...details,
-    });
+    };
+    try {
+      onStateChange?.(event);
+    } catch (error) {
+      logger.warn?.("Editor Surface state observer failed:", error);
+    }
+    if (entry.window?.isDestroyed?.() || entry.window?.webContents?.isDestroyed?.()) return;
+    entry.window.webContents.send("editor-surface:state", event);
   }
 
   function destroySession(sessionId, { reason = "disposed", publishDisposed = false } = {}) {
@@ -38,7 +51,13 @@ export function createEditorSurfaceSessionManager({
     if (!entry) return false;
     sessions.delete(sessionId);
     if (entry.unresponsiveTimer) clearTimeout(entry.unresponsiveTimer);
+    if (entry.navigationTimer) clearTimeout(entry.navigationTimer);
+    if (entry.bootstrapTimer) clearTimeout(entry.bootstrapTimer);
+    if (entry.firstFrameTimer) clearTimeout(entry.firstFrameTimer);
     entry.unresponsiveTimer = null;
+    entry.navigationTimer = null;
+    entry.bootstrapTimer = null;
+    entry.firstFrameTimer = null;
     entry.releaseOcclusion?.();
     entry.releasePointerPassthrough?.();
     entry.releasePartition?.();
@@ -95,6 +114,60 @@ export function createEditorSurfaceSessionManager({
     const entry = sessions.get(sessionId);
     if (!entry || entry.view.webContents?.id !== senderId) return null;
     return entry;
+  }
+
+  function findChild(senderId) {
+    return [...sessions.values()].find((entry) => entry.view.webContents?.id === senderId) ?? null;
+  }
+
+  function failPendingSession(entry, reason, message) {
+    if (sessions.get(entry.sessionId) !== entry) return;
+    publish(entry, "error", { reason, message });
+    destroySession(entry.sessionId, { reason });
+  }
+
+  function armBootstrapTimeout(entry) {
+    if (entry.bootstrapAcknowledged || entry.bootstrapTimer || sessions.get(entry.sessionId) !== entry) return;
+    entry.bootstrapTimer = setTimeout(() => {
+      entry.bootstrapTimer = null;
+      failPendingSession(
+        entry,
+        "bootstrap-timeout",
+        "Editor Surface did not request its bootstrap state.",
+      );
+    }, bootstrapTimeoutMs);
+    entry.bootstrapTimer.unref?.();
+  }
+
+  async function navigate(entry) {
+    const timeout = new Promise((_, reject) => {
+      entry.navigationTimer = setTimeout(() => {
+        entry.navigationTimer = null;
+        const error = new Error("Editor Surface navigation timed out.");
+        error.code = "navigation-timeout";
+        reject(error);
+      }, navigationTimeoutMs);
+      entry.navigationTimer.unref?.();
+    });
+    try {
+      await Promise.race([entry.view.webContents.loadURL(surfaceUrl), timeout]);
+    } finally {
+      if (entry.navigationTimer) clearTimeout(entry.navigationTimer);
+      entry.navigationTimer = null;
+    }
+  }
+
+  function armFirstFrameTimeout(entry) {
+    if (entry.firstFrameTimer || entry.status === "ready" || sessions.get(entry.sessionId) !== entry) return;
+    entry.firstFrameTimer = setTimeout(() => {
+      entry.firstFrameTimer = null;
+      failPendingSession(
+        entry,
+        "first-frame-timeout",
+        "Editor Surface did not produce a first frame in time.",
+      );
+    }, firstFrameTimeoutMs);
+    entry.firstFrameTimer.unref?.();
   }
 
   return Object.freeze({
@@ -160,6 +233,7 @@ export function createEditorSurfaceSessionManager({
         resourceUrl,
         title,
         safeMode,
+        resourcePolicy: definition.resourcePolicy,
         appearance,
         ownerWebContentsId,
         window,
@@ -175,6 +249,10 @@ export function createEditorSurfaceSessionManager({
         releaseOcclusion: null,
         releasePointerPassthrough: null,
         unresponsiveTimer: null,
+        navigationTimer: null,
+        bootstrapTimer: null,
+        firstFrameTimer: null,
+        bootstrapAcknowledged: false,
         statusBeforeUnresponsive: null,
       };
       sessions.set(sessionId, entry);
@@ -239,20 +317,14 @@ export function createEditorSurfaceSessionManager({
 
       publish(entry, "loading");
       try {
-        await view.webContents.loadURL(surfaceUrl);
+        await navigate(entry);
         if (sessions.get(sessionId) !== entry) throw new Error("Editor Surface was disposed while loading.");
-        view.webContents.send("editor-surface:initialize", {
-          sessionId,
-          viewerId,
-          resourceUrl,
-          title,
-          safeMode,
-          resourcePolicy: definition.resourcePolicy,
-          appearance,
-        });
+        armBootstrapTimeout(entry);
       } catch (error) {
-        publish(entry, "crashed", {
-          reason: "launch-failed",
+        if (sessions.get(sessionId) !== entry) throw error;
+        const navigationTimedOut = error?.code === "navigation-timeout";
+        publish(entry, navigationTimedOut ? "error" : "crashed", {
+          reason: navigationTimedOut ? "navigation-timeout" : "launch-failed",
           message: normalizeMessage(error),
         });
         destroySession(sessionId, { reason: "launch-failed" });
@@ -287,6 +359,24 @@ export function createEditorSurfaceSessionManager({
       return { ok: true };
     },
 
+    getBootstrapForChild(senderId) {
+      const entry = findChild(senderId);
+      if (!entry) throw new Error("Untrusted Editor Surface bootstrap request.");
+      entry.bootstrapAcknowledged = true;
+      if (entry.bootstrapTimer) clearTimeout(entry.bootstrapTimer);
+      entry.bootstrapTimer = null;
+      armFirstFrameTimeout(entry);
+      return {
+        sessionId: entry.sessionId,
+        viewerId: entry.viewerId,
+        resourceUrl: entry.resourceUrl,
+        title: entry.title,
+        safeMode: entry.safeMode,
+        resourcePolicy: entry.resourcePolicy,
+        appearance: entry.appearance,
+      };
+    },
+
     destroy(sessionId, ownerWebContentsId) {
       const entry = sessions.get(sessionId);
       if (!entry || entry.ownerWebContentsId !== ownerWebContentsId) return { ok: false };
@@ -296,6 +386,8 @@ export function createEditorSurfaceSessionManager({
     reportReady(sessionId, senderId) {
       const entry = assertChild(sessionId, senderId);
       if (!entry) return false;
+      if (entry.firstFrameTimer) clearTimeout(entry.firstFrameTimer);
+      entry.firstFrameTimer = null;
       publish(entry, "ready");
       applyVisibility(entry);
       return true;
@@ -304,6 +396,10 @@ export function createEditorSurfaceSessionManager({
     reportError(sessionId, senderId, request) {
       const entry = assertChild(sessionId, senderId);
       if (!entry) return false;
+      if (entry.bootstrapTimer) clearTimeout(entry.bootstrapTimer);
+      if (entry.firstFrameTimer) clearTimeout(entry.firstFrameTimer);
+      entry.bootstrapTimer = null;
+      entry.firstFrameTimer = null;
       publish(entry, "error", { message: normalizeMessage(request?.message) });
       entry.visible = false;
       applyVisibility(entry);
@@ -311,7 +407,7 @@ export function createEditorSurfaceSessionManager({
     },
 
     hasChild(senderId) {
-      return [...sessions.values()].some((entry) => entry.view.webContents?.id === senderId);
+      return Boolean(findChild(senderId));
     },
 
     destroyForOwner(ownerWebContentsId) {

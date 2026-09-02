@@ -4,6 +4,7 @@ import { createEditorSurfaceSessionManager } from "../electron/main/editor-surfa
 
 const createdViews = [];
 let nextWebContentsId = 100;
+let loadUrlBehavior = null;
 
 class FakeWebContents extends EventEmitter {
   constructor() {
@@ -13,7 +14,10 @@ class FakeWebContents extends EventEmitter {
     this.sent = [];
   }
 
-  async loadURL(url) { this.url = url; }
+  async loadURL(url) {
+    this.url = url;
+    return loadUrlBehavior?.(url);
+  }
   send(channel, payload) { this.sent.push([channel, payload]); }
   setWindowOpenHandler(handler) { this.windowOpenHandler = handler; }
   setAudioMuted(muted) { this.audioMuted = muted; }
@@ -75,7 +79,7 @@ function request(ownerWebContentsId = 7) {
   };
 }
 
-function createHarness(owner) {
+function createHarness(owner, options = {}) {
   const partition = {
     setPermissionRequestHandler: vi.fn(),
     setPermissionCheckHandler: vi.fn(),
@@ -89,6 +93,7 @@ function createHarness(owner) {
     preloadPath: "/app/editor-surface-preload.cjs",
     surfaceUrl: "file:///app/dist/isolated-editor.html",
     configurePartition: vi.fn(() => releasePartition),
+    ...options,
   });
   return { manager, partition, releasePartition };
 }
@@ -97,6 +102,7 @@ describe("built-in Editor Surface fault domain", () => {
   beforeEach(() => {
     createdViews.length = 0;
     nextWebContentsId = 100;
+    loadUrlBehavior = null;
   });
 
   it("launches PDF in a sandboxed process and publishes first-frame readiness", async () => {
@@ -113,14 +119,16 @@ describe("built-in Editor Surface fault domain", () => {
       session: partition,
     });
     expect(view.webContents.url).toBe("file:///app/dist/isolated-editor.html");
-    expect(view.webContents.sent.at(-1)).toEqual([
-      "editor-surface:initialize",
-      expect.objectContaining({ sessionId: session.sessionId, viewerId: "pdf-preview" }),
-    ]);
-    expect(view.webContents.sent.at(-1)[1].resourcePolicy).toMatchObject({
-      maxCanvasPixels: 8_388_608,
-      maxActiveCanvases: 6,
-      maxWorkers: 1,
+    expect(view.webContents.sent).toEqual([]);
+    const bootstrap = manager.getBootstrapForChild(view.webContents.id);
+    expect(bootstrap).toMatchObject({
+      sessionId: session.sessionId,
+      viewerId: "pdf-preview",
+      resourcePolicy: {
+        maxCanvasPixels: 8_388_608,
+        maxActiveCanvases: 6,
+        maxWorkers: 1,
+      },
     });
 
     expect(manager.reportReady(session.sessionId, view.webContents.id)).toBe(true);
@@ -128,6 +136,89 @@ describe("built-in Editor Surface fault domain", () => {
       "editor-surface:state",
       expect.objectContaining({ sessionId: session.sessionId, status: "ready" }),
     ]);
+  });
+
+  it("serves bootstrap as replayable child-owned state after page load", async () => {
+    const owner = new FakeOwnerWindow(7);
+    const { manager } = createHarness(owner);
+    const session = await manager.activate(request());
+    const childId = createdViews[0].webContents.id;
+
+    const first = manager.getBootstrapForChild(childId);
+    const replay = manager.getBootstrapForChild(childId);
+
+    expect(replay).toEqual(first);
+    expect(replay.sessionId).toBe(session.sessionId);
+    expect(() => manager.getBootstrapForChild(owner.webContents.id)).toThrow(/untrusted/i);
+  });
+
+  it("turns a missing child bootstrap into a pane-local error", async () => {
+    vi.useFakeTimers();
+    try {
+      const owner = new FakeOwnerWindow(7);
+      const { manager } = createHarness(owner, { bootstrapTimeoutMs: 10 });
+      const session = await manager.activate(request());
+
+      await vi.advanceTimersByTimeAsync(11);
+
+      expect(manager.values()).toEqual([]);
+      expect(owner.webContents.sent).toContainEqual([
+        "editor-surface:state",
+        expect.objectContaining({
+          sessionId: session.sessionId,
+          status: "error",
+          reason: "bootstrap-timeout",
+        }),
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("bounds navigation before the isolated page can bootstrap", async () => {
+    vi.useFakeTimers();
+    try {
+      loadUrlBehavior = () => new Promise(() => {});
+      const owner = new FakeOwnerWindow(7);
+      const { manager } = createHarness(owner, { navigationTimeoutMs: 10 });
+      const activation = manager.activate(request());
+      const rejection = expect(activation).rejects.toThrow(/navigation timed out/i);
+
+      await vi.advanceTimersByTimeAsync(11);
+      await rejection;
+
+      expect(manager.values()).toEqual([]);
+      expect(owner.webContents.sent).toContainEqual([
+        "editor-surface:state",
+        expect.objectContaining({ status: "error", reason: "navigation-timeout" }),
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("turns a missing first frame into a pane-local error", async () => {
+    vi.useFakeTimers();
+    try {
+      const owner = new FakeOwnerWindow(7);
+      const { manager } = createHarness(owner, { firstFrameTimeoutMs: 10 });
+      const session = await manager.activate(request());
+      manager.getBootstrapForChild(createdViews[0].webContents.id);
+
+      await vi.advanceTimersByTimeAsync(11);
+
+      expect(manager.values()).toEqual([]);
+      expect(owner.webContents.sent).toContainEqual([
+        "editor-surface:state",
+        expect.objectContaining({
+          sessionId: session.sessionId,
+          status: "error",
+          reason: "first-frame-timeout",
+        }),
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("contains an out-of-memory crash to one Editor Surface", async () => {
