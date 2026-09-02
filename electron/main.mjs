@@ -127,6 +127,8 @@ import {
 import { resolveViewerPackFeatureProfile } from "./main/viewer-packs/feature-profile.mjs";
 import { resolveGitAutoCommitFeatureProfile } from "./main/git-auto-commit/feature-profile.mjs";
 import { createGitAutoCommitHost } from "./main/git-auto-commit/host.mjs";
+import { createEditorSurfaceSessionManager } from "./main/editor-surfaces/session-manager.mjs";
+import { registerEditorSurfaceIpcHandlers } from "./main/editor-surfaces/ipc.mjs";
 
 // Must run before any console.* / IPC replyWithError logging: broken inherited
 // stdout/stderr (Dock launch, detached child, closed terminal) otherwise throws
@@ -138,7 +140,9 @@ const require = createRequire(import.meta.url);
 const packageMetadata = require("../package.json");
 const projectRoot = path.resolve(__dirname, "..");
 const preloadPath = path.join(__dirname, "preload.cjs");
+const editorSurfacePreloadPath = path.join(__dirname, "editor-surface-preload.cjs");
 const rendererDistPath = path.join(projectRoot, "dist", "index.html");
+const editorSurfaceDistPath = path.join(projectRoot, "dist", "isolated-editor.html");
 const desktopBuildInfo = loadDesktopBuildInfo({
   app,
   packageMetadata,
@@ -167,6 +171,9 @@ if (!gotSingleInstanceLock) {
 
 const devServerUrl = process.env.PUPPYONE_DESKTOP_DEV_URL;
 const rendererApplicationUrl = devServerUrl || pathToFileURL(rendererDistPath).toString();
+const editorSurfaceApplicationUrl = devServerUrl
+  ? new URL("isolated-editor.html", devServerUrl).toString()
+  : pathToFileURL(editorSurfaceDistPath).toString();
 if (devServerUrl) app.commandLine.appendSwitch("remote-debugging-port", "9222");
 const viewerPackFeatureProfile = resolveViewerPackFeatureProfile({
   packageMetadata,
@@ -206,6 +213,7 @@ let appPreviewRuntime = null;
 let viewerPackHost = null;
 let viewerPackRuntime = null;
 let markdownWebEmbedService = null;
+let editorSurfaceManager = null;
 let stopLocaleNativeRefresh = null;
 const windowsById = new Map();
 const windowStateById = new Map();
@@ -521,6 +529,7 @@ async function createWindow(options = {}) {
     nativeSurfaceOcclusion.releaseOwner(webContentsId);
     nativeSurfacePointerPassthrough.releaseOwner(webContentsId);
     viewerPackHost?.destroySessionsForOwner(webContentsId);
+    editorSurfaceManager?.destroyForOwner(webContentsId);
     appPreviewRuntime?.closeSessionsForWindow(webContentsId);
   });
 
@@ -541,6 +550,7 @@ async function createWindow(options = {}) {
   window.on("closed", () => {
     releaseWindowWorkspaceById(webContentsId, window);
     viewerPackHost?.destroySessionsForOwner(webContentsId);
+    editorSurfaceManager?.destroyForOwner(webContentsId);
     appPreviewRuntime?.closeSessionsForWindow(webContentsId);
     nativeSurfaceOcclusion.releaseOwner(webContentsId);
     nativeSurfacePointerPassthrough.releaseOwner(webContentsId);
@@ -668,8 +678,9 @@ app.whenReady().then(async () => {
     buildInfo: desktopBuildInfo,
     getWindows: () => BrowserWindow.getAllWindows(),
   });
-  stopLocaleNativeRefresh = localeService.onDidChange(() => {
+  stopLocaleNativeRefresh = localeService.onDidChange((state) => {
     nativeMenuService.refresh();
+    editorSurfaceManager?.broadcastLocale(state);
   });
   setDefaultDockIcon();
   nativeMenuService.refresh();
@@ -684,6 +695,35 @@ app.whenReady().then(async () => {
     isOpenWorkspaceRoot,
     resolveCapability: localFileCapabilities.resolve,
     applicationUrl: rendererApplicationUrl,
+  });
+  editorSurfaceManager = createEditorSurfaceSessionManager({
+    WebContentsView,
+    sessionFromPartition: (partition, options) => electronSession.fromPartition(partition, options),
+    getOwnerWindow: (ownerWebContentsId) => windowsById.get(ownerWebContentsId) ?? null,
+    preloadPath: editorSurfacePreloadPath,
+    surfaceUrl: editorSurfaceApplicationUrl,
+    configurePartition: ({ partitionSession, applicationUrl }) => {
+      registerLocalFileProtocol({
+        protocol: partitionSession.protocol,
+        readWorkspaceFile,
+        openWorkspaceFileRangeStream,
+        statWorkspaceFile,
+        getMimeType,
+        canonicalizeWorkspacePath,
+        isOpenWorkspaceRoot,
+        resolveCapability: localFileCapabilities.resolve,
+        applicationUrl,
+      });
+      return () => {
+        try {
+          partitionSession.protocol.unhandle("puppyone-local");
+        } catch {
+          // Ephemeral partition teardown is best-effort.
+        }
+      };
+    },
+    nativeSurfaceOcclusion,
+    nativeSurfacePointerPassthrough,
   });
   const appPreviewProcessRuntime = createAppPreviewRuntime({
     app,
@@ -770,6 +810,7 @@ app.on("will-quit", () => {
   cloudAuthService.dispose();
   updateService?.dispose();
   telemetryHost?.dispose();
+  editorSurfaceManager?.destroyAll();
   viewerPackHost?.destroyAllSessions();
   appPreviewRuntime?.closeAll();
   markdownWebEmbedService?.dispose();
@@ -798,6 +839,12 @@ app.on("before-quit", createAgentQuitCoordinator({
 }));
 
 function registerIpcHandlers() {
+  registerEditorSurfaceIpcHandlers({
+    trustedIpcMain,
+    rawIpcMain: ipcMain,
+    manager: editorSurfaceManager,
+    localeService,
+  });
   registerAppearanceIpcHandlers({
     ipcMain: trustedIpcMain,
     BrowserWindow,
@@ -1363,6 +1410,7 @@ function releaseWindowWorkspace(window) {
 function releaseWindowWorkspaceById(webContentsId, window = null) {
   gitAutoCommitHost.releaseWindow(webContentsId);
   viewerPackHost?.destroySessionsForOwner(webContentsId);
+  editorSurfaceManager?.destroyForOwner(webContentsId);
   localFileCapabilities.revokeSender(webContentsId);
   const state = windowStateById.get(webContentsId);
   const workspacePaths = state?.folderPaths ?? [];

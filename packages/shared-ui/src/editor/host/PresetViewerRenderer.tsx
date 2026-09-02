@@ -15,6 +15,7 @@ import type {
   PresetViewerRenderContext,
 } from "../registry/viewerTypes";
 import type { ViewerSurfaceFamily, ViewerSurfaceTrait } from "../registry/viewerContract";
+import { usePresetViewerRuntimeHost } from "./PresetViewerRuntimeHost";
 
 const lazyRenderers = new WeakMap<
   LazyPresetViewerContribution,
@@ -42,6 +43,18 @@ export function PresetViewerRenderer({
   loadingIndicator?: ReactNode;
 }) {
   const { t } = useLocalization();
+  const runtimeHost = usePresetViewerRuntimeHost();
+  if (viewer.executionIsolation === "isolated-webcontents" && runtimeHost) {
+    return (
+      <ViewerSurfaceBoundary
+        viewerId={viewer.id}
+        family={viewer.surfaceFamily}
+        traits={viewer.surfaceTraits}
+      >
+        {runtimeHost.renderIsolatedSurface({ viewer, context })}
+      </ViewerSurfaceBoundary>
+    );
+  }
   if ("render" in viewer && typeof viewer.render === "function") {
     return (
       <ViewerSurfaceBoundary

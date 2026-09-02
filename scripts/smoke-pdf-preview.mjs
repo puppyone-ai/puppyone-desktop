@@ -44,7 +44,7 @@ await build({
   },
 });
 const builtHtmlPath = (await fsp.readdir(outputDir, { recursive: true }))
-  .find((entry) => entry.endsWith(".html"));
+  .find((entry) => entry.endsWith("pdf-preview-smoke.html"));
 if (!builtHtmlPath) throw new Error("PDF Preview smoke build did not emit HTML.");
 
 app.setPath("userData", userDataPath);

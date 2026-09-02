@@ -2,6 +2,8 @@ import manifestJson from "./presetViewerManifest.json";
 import {
   PRESET_VIEWER_CAPABILITIES,
   PRESET_VIEWER_CONTRACT_VERSION,
+  PRESET_VIEWER_EXECUTION_ISOLATIONS,
+  PRESET_VIEWER_MEMORY_CLASSES,
   PRESET_VIEWER_RUNTIMES,
   PRESET_VIEWER_SOURCES,
   VIEWER_SURFACE_PREPARATIONS,
@@ -10,6 +12,9 @@ import {
   VIEWER_SURFACE_TRAITS,
   type CoreViewerCapability,
   type PresetViewerContractVersion,
+  type PresetViewerExecutionIsolation,
+  type PresetViewerRecoveryPolicy,
+  type PresetViewerResourcePolicy,
   type PresetViewerRuntime,
   type PresetViewerSource,
   type ViewerSurfacePreparation,
@@ -25,6 +30,9 @@ export type PresetViewerDefinition = Readonly<{
   capability: CoreViewerCapability;
   source: PresetViewerSource;
   runtime: PresetViewerRuntime;
+  executionIsolation: PresetViewerExecutionIsolation;
+  resourcePolicy: PresetViewerResourcePolicy;
+  recoveryPolicy: PresetViewerRecoveryPolicy;
   surfacePreparation: ViewerSurfacePreparation;
   readinessSignal: ViewerSurfaceReadinessSignal;
   surfaceFamily: ViewerSurfaceFamily;
@@ -45,6 +53,9 @@ const DEFINITION_KEYS = new Set([
   "capability",
   "source",
   "runtime",
+  "executionIsolation",
+  "resourcePolicy",
+  "recoveryPolicy",
   "surfacePreparation",
   "readinessSignal",
   "surfaceFamily",
@@ -160,6 +171,11 @@ function parseDefinition(input: unknown, index: number): PresetViewerDefinition 
   if (!PRESET_VIEWER_RUNTIMES.includes(record.runtime as never)) {
     throw new TypeError(`Preset viewer ${record.id} has an unsupported runtime boundary.`);
   }
+  if (!PRESET_VIEWER_EXECUTION_ISOLATIONS.includes(record.executionIsolation as never)) {
+    throw new TypeError(`Preset viewer ${record.id} has an unsupported execution isolation boundary.`);
+  }
+  const resourcePolicy = parseResourcePolicy(record.resourcePolicy, record.id);
+  const recoveryPolicy = parseRecoveryPolicy(record.recoveryPolicy, record.id);
   if (!VIEWER_SURFACE_PREPARATIONS.includes(record.surfacePreparation as never)) {
     throw new TypeError(`Preset viewer ${record.id} has an unsupported surface preparation policy.`);
   }
@@ -189,6 +205,15 @@ function parseDefinition(input: unknown, index: number): PresetViewerDefinition 
   if (capability === "placeholder" && source !== "none") {
     throw new TypeError(`Placeholder preset viewer ${record.id} must use source 'none'.`);
   }
+  if (record.executionIsolation === "worker-backed" && resourcePolicy.maxWorkers === 0) {
+    throw new TypeError(`Worker-backed preset viewer ${record.id} must declare at least one worker.`);
+  }
+  if (
+    (record.surfaceFamily === "canvas" || (record.surfaceTraits as unknown[]).includes("paginated"))
+    && (resourcePolicy.maxCanvasPixels === 0 || resourcePolicy.maxActiveCanvases === 0)
+  ) {
+    throw new TypeError(`Canvas or paginated preset viewer ${record.id} must declare positive Canvas limits.`);
+  }
 
   return Object.freeze({
     contractVersion: PRESET_VIEWER_CONTRACT_VERSION,
@@ -197,10 +222,57 @@ function parseDefinition(input: unknown, index: number): PresetViewerDefinition 
     capability,
     source,
     runtime: record.runtime as PresetViewerRuntime,
+    executionIsolation: record.executionIsolation as PresetViewerExecutionIsolation,
+    resourcePolicy,
+    recoveryPolicy,
     surfacePreparation: record.surfacePreparation as ViewerSurfacePreparation,
     readinessSignal: record.readinessSignal as ViewerSurfaceReadinessSignal,
     surfaceFamily: record.surfaceFamily as ViewerSurfaceFamily,
     surfaceTraits: Object.freeze([...record.surfaceTraits]) as readonly ViewerSurfaceTrait[],
+  });
+}
+
+function parseResourcePolicy(input: unknown, viewerId: unknown): PresetViewerResourcePolicy {
+  const label = `Preset viewer ${String(viewerId)} resource policy`;
+  const record = assertRecord(input, label);
+  assertExactKeys(
+    record,
+    new Set(["memoryClass", "maxCanvasPixels", "maxActiveCanvases", "maxWorkers"]),
+    label,
+  );
+  if (!PRESET_VIEWER_MEMORY_CLASSES.includes(record.memoryClass as never)) {
+    throw new TypeError(`${label} has an unsupported memory class.`);
+  }
+  for (const key of ["maxCanvasPixels", "maxActiveCanvases", "maxWorkers"] as const) {
+    if (!Number.isSafeInteger(record[key]) || (record[key] as number) < 0) {
+      throw new TypeError(`${label} ${key} must be a non-negative safe integer.`);
+    }
+  }
+  return Object.freeze({
+    memoryClass: record.memoryClass as PresetViewerResourcePolicy["memoryClass"],
+    maxCanvasPixels: record.maxCanvasPixels as number,
+    maxActiveCanvases: record.maxActiveCanvases as number,
+    maxWorkers: record.maxWorkers as number,
+  });
+}
+
+function parseRecoveryPolicy(input: unknown, viewerId: unknown): PresetViewerRecoveryPolicy {
+  const label = `Preset viewer ${String(viewerId)} recovery policy`;
+  const record = assertRecord(input, label);
+  assertExactKeys(record, new Set(["maxAutomaticRetries", "supportsSafeMode"]), label);
+  if (
+    !Number.isSafeInteger(record.maxAutomaticRetries)
+    || (record.maxAutomaticRetries as number) < 0
+    || (record.maxAutomaticRetries as number) > 1
+  ) {
+    throw new TypeError(`${label} maxAutomaticRetries must be zero or one.`);
+  }
+  if (typeof record.supportsSafeMode !== "boolean") {
+    throw new TypeError(`${label} supportsSafeMode must be a boolean.`);
+  }
+  return Object.freeze({
+    maxAutomaticRetries: record.maxAutomaticRetries as number,
+    supportsSafeMode: record.supportsSafeMode,
   });
 }
 

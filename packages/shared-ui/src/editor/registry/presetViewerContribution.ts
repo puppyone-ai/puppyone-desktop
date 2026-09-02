@@ -20,6 +20,9 @@ const RESOLVED_KEYS = new Set([
   "capability",
   "source",
   "runtime",
+  "executionIsolation",
+  "resourcePolicy",
+  "recoveryPolicy",
   "surfacePreparation",
   "readinessSignal",
   "surfaceFamily",
@@ -61,6 +64,7 @@ export function normalizePresetViewerContribution(
     "capability",
     "source",
     "runtime",
+    "executionIsolation",
     "surfacePreparation",
     "readinessSignal",
     "surfaceFamily",
@@ -75,6 +79,11 @@ export function normalizePresetViewerContribution(
     || record.formatViewerIds.some((value, index) => value !== definition.formatViewerIds[index])
   ) {
     throw new TypeError(`Preset viewer ${record.id} does not match canonical format viewer ids.`);
+  }
+  for (const key of ["resourcePolicy", "recoveryPolicy"] as const) {
+    if (record[key] !== definition[key]) {
+      throw new TypeError(`Preset viewer ${record.id} does not match canonical ${key} metadata.`);
+    }
   }
   if (
     !Array.isArray(record.surfaceTraits)
@@ -120,6 +129,8 @@ export function normalizePresetViewerContribution(
   return Object.freeze({
     ...contribution,
     formatViewerIds: definition.formatViewerIds,
+    resourcePolicy: definition.resourcePolicy,
+    recoveryPolicy: definition.recoveryPolicy,
     surfaceTraits: definition.surfaceTraits,
   });
 }

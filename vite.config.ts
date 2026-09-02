@@ -2,6 +2,7 @@ import type { Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
+import path from "node:path";
 
 const DESKTOP_CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
@@ -61,6 +62,10 @@ export default defineConfig({
         replacement: fileURLToPath(new URL("./packages/shared-ui/src/styles/editor.css", import.meta.url)),
       },
       {
+        find: "@puppyone/shared-ui/pdf-document-preview",
+        replacement: fileURLToPath(new URL("./packages/shared-ui/src/editor/viewers/pdf/PdfViewer.tsx", import.meta.url)),
+      },
+      {
         find: "@puppyone/shared-ui/markdown-presentation-preview",
         replacement: fileURLToPath(new URL("./packages/shared-ui/src/editor/markdown/MarkdownPresentationPreview.tsx", import.meta.url)),
       },
@@ -92,6 +97,17 @@ export default defineConfig({
   },
   worker: {
     format: "es",
+  },
+  build: {
+    rollupOptions: {
+      input: {
+        index: path.resolve(fileURLToPath(new URL(".", import.meta.url)), "index.html"),
+        "isolated-editor": path.resolve(
+          fileURLToPath(new URL(".", import.meta.url)),
+          "isolated-editor.html",
+        ),
+      },
+    },
   },
   server: {
     strictPort: true,

@@ -12,6 +12,9 @@ for (const requiredPath of [
   "electron/main/ipc/native-surface-occlusion-ipc.mjs",
   "electron/main/native-surfaces/pointer-passthrough-coordinator.mjs",
   "electron/main/ipc/native-surface-pointer-passthrough-ipc.mjs",
+  "electron/main/editor-surfaces/session-manager.mjs",
+  "electron/main/editor-surfaces/ipc.mjs",
+  "electron/editor-surface-preload.cjs",
   "src/features/native-surfaces/nativeSurfaceOcclusion.ts",
   "src/features/native-surfaces/nativeSurfacePointerRoutingRegions.ts",
   "src/features/native-surfaces/useNativeSurfacePointerRoutingRegion.ts",
@@ -35,6 +38,7 @@ for (const token of [
 for (const relativePath of [
   "electron/main/markdown-web-embed-service.mjs",
   "electron/main/viewer-packs/session-manager.mjs",
+  "electron/main/editor-surfaces/session-manager.mjs",
 ]) {
   const source = read(relativePath);
   if (!source.includes("nativeSurfaceOcclusion?.register?.")) {
@@ -137,6 +141,7 @@ for (const token of [
 for (const relativePath of [
   "electron/main/markdown-web-embed-service.mjs",
   "electron/main/viewer-packs/session-manager.mjs",
+  "electron/main/editor-surfaces/session-manager.mjs",
 ]) {
   if (!read(relativePath).includes("nativeSurfacePointerPassthrough?.register?.")) {
     errors.push(`${relativePath} does not register its native view for drag pointer passthrough`);

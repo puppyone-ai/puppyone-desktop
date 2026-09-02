@@ -116,6 +116,7 @@ function EditorDocumentSurface({
   const { viewer, format, resolvedExtension } = resolveEditorViewer(document);
   const preloadWhileReading = Boolean(
     !viewerExtensionAdapter
+    && viewer.executionIsolation !== "isolated-webcontents"
     && loading
     && !document.content
     && !document.preview,
