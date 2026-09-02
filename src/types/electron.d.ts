@@ -1499,7 +1499,7 @@ declare global {
       }) => Promise<{ enrollment: string; reason?: string }>;
     };
     puppyoneEditorSurface?: {
-      onInitialize: (callback: (bootstrap: Readonly<{
+      getBootstrap: () => Promise<Readonly<{
         sessionId: string;
         viewerId: "pdf-preview";
         resourceUrl: string;
@@ -1510,7 +1510,7 @@ declare global {
           maxActiveCanvases: number;
         }>;
         appearance: EditorSurfaceAppearance;
-      }>) => void) => () => void;
+      }>>;
       onAppearance: (callback: (appearance: EditorSurfaceAppearance) => void) => () => void;
       reportReady: (request: { sessionId: string }) => void;
       reportError: (request: {

@@ -74,7 +74,7 @@ export function PdfDocumentPreview({
   const markFirstPageReady = useCallback(() => setFirstPageReady(true), []);
   const budget = useMemo(
     () => resolvePdfRenderBudget(resourcePolicy, safeMode),
-    [resourcePolicy.maxActiveCanvases, resourcePolicy.maxCanvasPixels, safeMode],
+    [resourcePolicy, safeMode],
   );
 
   useEffect(() => {

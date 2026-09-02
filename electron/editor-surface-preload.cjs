@@ -9,10 +9,11 @@ function subscribe(channel, callback) {
 }
 
 contextBridge.exposeInMainWorld("puppyoneEditorSurface", {
-  onInitialize: (callback) => typeof callback !== "function" ? () => {} : subscribe("editor-surface:initialize", (payload) => {
+  getBootstrap: async () => {
+    const payload = await ipcRenderer.invoke("editor-surface:bootstrap");
     activeSessionId = typeof payload?.sessionId === "string" ? payload.sessionId : null;
-    callback(payload);
-  }),
+    return payload;
+  },
   onAppearance: (callback) => subscribe("editor-surface:appearance", callback),
   reportReady: (request = {}) => ipcRenderer.send("editor-surface:ready", {
     ...request,
