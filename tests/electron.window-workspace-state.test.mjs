@@ -3,7 +3,11 @@ import { WindowWorkspaceState } from "../electron/main/window-workspace-state.mj
 
 describe("WindowWorkspaceState", () => {
   it("models one visible folder as a general ordered composition", () => {
-    const state = new WindowWorkspaceState({ initialWorkspacePaths: ["/initial", "/second"] });
+    const state = new WindowWorkspaceState({
+      initialWorkspaceId: "workbench:persisted",
+      initialWorkspacePaths: ["/initial", "/second"],
+    });
+    expect(state.workspaceId).toBe("workbench:persisted");
     expect(state.initialRestorePath).toBe("/initial");
     expect(state.initialRestorePaths).toEqual(["/initial", "/second"]);
     expect(state.folderPaths).toEqual([]);
@@ -22,6 +26,13 @@ describe("WindowWorkspaceState", () => {
     expect(state.primaryWorkspace).toMatchObject({ id: "a" });
     expect(state.initialRestorePath).toBe("/a");
     expect(state.initialRestorePaths).toEqual(["/a", "/b"]);
+
+    state.replaceFolders([
+      { path: "/b", workspace: { id: "b", name: "B" } },
+    ]);
+    expect(state.workspaceId).toBe("workbench:persisted");
+    expect(state.beginNewWorkspace("workbench:replacement")).toBe("workbench:replacement");
+    expect(state.workspaceId).toBe("workbench:replacement");
   });
 
   it("reports scoped Folder changes and releases an immutable snapshot", () => {
@@ -57,5 +68,9 @@ describe("WindowWorkspaceState", () => {
       { path: "/a", workspace: { id: "same", name: "A" } },
       { path: "/b", workspace: { id: "same", name: "B" } },
     ])).toThrow(/duplicate.*identity/i);
+    expect(() => state.replaceFolders([
+      { path: "/repo", workspace: { id: "root", name: "Root" } },
+      { path: "/repo/packages/ui", workspace: { id: "nested", name: "Nested" } },
+    ])).toThrow(/overlapping Workspace Folder/i);
   });
 });

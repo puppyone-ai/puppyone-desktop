@@ -73,4 +73,34 @@ describe("CSS theme IPC", () => {
     expect(() => registerThemeIpcHandlers({ ipcMain: { handle() {} }, themeService: {} }))
       .toThrow("Theme service is required");
   });
+
+  it("bounds renderer-controlled theme menu metadata before it reaches the main menu", () => {
+    const handlers = new Map();
+    const onSyncNativeMenu = vi.fn();
+    registerThemeIpcHandlers({
+      ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) },
+      themeService: {
+        listThemes: vi.fn(),
+        openDirectory: vi.fn(),
+        createTheme: vi.fn(),
+      },
+      onSyncNativeMenu,
+    });
+
+    handlers.get(THEME_SYNC_NATIVE_MENU_CHANNEL)({}, {
+      pack: `default.${"a".repeat(200)}`,
+      requiredTargets: ["markdown", ...Array.from({ length: 32 }, () => "invalid"), "csv"],
+      themes: [{
+        id: `default.${"b".repeat(200)}`,
+        name: `${"Theme".repeat(30)} ignored suffix`,
+        targets: ["markdown"],
+      }],
+    });
+
+    expect(onSyncNativeMenu).toHaveBeenCalledWith({
+      pack: "default.neutral",
+      requiredTargets: ["markdown"],
+      themes: [],
+    });
+  });
 });

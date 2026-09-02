@@ -1,4 +1,11 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import {
   SidebarResizeHandle,
   useCollapsiblePaneResize,
@@ -16,6 +23,7 @@ export type AuxiliaryPanelHostProps = {
   collapseThreshold?: number;
   open: boolean;
   width?: number;
+  expandedWidth?: number;
   minWidth?: number;
   maxWidth?: number;
   resizable?: boolean;
@@ -30,6 +38,7 @@ export function AuxiliaryPanelHost({
   collapseThreshold = 0,
   open,
   width,
+  expandedWidth,
   minWidth = 320,
   maxWidth = 760,
   resizable = false,
@@ -38,6 +47,12 @@ export function AuxiliaryPanelHost({
 }: AuxiliaryPanelHostProps) {
   const { t } = useLocalization();
   const resolvedWidth = width ?? 560;
+  const [lastExpandedWidth, setLastExpandedWidth] = useState(() => clamp(
+    resolvedWidth > 0 ? resolvedWidth : expandedWidth ?? 560,
+    minWidth,
+    maxWidth,
+  ));
+  const wasOpenRef = useRef(open);
   const [collapsedEdgeSettled, setCollapsedEdgeSettled] = useState(!open);
   const onResizeActiveChange = useNativeSurfacePointerPassthroughActivity(
     "auxiliary-panel-resize",
@@ -67,15 +82,34 @@ export function AuxiliaryPanelHost({
     minWidth,
     side: "inline-end",
     width: resolvedWidth,
+    widthChangeMode: "end",
     onCollapsedChange: onOpenChange
       ? (collapsed) => onOpenChange(!collapsed)
       : undefined,
     onDragActiveChange: onResizeActiveChange,
     onWidthChange: onWidthChange ?? noop,
   });
-  const panelStyle = width !== undefined || resize.dragging
-    ? ({ "--desktop-right-sidebar-width": `${resize.width}px` } as CSSProperties)
-    : undefined;
+  const liveExpandedWidth = clamp(resize.width, minWidth, maxWidth);
+  const renderedExpandedWidth = open ? liveExpandedWidth : lastExpandedWidth;
+
+  useLayoutEffect(() => {
+    const wasOpen = wasOpenRef.current;
+    wasOpenRef.current = open;
+    if (open) {
+      setLastExpandedWidth((current) => current === liveExpandedWidth
+        ? current
+        : liveExpandedWidth);
+      return;
+    }
+    if (!wasOpen && expandedWidth !== undefined) {
+      const preferred = clamp(expandedWidth, minWidth, maxWidth);
+      setLastExpandedWidth((current) => current === preferred ? current : preferred);
+    }
+  }, [expandedWidth, liveExpandedWidth, maxWidth, minWidth, open]);
+
+  const panelStyle = {
+    "--desktop-right-sidebar-width": `${renderedExpandedWidth}px`,
+  } as CSSProperties;
   const collapsedEdgeVisible = !open && collapsedEdgeSettled;
 
   const resizeByKeyboard = (intent: SidebarResizeIntent, accelerated: boolean) => {
@@ -128,12 +162,14 @@ export function AuxiliaryPanelHost({
           onKeyboardResize={resizeByKeyboard}
         />
       )}
-      <div
-        className="desktop-right-sidebar-inner"
-        aria-hidden={open ? undefined : true}
-        {...(!open ? { inert: "" } : {})}
-      >
-        {children}
+      <div className="desktop-right-sidebar-viewport">
+        <div
+          className="desktop-right-sidebar-inner"
+          aria-hidden={open ? undefined : true}
+          {...(!open ? { inert: "" } : {})}
+        >
+          {children}
+        </div>
       </div>
     </aside>
   );

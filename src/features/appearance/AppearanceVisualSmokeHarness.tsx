@@ -1,6 +1,6 @@
 import { DesktopWindowChrome } from "../../components/DesktopWindowChrome";
 import { DesktopShellLocationBar } from "../app-shell/DesktopShellLocationBar";
-import { TerminalCloseConfirmationDialog } from "../desktop-terminal/ui/TerminalCloseConfirmationDialog";
+import { AuxiliaryWorkbenchCloseDialog } from "../app-shell/auxiliary-workbench/AuxiliaryWorkbenchCloseDialog";
 import { useLocalization } from "@puppyone/localization/react";
 import {
   ExplorerTree,
@@ -160,9 +160,23 @@ export function AppearanceVisualSmokeHarness() {
         </div>
       </div>
       {dialogFixture === "terminal-close" && (
-        <TerminalCloseConfirmationDialog
-          title={t("terminal.sessionTitle", { number: 1 })}
-          onCancel={() => undefined}
+        <AuxiliaryWorkbenchCloseDialog
+          pending={Object.freeze({
+            itemId: "appearance-terminal-close",
+            decision: Object.freeze({
+              kind: "confirm" as const,
+              tone: "danger" as const,
+              dialog: Object.freeze({
+                title: t("terminal.closeDialog.title", {
+                  title: t("terminal.sessionTitle", { number: 1 }),
+                }),
+                detail: t("terminal.closeDialog.detail"),
+                actionLabel: t("terminal.closeDialog.confirm"),
+              }),
+            }),
+          })}
+          committing={false}
+          onDismiss={() => undefined}
           onConfirm={() => undefined}
         />
       )}

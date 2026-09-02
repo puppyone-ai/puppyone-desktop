@@ -75,6 +75,7 @@ export class AcpClient {
   authenticate(params) { return this.#request("authenticate", params); }
   newSession(params) { return this.#request("newSession", params); }
   loadSession(params) { return this.#request("loadSession", params); }
+  resumeSession(params) { return this.#request("resumeSession", params); }
   listSessions(params = {}) { return this.#request("listSessions", params); }
   closeSession(params) { return this.#request("closeSession", params); }
   forkSession(params) { return this.#request("forkSession", params); }

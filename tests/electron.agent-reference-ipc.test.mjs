@@ -39,13 +39,17 @@ describe("Agent reference IPC authorization", () => {
     await handlers.get("agent:turn-start")(owner, {
       rootPath: workspace,
       sessionId: "session-1",
-      prompt: "use this",
+      prompt: "use @outside.txt",
+      promptMentions: [{ referenceId: draft.id, start: 4, end: 16 }],
       referenceEpoch: "draft-a",
       references: [draft],
     });
     const authorized = startTurn.mock.calls[0][1].references[0];
     expect(authorized).toMatchObject({ authorized: true, kind: "staged-attachment", name: "outside.txt" });
     expect(authorized.path).not.toBe(source);
+    expect(startTurn.mock.calls[0][1].promptMentions).toEqual([
+      { referenceId: draft.id, start: 4, end: 16 },
+    ]);
     expect(adapterInput).toBe("immutable input");
     await expect(fs.promises.stat(authorized.path)).resolves.toBeDefined();
 
@@ -79,7 +83,8 @@ describe("Agent reference IPC authorization", () => {
       rootPath: workspace,
       paths: ["inside.txt"],
     });
-    expect(workspaceDraft).toMatchObject({ path: "inside.txt", relativePath: "inside.txt", status: "ready" });
+    expect(workspaceDraft).toMatchObject({ relativePath: "inside.txt", status: "ready" });
+    expect(workspaceDraft).not.toHaveProperty("path");
     expect(workspaceDraft).not.toHaveProperty("authorized");
     expect(JSON.stringify(workspaceDraft)).not.toContain(workspace);
 
@@ -99,12 +104,11 @@ describe("Agent reference IPC authorization", () => {
         id: "raw-external",
         kind: "workspace-entry",
         entryType: "file",
-        path: source,
-        relativePath: "external.txt",
+        relativePath: "../external.txt",
         displayName: "external.txt",
         status: "ready",
       }],
-    })).rejects.toThrow(/outside|workspace/i);
+    })).rejects.toThrow(/workspace-relative/i);
     await store.close();
   });
 
@@ -135,6 +139,50 @@ describe("Agent reference IPC authorization", () => {
       referenceEpoch: "workspace-a-draft",
       references: [draft],
     })).rejects.toThrow(/invalid|belongs|workspace/i);
+    await store.close();
+  });
+
+  it("resolves one portable workspace identity against the assigned Session/worktree root at send time", async () => {
+    const root = await temporaryRoot();
+    const workspaceA = path.join(root, "checkout-a");
+    const workspaceB = path.join(root, "worktree-b");
+    await Promise.all([
+      fs.promises.mkdir(path.join(workspaceA, "docs"), { recursive: true }),
+      fs.promises.mkdir(path.join(workspaceB, "docs"), { recursive: true }),
+    ]);
+    await Promise.all([
+      fs.promises.writeFile(path.join(workspaceA, "docs", "notes.md"), "checkout"),
+      fs.promises.writeFile(path.join(workspaceB, "docs", "notes.md"), "worktree"),
+    ]);
+    const store = createAgentAttachmentStore({ rootPath: path.join(root, "staging") });
+    const owner = { sender: { id: 31 } };
+    const startA = vi.fn(async () => ({ sessionId: "session-a", turnId: "turn-a" }));
+    const startB = vi.fn(async () => ({ sessionId: "session-b", turnId: "turn-b" }));
+    const handlersA = registerHandlers({ workspace: workspaceA, store, startTurn: startA });
+    const handlersB = registerHandlers({ workspace: workspaceB, store, startTurn: startB });
+    const [portableDraft] = await handlersA.get("agent:reference-resolve-workspace")(owner, {
+      rootPath: workspaceA,
+      paths: ["docs/notes.md"],
+    });
+
+    await handlersB.get("agent:turn-start")(owner, {
+      rootPath: workspaceB,
+      sessionId: "session-b",
+      prompt: "Review @docs/notes.md",
+      promptMentions: [{ referenceId: portableDraft.id, start: 7, end: 21 }],
+      references: [portableDraft],
+    });
+
+    expect(portableDraft).toMatchObject({ relativePath: "docs/notes.md", displayName: "notes.md" });
+    expect(portableDraft).not.toHaveProperty("path");
+    expect(startB).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      references: [expect.objectContaining({
+        id: portableDraft.id,
+        path: await fs.promises.realpath(path.join(workspaceB, "docs", "notes.md")),
+        relativePath: "docs/notes.md",
+      })],
+    }), workspaceB);
+    expect(startA).not.toHaveBeenCalled();
     await store.close();
   });
 

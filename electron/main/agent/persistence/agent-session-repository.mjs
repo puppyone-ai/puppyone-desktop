@@ -8,15 +8,38 @@ export function createAgentSessionRepository({ eventCache, conversationCatalog }
     throw new TypeError("Agent session repository requires an event cache and conversation catalog.");
   }
   return {
-    async save(record) {
-      await Promise.all([eventCache.save(record), conversationCatalog.save(record)]);
+    async save(record, { promoteCatalog = true } = {}) {
+      await Promise.all([
+        eventCache.save(record),
+        ...(promoteCatalog ? [conversationCatalog.save({ ...record, availability: "available" })] : []),
+      ]);
     },
     upsertNative(record) {
       return conversationCatalog.upsertNative(record);
     },
+    async reconcileNative(scope) {
+      const result = await conversationCatalog.reconcileNative(scope);
+      await Promise.all(result.unavailableSessionIds.map((sessionId) => eventCache.remove(sessionId)));
+      return result;
+    },
+    async markUnavailable(sessionId, unavailableAt) {
+      await eventCache.remove(sessionId);
+      return conversationCatalog.markUnavailable(sessionId, unavailableAt);
+    },
     async findById(sessionId, workspaceRoot = null) {
-      return await eventCache.findById(sessionId, workspaceRoot)
-        ?? conversationCatalog.findById(sessionId, workspaceRoot);
+      const [liveRecord, catalogRecord] = await Promise.all([
+        eventCache.findById(sessionId, workspaceRoot),
+        conversationCatalog.findById(sessionId, workspaceRoot),
+      ]);
+      if (!liveRecord) return catalogRecord;
+      if (!catalogRecord) return liveRecord;
+      return {
+        ...catalogRecord,
+        ...liveRecord,
+        // Availability belongs to the durable catalog. The process-local
+        // replay cache deliberately does not model History lifecycle state.
+        availability: catalogRecord.availability,
+      };
     },
     async findLatest(workspaceRoot, runtimeId = null) {
       return await eventCache.findLatest(workspaceRoot, runtimeId)

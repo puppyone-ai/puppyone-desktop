@@ -219,6 +219,7 @@ describe("sender-bound workspace authorization", () => {
       create: vi.fn(),
       input: vi.fn(),
       resize: vi.fn(),
+      appearance: vi.fn(),
       close: vi.fn(),
     };
 
@@ -280,6 +281,7 @@ describe("sender-bound workspace authorization", () => {
       create: vi.fn(),
       input: vi.fn(),
       resize: vi.fn(),
+      appearance: vi.fn(),
       close: vi.fn(),
     };
     const terminalAgentLocator = {
@@ -326,9 +328,23 @@ describe("sender-bound workspace authorization", () => {
 
     listeners.get("terminal:input")(event, { id: "terminal-1", data: "pwd\n" });
     listeners.get("terminal:resize")(event, { id: "terminal-1", cols: 100, rows: 40 });
+    listeners.get("terminal:appearance")(event, {
+      id: "terminal-1",
+      defaultColors: {
+        foreground: [209, 206, 198],
+        background: [22, 20, 19],
+      },
+    });
     await handlers.get("terminal:close")(event, "terminal-1");
     expect(terminalService.input).toHaveBeenCalledWith(sender, { id: "terminal-1", data: "pwd\n" });
     expect(terminalService.resize).toHaveBeenCalledWith(sender, { id: "terminal-1", cols: 100, rows: 40 });
+    expect(terminalService.appearance).toHaveBeenCalledWith(sender, {
+      id: "terminal-1",
+      defaultColors: {
+        foreground: [209, 206, 198],
+        background: [22, 20, 19],
+      },
+    });
     expect(terminalService.close).toHaveBeenCalledWith(sender, "terminal-1");
   });
 });

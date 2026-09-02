@@ -35,9 +35,11 @@ export function preloadPresetViewer(viewer: PresetViewerContribution): Promise<v
 export function PresetViewerRenderer({
   viewer,
   context,
+  loadingIndicator,
 }: {
   viewer: PresetViewerContribution;
   context: PresetViewerRenderContext;
+  loadingIndicator?: ReactNode;
 }) {
   const { t } = useLocalization();
   if ("render" in viewer && typeof viewer.render === "function") {
@@ -59,7 +61,11 @@ export function PresetViewerRenderer({
       family={viewer.surfaceFamily}
       traits={viewer.surfaceTraits}
     >
-      <Suspense fallback={<DocumentSurfacePending label={t("editor.loadingViewer")} />}>
+      <Suspense fallback={(
+        <DocumentSurfacePending label={t("editor.loadingViewer")}>
+          {loadingIndicator}
+        </DocumentSurfacePending>
+      )}>
         <LazyRenderer {...context} />
       </Suspense>
     </ViewerSurfaceBoundary>

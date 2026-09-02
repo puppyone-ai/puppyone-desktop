@@ -5,26 +5,36 @@
   --agent-dock-padding-top: 12px;
   --agent-dock-padding-bottom: 12px;
   --agent-control-size: 30px;
-  --agent-radius-composer: 12px;
+  --agent-primary-action-visual-size: 28px;
+  --agent-primary-action-separation: 4px;
+  --agent-radius-composer: 8px;
   --agent-radius-message: var(--agent-radius-composer);
   --agent-message-content-inset: 12px;
   --agent-message-turn-gap: 24px;
   --agent-work-handoff-gap: 8px;
   --agent-composer-line-height: 20px;
-  --agent-composer-input-padding: 12px;
-  --agent-composer-text-min-height: 44px;
+  --agent-composer-input-padding-block: 12px;
+  --agent-composer-text-inset-inline: 16px;
   --agent-composer-text-max-height: 120px;
-  --agent-composer-input-min-height: 70px;
+  /* One visible text line at rest; CodeMirror grows naturally until max-height. */
+  --agent-composer-input-min-height: calc(var(--agent-composer-line-height) + var(--agent-composer-input-padding-block) + var(--agent-composer-input-padding-block));
   --agent-composer-toolbar-height: 38px;
-  --agent-composer-picker-padding-inline: 8px;
+  --agent-composer-toolbar-padding-inline: 8px;
+  /* Prompt and picker labels share one text edge even when either inset changes. */
+  --agent-composer-picker-padding-inline: calc(var(--agent-composer-text-inset-inline) - var(--agent-composer-toolbar-padding-inline));
   --agent-reference-card-height: 52px;
+  --agent-empty-state-dock-reserve: calc(
+    var(--agent-dock-padding-top)
+    + var(--agent-composer-input-min-height)
+    + var(--agent-composer-toolbar-height)
+    + var(--agent-dock-padding-bottom)
+    + 2px
+  );
   --agent-font-size: var(--desktop-sidebar-font-size, var(--po-text-size-sidebar, 13px));
   --agent-font-size-meta: var(--desktop-sidebar-font-size-meta, var(--po-text-size-meta, 12px));
   --agent-font-size-caption: var(--po-text-size-caption, 11px);
   --agent-font-size-micro: var(--po-text-size-micro, 10px);
   --agent-code-font-size: var(--po-code-font-size, 13px);
-  --agent-canvas: var(--po-editor-bg);
-  --agent-report-surface: color-mix(in srgb, var(--po-panel-raised) 90%, var(--po-canvas));
   /* One-way visual mirror of the existing Data tree row states. */
   --agent-row-hover-surface: color-mix(in srgb, var(--po-hover) 86%, transparent);
   --agent-row-selected-surface: linear-gradient(
@@ -33,21 +43,6 @@
     color-mix(in srgb, var(--po-selected) 88%, transparent) calc(100% - 36px),
     color-mix(in srgb, var(--po-selected) 62%, transparent) 100%
   );
-  --agent-composer-surface: var(--po-active);
-  --agent-user-message-surface: color-mix(in srgb, var(--agent-composer-surface) 48%, var(--agent-canvas));
-  --agent-control-surface: color-mix(in srgb, var(--po-header) 82%, var(--po-panel-raised));
-  --agent-border: var(--po-border-strong);
-  --agent-border-subtle: var(--po-divider);
-  --agent-sidebar-border: var(--po-divider);
-  --agent-config-border: var(--po-border-subtle);
-  --agent-config-surface: var(--po-control);
-  --agent-config-surface-hover: var(--po-control-hover);
-  --agent-text: var(--po-text);
-  --agent-text-muted: var(--po-text-muted);
-  --agent-text-subtle: var(--po-text-subtle);
-  --agent-tool-foreground: var(--agent-text-subtle);
-  --agent-accent: var(--po-accent);
-  --agent-accent-soft: color-mix(in srgb, var(--po-accent) 16%, transparent);
   color: var(--agent-text);
   font-family: var(--po-font-sans);
   font-size: var(--agent-font-size);
@@ -64,49 +59,25 @@
   background: var(--agent-canvas);
 }
 
-.desktop-agent-reference-drop-overlay {
-  position: absolute;
-  z-index: 100;
-  inset: 8px;
-  display: grid;
-  align-items: end;
-  justify-items: center;
-  padding: 20px 20px 126px;
-  border: 0;
-  background: color-mix(in srgb, var(--agent-canvas) 82%, transparent);
-  color: var(--agent-text);
-  font-weight: 500;
-  text-align: center;
-  pointer-events: none;
+/* Product chrome never participates in document selection. Only authored or
+ * generated conversation content and editable fields opt back into selection. */
+.desktop-agent-workspace,
+.desktop-agent-boundary,
+.desktop-agent-overlay {
+  -webkit-user-select: none;
+  user-select: none;
 }
-.desktop-agent-reference-drop-overlay > span {
-  padding: 7px 11px;
-  border: 1px solid color-mix(in srgb, var(--agent-accent) 60%, var(--agent-border-subtle));
-  border-radius: 999px;
-  background: var(--po-menu-bg);
-  box-shadow: var(--po-menu-shadow);
+
+.desktop-agent-boundary .desktop-agent-virtual-row,
+.desktop-agent-boundary .desktop-agent-live-tail > .desktop-agent-message,
+.desktop-agent-boundary :is(input, textarea, [contenteditable="true"]),
+.desktop-agent-overlay :is(input, textarea, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
 }
-.desktop-agent-boundary[data-drop-active="true"] .desktop-agent-composer {
-  background: color-mix(in srgb, var(--agent-composer-surface) 82%, var(--agent-accent));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--agent-accent) 64%, transparent);
-}
-.desktop-agent-reference-drop-overlay.is-invalid {
-  background: color-mix(in srgb, var(--agent-canvas) 86%, transparent);
-}
-.desktop-agent-reference-drop-overlay.is-invalid > span { border-color: color-mix(in srgb, var(--po-danger) 64%, var(--agent-border-subtle)); }
 
 .dark .desktop-agent-boundary,
 .dark .desktop-agent-overlay {
-  --agent-canvas: var(--po-editor-bg);
-  --agent-report-surface: #18181b;
-  --agent-control-surface: color-mix(in srgb, var(--po-header) 82%, var(--po-panel-raised));
-  --agent-border: #3a3a3a;
-  --agent-border-subtle: rgba(255, 255, 255, 0.08);
-  --agent-text: #e5e5e5;
-  --agent-text-muted: #a0a0a0;
-  --agent-text-subtle: #737373;
-  --agent-accent: #4a90e2;
-  --agent-accent-soft: rgba(74, 144, 226, 0.15);
   --agent-row-hover-surface: color-mix(in srgb, rgba(211, 208, 197, 0.075) 86%, transparent);
   --agent-row-selected-surface: linear-gradient(
     90deg,
@@ -116,12 +87,6 @@
   );
 }
 
-/* Agent Chat is document-like in a workbench tab, but becomes part of the
- * application chrome when hosted by the auxiliary sidebar. */
-.desktop-right-sidebar .desktop-agent-boundary {
-  --agent-canvas: var(--po-terminal-bg);
-}
-
 .desktop-agent-panel {
   position: relative;
   display: grid;
@@ -129,9 +94,21 @@
   height: 100%;
   min-width: 0;
   min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   overflow: hidden;
   background: var(--agent-canvas);
+}
+
+/* Every structural region shares the panel's only explicit column. The empty
+ * overlay intentionally overlaps conversation + dock rows and must never make
+ * Grid auto-placement synthesize a second column for the dock. */
+.desktop-agent-header-region,
+.desktop-agent-status-region,
+.desktop-agent-conversation-region,
+.desktop-agent-conversation-overlay,
+.desktop-agent-dock-region {
+  grid-column: 1;
 }
 
 .desktop-agent-boundary *,
@@ -167,20 +144,25 @@
   display: block;
   width: 100%;
   height: 100%;
-  transform: scale(var(--desktop-agent-brand-mark-scale, 1));
   transform-origin: center;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-.desktop-agent-brand-mark img { object-fit: cover; }
+.desktop-agent-brand-mark img {
+  object-fit: cover;
+  transform: scale(var(--po-agent-brand-image-scale, 1));
+}
+.desktop-agent-brand-mark svg { transform: scale(var(--desktop-agent-brand-mark-scale, 1)); }
 .desktop-agent-brand-mark.is-codex { background: transparent; }
 .desktop-agent-brand-mark.is-claude { --desktop-agent-brand-mark-scale: 0.84; background: transparent; }
-.desktop-agent-brand-mark.is-cursor { background: #111418; }
-.desktop-agent-brand-mark.is-opencode { --desktop-agent-brand-mark-scale: 1.3; background: #131010; }
+.desktop-agent-brand-mark.is-cursor { background: transparent; }
+.desktop-agent-brand-mark.is-cursor img { object-fit: contain; }
+.desktop-agent-brand-mark.is-opencode { background: #131010; }
+.desktop-agent-brand-mark.is-pi { background: transparent; }
+.desktop-agent-brand-mark.is-pi img { object-fit: contain; }
 .desktop-agent-brand-mark.is-fallback { border: 1px solid var(--agent-border-subtle); background: var(--agent-control-surface); color: var(--agent-text-muted); }
-
-.dark .desktop-agent-brand-mark.is-codex img {
-  content: url("/assets/icons/agents/codex-dark.png");
-}
 
 .desktop-agent-header-region {
   --desktop-sidebar-control-size: 26px;
@@ -217,6 +199,23 @@
   min-height: 0;
   grid-row: 3;
   overflow: hidden;
+}
+
+/* Empty-chat identity spans both flexible conversation space and the auto-size
+ * dock. Their combined track height is stable while width-driven composer
+ * reflow changes the split between them. */
+.desktop-agent-conversation-overlay {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-row: 3 / 5;
+  overflow: hidden;
+  pointer-events: none;
+}
+.desktop-agent-conversation-overlay.has-dock {
+  padding-bottom: var(--agent-empty-state-dock-reserve);
 }
 
 .desktop-agent-dock-region {

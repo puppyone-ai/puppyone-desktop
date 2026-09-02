@@ -85,6 +85,7 @@ export type TitlebarActionsSettings = {
 };
 export type LocalAgentsSettings = {
   hiddenTerminalAgentIds: string[];
+  chatHistoryDiscoveryEnabled: boolean;
 };
 export type ExperimentalSettings = {
   enableAgentChat: boolean;
@@ -171,7 +172,10 @@ export const DEFAULT_TITLEBAR_ACTIONS_SETTINGS: TitlebarActionsSettings = {
   },
   order: [...TITLEBAR_ACTION_IDS],
 };
-export const DEFAULT_LOCAL_AGENTS_SETTINGS: LocalAgentsSettings = { hiddenTerminalAgentIds: [] };
+export const DEFAULT_LOCAL_AGENTS_SETTINGS: LocalAgentsSettings = {
+  hiddenTerminalAgentIds: [],
+  chatHistoryDiscoveryEnabled: false,
+};
 export const DEFAULT_AGENT_FILE_ACTIVITY_INDICATORS_ENABLED = false;
 export const DEFAULT_AI_EDIT_ASSIST_ENABLED = false;
 export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
@@ -458,14 +462,20 @@ export function parseLocalAgentsSettings(
     const parsed = JSON.parse(value) as {
       hiddenTerminalAgentIds?: unknown;
       enabledAgentIds?: unknown;
+      chatHistoryDiscoveryEnabled?: unknown;
     } | null;
     // The legacy enabledAgentIds field controlled Editor provider visibility.
     // It must not silently hide Terminal launchers after the preference changes meaning.
-    if (!parsed || !Array.isArray(parsed.hiddenTerminalAgentIds)) return DEFAULT_LOCAL_AGENTS_SETTINGS;
-    const hiddenTerminalAgentIds = Array.from(new Set(parsed.hiddenTerminalAgentIds.filter(
+    if (!parsed || typeof parsed !== "object") return DEFAULT_LOCAL_AGENTS_SETTINGS;
+    const hiddenTerminalAgentIds = Array.from(new Set((Array.isArray(parsed.hiddenTerminalAgentIds)
+      ? parsed.hiddenTerminalAgentIds
+      : []).filter(
       (id): id is string => typeof id === "string" && /^[a-z0-9][a-z0-9._-]{0,79}$/u.test(id),
     ))).slice(0, 16);
-    return { hiddenTerminalAgentIds };
+    return {
+      hiddenTerminalAgentIds,
+      chatHistoryDiscoveryEnabled: parsed.chatHistoryDiscoveryEnabled === true,
+    };
   } catch {
     return DEFAULT_LOCAL_AGENTS_SETTINGS;
   }

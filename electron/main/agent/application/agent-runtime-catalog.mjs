@@ -1,178 +1,28 @@
-import os from "node:os";
-import { redactSecretText } from "../agent-events.mjs";
-import { readinessWithAccountState } from "./agent-input-policy.mjs";
-import { publicRuntimeReadiness } from "../runtime/agent-runtime-registry.mjs";
-import { sanitizeAgentRuntimeDescriptor } from "../../../../shared/agent-contract/runtime-schema.mjs";
-import {
-  assertAgentRuntimeInspection,
-  normalizeCapabilitySnapshot,
-} from "../runtime/agent-runtime-port.mjs";
-import { createAgentProcessSupervisor } from "./processes/agent-process-supervisor.mjs";
+import { createRuntimeResolutionCoordinator } from "./runtime-resolution/runtime-resolution-coordinator.mjs";
+import { runtimeReadinessStorePolicy } from "./runtime-resolution/runtime-readiness-store.mjs";
 
-const INSPECTION_CACHE_MS = 5 * 60_000;
-// Discovery/account/model inspection must never depend on process.cwd().
-const NEUTRAL_INSPECTION_ROOT = os.tmpdir();
-
+/** Renderer-safe catalog facade over the authoritative main-process resolver. */
 export function createAgentRuntimeCatalog({
+  runtimeResolutionCoordinator = null,
   runtimeRegistry,
-  processSupervisor = createAgentProcessSupervisor(),
-}) {
-  const inspectionCache = new Map();
-
-  async function discover(request = {}, workspaceRoot = null) {
-    const catalog = await runtimeRegistry.discover({ refresh: Boolean(request.refresh) });
-    if (request.refresh) inspectionCache.clear();
-    const selected = selectRequestedRuntime(catalog, request.runtimeId);
-    const runtimes = catalog.map((entry) => ({
-      descriptor: sanitizeAgentRuntimeDescriptor(entry.descriptor),
-      readiness: publicRuntimeReadiness(entry),
-    }));
-    if (!selected) {
-      return {
-        runtimes,
-        selectedRuntimeId: null,
-        readiness: null,
-        account: null,
-        providers: [],
-        models: [],
-        modes: [],
-        commands: [],
-        capabilities: null,
-        warnings: [],
-      };
-    }
-    const publicReadiness = publicRuntimeReadiness(selected);
-    const inspectThroughRuntimeHandshake = selected.readiness?.inspectionFallback === "runtime-handshake";
-    if (publicReadiness.status !== "ready" && !inspectThroughRuntimeHandshake) {
-      return {
-        runtimes,
-        selectedRuntimeId: selected.descriptor.id,
-        readiness: publicReadiness,
-        account: null,
-        providers: [],
-        models: [],
-        modes: [],
-        commands: [],
-        capabilities: null,
-        runtime: { ...selected.descriptor },
-        warnings: [],
-      };
-    }
-    try {
-      const inspection = await inspect({
-        runtimeId: selected.descriptor.id,
-        readiness: selected.readiness,
-        workspaceRoot: workspaceRoot || NEUTRAL_INSPECTION_ROOT,
-        refresh: Boolean(request.refresh),
-      });
-      const inspectedReadiness = inspectThroughRuntimeHandshake
-        ? {
-          ...publicReadiness,
-          status: "ready",
-          code: "READY",
-          selectable: true,
-          message: `${selected.descriptor.displayName} authentication was verified through its native protocol.`,
-        }
-        : publicReadiness;
-      const effectiveReadiness = readinessWithAccountState(
-        inspectedReadiness,
-        inspection.account,
-        selected.descriptor.displayName,
-      );
-      const selectedEntry = runtimes.find((entry) => entry.descriptor.id === selected.descriptor.id);
-      if (selectedEntry) selectedEntry.readiness = effectiveReadiness;
-      return {
-        runtimes,
-        selectedRuntimeId: selected.descriptor.id,
-        readiness: effectiveReadiness,
-        ...inspection,
-      };
-    } catch (error) {
-      const message = redactSecretText(error instanceof Error ? error.message : String(error));
-      const failedReadiness = inspectThroughRuntimeHandshake
-        ? {
-          ...publicReadiness,
-          selectable: false,
-          diagnostic: [publicReadiness.diagnostic, `Native protocol fallback failed: ${message}`]
-            .filter(Boolean)
-            .join(" ")
-            .slice(0, 4_000),
-        }
-        : {
-          ...publicReadiness,
-          status: "error",
-          code: "RUNTIME_INSPECTION_FAILED",
-          selectable: false,
-          message,
-        };
-      const selectedEntry = runtimes.find((entry) => entry.descriptor.id === selected.descriptor.id);
-      if (selectedEntry) selectedEntry.readiness = failedReadiness;
-      return {
-        runtimes,
-        selectedRuntimeId: selected.descriptor.id,
-        readiness: failedReadiness,
-        account: null,
-        providers: [],
-        models: [],
-        modes: [],
-        commands: [],
-        capabilities: null,
-        runtime: { ...selected.descriptor },
-        warnings: [message],
-      };
-    }
-  }
-
-  async function inspect({ runtimeId, readiness, workspaceRoot, refresh = false }) {
-    const key = `${runtimeId}\0${workspaceRoot}`;
-    const now = Date.now();
-    const cached = inspectionCache.get(key);
-    if (!refresh && cached && now - cached.createdAt < INSPECTION_CACHE_MS) return cached.value;
-    const adapter = runtimeRegistry.createAdapter(runtimeId, {
-      readiness,
-      workspaceRoot,
-      onEvent: () => {},
-      onExit: () => {},
-    });
-    try {
-      const inspected = await processSupervisor.runStart(
-        { label: `${runtimeId}:catalog-inspect` },
-        () => adapter.inspect(),
-      );
-      const inspection = assertAgentRuntimeInspection(adapter, inspected, runtimeId);
-      const value = {
-        account: inspection.account ?? null,
-        providers: Array.isArray(inspection.providers) ? inspection.providers : [],
-        models: Array.isArray(inspection.models) ? inspection.models : [],
-        modes: Array.isArray(inspection.modes) ? inspection.modes : [],
-        commands: Array.isArray(inspection.commands) ? inspection.commands : [],
-        capabilities: normalizeCapabilitySnapshot(inspection.capabilities),
-        runtime: sanitizeAgentRuntimeDescriptor(inspection.runtime ?? runtimeRegistry.require(runtimeId).descriptor),
-        warnings: Array.isArray(inspection.warnings) ? inspection.warnings : [],
-      };
-      inspectionCache.set(key, { createdAt: now, value });
-      return value;
-    } finally {
-      await adapter.dispose();
-    }
-  }
-
+  processSupervisor,
+} = {}) {
+  const coordinator = runtimeResolutionCoordinator ?? createRuntimeResolutionCoordinator({
+    runtimeRegistry,
+    processSupervisor,
+  });
   return {
-    discover,
-    listModels: async (request, workspaceRoot) => (await discover(request, workspaceRoot)).models,
-    readAccount: async (request, workspaceRoot) => (await discover(request, workspaceRoot)).account,
-    clear: () => inspectionCache.clear(),
+    discover: (request, workspaceRoot) => coordinator.queryCatalog(request, workspaceRoot),
+    listModels: async (request, workspaceRoot) => (
+      await coordinator.queryCatalog(request, workspaceRoot)
+    ).models,
+    readAccount: async (request, workspaceRoot) => (
+      await coordinator.queryCatalog(request, workspaceRoot)
+    ).account,
+    clear: () => coordinator.clear(),
   };
 }
 
 export const agentRuntimeCatalogPolicy = Object.freeze({
-  inspectionCacheTtlMs: INSPECTION_CACHE_MS,
+  inspectionCacheTtlMs: runtimeReadinessStorePolicy.successTtlMs,
 });
-
-function selectRequestedRuntime(catalog, value) {
-  if (value === undefined || value === null) return null;
-  if (!/^[a-z][a-z0-9-]{1,39}$/.test(value)) {
-    throw new Error("Agent runtime selection is invalid.");
-  }
-  return catalog.find((entry) => entry.descriptor.id === value) ?? null;
-}

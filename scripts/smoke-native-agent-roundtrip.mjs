@@ -4,7 +4,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { EventEmitter } from "node:events";
-import { fileURLToPath } from "node:url";
 import { createDefaultAgentRuntimeHost } from "../electron/main/agent/bootstrap/create-agent-runtime-host.mjs";
 import { createAgentService } from "../electron/main/agent/application/agent-service.mjs";
 import { createEphemeralAgentSessionCache } from "../electron/main/agent/cache/ephemeral-agent-session-cache.mjs";
@@ -40,7 +39,7 @@ if (process.env.RUN_NATIVE_AGENT_SMOKE !== "1") {
 } else {
   const selection = requestedNativeAgentRuntimeIds(process.argv.slice(2), process.env.PUPPYONE_NATIVE_AGENT_RUNTIMES);
   if (!selection.valid) {
-    console.error("Invalid native Agent runtime selection. Use puppyone-agent, codex, claude, cursor, opencode-native, or all.");
+    console.error("Invalid native Agent runtime selection. Use codex, claude, cursor, opencode-native, pi, or all.");
     process.exitCode = 2;
   } else {
     await main(selection).catch(() => {
@@ -52,7 +51,6 @@ if (process.env.RUN_NATIVE_AGENT_SMOKE !== "1") {
 }
 
 async function main(selection) {
-  const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const temporaryRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), "puppyone-native-agent-smoke-"));
   const workspaceRoot = path.join(temporaryRoot, "workspace");
   const userDataRoot = path.join(temporaryRoot, "user-data");
@@ -65,9 +63,6 @@ async function main(selection) {
   try {
     await fs.promises.mkdir(workspaceRoot, { recursive: true, mode: 0o700 });
     const runtimeHost = createDefaultAgentRuntimeHost({
-      appPath: repositoryRoot,
-      resourcesPath: path.join(repositoryRoot, "resources"),
-      managedOpenCodeConfigDir: path.join(temporaryRoot, "managed-agent"),
       appVersion: "native-roundtrip-smoke",
       logger: safeLogger,
     });

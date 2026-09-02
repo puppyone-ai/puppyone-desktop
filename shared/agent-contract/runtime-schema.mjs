@@ -47,12 +47,25 @@ export function normalizeCapabilitySnapshot(value = {}) {
   const revision = boundedOptionalText(source.revision, 160);
   const protocol = normalizeCapabilityProtocol(source.protocol);
   const constraints = normalizeCapabilityConstraints(source.constraints);
+  const history = normalizeSessionHistoryCapabilities(source.history);
   return {
     ...Object.fromEntries(AGENT_RUNTIME_CAPABILITIES.map((capability) => [capability, source[capability] === true])),
     ...(revision ? { revision } : {}),
     ...(protocol ? { protocol } : {}),
     ...(constraints ? { constraints } : {}),
+    ...(history ? { history } : {}),
     referenceInputs: normalizeReferenceInputCapabilities(source.referenceInputs, source),
+  };
+}
+
+function normalizeSessionHistoryCapabilities(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return {
+    discovery: value.discovery === "paged" ? "paged" : "unsupported",
+    exactOpen: value.exactOpen === "supported" ? "supported" : "unsupported",
+    hydration: ["push-replay", "snapshot", "paged"].includes(value.hydration)
+      ? value.hydration
+      : "unsupported",
   };
 }
 

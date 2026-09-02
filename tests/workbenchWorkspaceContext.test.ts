@@ -12,15 +12,22 @@ import {
 } from "../packages/shared-ui/src/core/resourceUri";
 
 describe("WorkbenchWorkspaceContext", () => {
-  it("creates one stable Workbench identity for an ordered multi-folder composition", () => {
+  it("creates one stable Workbench identity independent of Folder order", async () => {
     const first = workspace("first", "/projects/first", "instance-first");
     const second = workspace("second", "/projects/second", "instance-second");
 
-    const composition = createWorkbenchWorkspace([first, second]);
+    const composition = createWorkbenchWorkspace([first, second], { id: "workbench:window-1" });
+    const context = new WorkbenchWorkspaceContext(composition);
 
-    expect(composition.id).toBe(`single:${first.workspaceInstanceId}`);
+    expect(composition.id).toBe("workbench:window-1");
     expect(composition.folders.map((folder) => folder.workspace.id)).toEqual([first.id, second.id]);
     expect(composition.folders.map((folder) => folder.index)).toEqual([0, 1]);
+
+    await context.detachFolder(first.workspaceInstanceId!);
+    expect(context.getWorkspace().id).toBe("workbench:window-1");
+    expect(context.getWorkspace().folders.map((folder) => folder.id)).toEqual([
+      second.workspaceInstanceId,
+    ]);
   });
   it("runs the single-folder product through the zero/one/many-folder model", async () => {
     const legacy = workspace("workspace-a", "/projects/a", "instance-a");

@@ -102,4 +102,29 @@ describe("Claude Code event normalization", () => {
     expect(second).toEqual([]);
     expect(JSON.stringify(first)).not.toContain("private reasoning");
   });
+
+  it("normalizes API retries as replaceable connection state instead of transcript warnings", () => {
+    const state = createClaudeEventState({ turnId: "claude:turn-retry" });
+    const [retry] = normalizeClaudeMessage({
+      type: "system",
+      subtype: "api_retry",
+      session_id: "session-1",
+      error: "Connection timed out",
+      attempt: 3,
+      max_retries: 5,
+      retry_delay_ms: 250,
+    }, state);
+
+    expect(retry).toMatchObject({
+      type: "provider.connection.updated",
+      turnId: "claude:turn-retry",
+      payload: {
+        state: "reconnecting",
+        message: "Connection timed out",
+        attempt: 3,
+        maxAttempts: 5,
+        retryDelayMs: 250,
+      },
+    });
+  });
 });

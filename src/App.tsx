@@ -7,6 +7,7 @@ import {
   flushActiveDocumentSessions,
   isDataResourceUri,
   isDocumentDataNode,
+  qualifyDataResourcePath,
   EditorAppearanceProvider,
   type DataNode,
   type WorkspaceContentChange,
@@ -24,8 +25,10 @@ import {
   closeAgentChatWorkbenchItem,
   discardPreparedAgentChatWorkbenchItem,
   isDesktopAgentChatEnabled,
+  loadAgentChatHistoryBrowser,
   loadAgentChatWorkbenchItem,
   prepareAgentChatWorkbenchItem,
+  resolveAgentWorkspaceProviderPath,
 } from "./features/desktop-agent/lazy";
 import {
   isDesktopTerminalEnabled,
@@ -99,12 +102,20 @@ import {
   useTypographyRuntime,
 } from "./features/typography";
 import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
-import type { AuxiliaryWorkbenchContribution } from "./features/app-shell/auxiliary-workbench/types";
-import { AGENT_CHAT_CREATION_RECIPES } from "./features/app-shell/auxiliary-workbench/agentChatCreationRecipes";
+import type {
+  AuxiliaryWorkbenchCloseAdapter,
+  AuxiliaryWorkbenchContribution,
+  AuxiliaryWorkbenchHistoryBrowserContext,
+} from "./features/app-shell/auxiliary-workbench/types";
+import {
+  AGENT_CHAT_CREATION_RECIPES,
+  localAgentIdForAgentChatRuntime,
+} from "./features/app-shell/auxiliary-workbench/agentChatCreationRecipes";
 import { SubThemeStyleHost } from "./features/themes/SubThemeStyleHost";
 import { useSubThemeCatalog, useSubThemeNativeMenu } from "./features/themes/useSubThemeCatalog";
 
 const AgentChatWorkbenchItem = lazy(loadAgentChatWorkbenchItem);
+const AgentChatHistoryBrowser = lazy(loadAgentChatHistoryBrowser);
 const EMPTY_WORKSPACE_FOLDERS: readonly WorkspaceFolder[] = Object.freeze([]);
 
 export function App() {
@@ -226,6 +237,7 @@ function AppContent() {
     setAgentPreferredRuntime,
     setAgentPreferredRoute,
     setAgentPreferredModel,
+    setLocalAgentsSettings,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
     setThemeMode,
@@ -234,6 +246,18 @@ function AppContent() {
     () => resolveVisibleCreateNewMenuItems(createNewMenuSettings, experimentalSettings),
     [createNewMenuSettings, experimentalSettings],
   );
+  const agentChatRuntimeVisibility = useMemo(() => {
+    const hiddenLocalAgentIds = new Set(localAgentsSettings.hiddenTerminalAgentIds);
+    const activeRecipes = AGENT_CHAT_CREATION_RECIPES.filter(
+      (recipe) => !hiddenLocalAgentIds.has(localAgentIdForAgentChatRuntime(recipe.id)),
+    );
+    const hiddenRuntimeIds: string[] = AGENT_CHAT_CREATION_RECIPES.flatMap(
+      (recipe) => hiddenLocalAgentIds.has(localAgentIdForAgentChatRuntime(recipe.id))
+        ? [recipe.id]
+        : [],
+    );
+    return Object.freeze({ activeRecipes, hiddenRuntimeIds });
+  }, [localAgentsSettings.hiddenTerminalAgentIds]);
   const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
     available: assetLibraryHomeAvailable,
     optedIn: experimentalSettings.enableAssetLibraryHome,
@@ -265,9 +289,10 @@ function AppContent() {
       hostPath: path,
     };
   }, [workbenchDataService]);
-  const resolveWorkspaceResource = useCallback((path: string | null) => (
-    workbenchDataService?.resolveResource(path) ?? null
-  ), [workbenchDataService]);
+  const resolveWorkspaceResource = useCallback((path: string | null) => {
+    if (!path || !workbenchDataService) return null;
+    return workbenchDataService.resolveResource(path);
+  }, [workbenchDataService]);
   const resolveAgentWorkspaceReference = useCallback(async (resource: string) => {
     if (!workbenchDataService || !isDataResourceUri(resource)) return null;
     try {
@@ -314,9 +339,13 @@ function AppContent() {
     editorWorkbench.closeUnderResource(path);
   }, [documentStorageIdentity, editorWorkbench]);
   const [activeExplorerNode, setActiveExplorerNode] = useState<DataNode | null>(null);
-  const focusedWorkspace = resolveWorkspaceResource(
+  const focusedWorkspaceResource = resolveWorkspaceResource(
     activeDocumentPath ?? activeExplorerNode?.path ?? null,
-  )?.folder.workspace ?? workspace;
+  );
+  const focusedWorkspaceFolder = focusedWorkspaceResource?.folder
+    ?? workbenchWorkspace?.folders[0]
+    ?? null;
+  const focusedWorkspace = focusedWorkspaceFolder?.workspace ?? workspace;
   const handleRemoveProject = useCallback(async (folder: WorkspaceFolder) => {
     if (documentStorageIdentity) {
       await closeDocumentWorkingCopiesUnderResource(documentStorageIdentity, folder.uri);
@@ -470,6 +499,7 @@ function AppContent() {
     aiEditAssistEnabled,
     onWorkspaceContentChanged: refreshWorkspaceContent,
     workspace: focusedWorkspace,
+    workspaceRootUri: focusedWorkspaceFolder?.uri ?? null,
   });
   const activeAiEditRequest = aiEditAssistEnabled ? latestAiEditRequest : null;
   const enterDataView = useCallback(() => {
@@ -929,10 +959,19 @@ function AppContent() {
     setActiveView("git");
     setSidebarCollapsed(false);
   }, [setSidebarCollapsed]);
-  const handleAgentOpenFile = useCallback((path: string) => {
-    handleActiveDataPathChange(path);
+  const handleAgentOpenFile = useCallback((workspaceRootPath: string, path: string) => {
+    const folder = workbenchWorkspace?.folders.find(
+      (candidate) => candidate.workspace.path === workspaceRootPath,
+    );
+    if (!folder) return;
+    const providerPath = isDataResourceUri(path)
+      ? path
+      : resolveAgentWorkspaceProviderPath(workspaceRootPath, path);
+    if (!providerPath) return;
+    const resource = qualifyDataResourcePath(folder.uri, providerPath);
+    handleActiveDataPathChange(resource);
     navigateDesktopView("data");
-  }, [handleActiveDataPathChange, navigateDesktopView]);
+  }, [handleActiveDataPathChange, navigateDesktopView, workbenchWorkspace?.folders]);
   const agentChatContribution = useMemo<AuxiliaryWorkbenchContribution | null>(() => {
     if (!desktopAgentChatEnabled) return null;
     return Object.freeze({
@@ -950,39 +989,73 @@ function AppContent() {
       }),
       maximumItems: 8,
       minimumSize: Object.freeze({ width: 280, height: 260 }),
-      creationRecipes: AGENT_CHAT_CREATION_RECIPES,
+      creationRecipes: agentChatRuntimeVisibility.activeRecipes,
+      history: Object.freeze({
+        label: t("agent.history.title"),
+        iconKey: null,
+        renderBrowser: (context: AuxiliaryWorkbenchHistoryBrowserContext) => (
+          <Suspense fallback={null}>
+            <AgentChatHistoryBrowser
+              {...context}
+              historyDiscoveryEnabled={localAgentsSettings.chatHistoryDiscoveryEnabled}
+              onHistoryDiscoveryEnabledChange={(enabled) => setLocalAgentsSettings({
+                ...localAgentsSettings,
+                chatHistoryDiscoveryEnabled: enabled,
+              })}
+            />
+          </Suspense>
+        ),
+      }),
       prepare: prepareAgentChatWorkbenchItem,
       discardPreparedItem: discardPreparedAgentChatWorkbenchItem,
       renderItem: (context) => (
         <Suspense fallback={null}>
           <AgentChatWorkbenchItem
             {...context}
-            enabledRuntimeIds={null}
-            preferredRuntimeId={agentPreferredRuntime}
+            hiddenRuntimeIds={agentChatRuntimeVisibility.hiddenRuntimeIds}
+            preferredRuntimeId={agentPreferredRuntime
+              && !agentChatRuntimeVisibility.hiddenRuntimeIds.includes(agentPreferredRuntime)
+              ? agentPreferredRuntime
+              : null}
             onPreferredRuntimeChange={setAgentPreferredRuntime}
             preferredRoute={agentPreferredRoute}
             onPreferredRouteChange={setAgentPreferredRoute}
             preferredModel={agentPreferredModel}
             onPreferredModelChange={setAgentPreferredModel}
             onViewChanges={handleAgentViewChanges}
-            onOpenFile={handleAgentOpenFile}
+            onOpenFile={(path) => handleAgentOpenFile(context.item.rootId, path)}
             resolveWorkspaceReference={resolveAgentWorkspaceReference}
           />
         </Suspense>
       ),
-      requestClose: (item) => closeAgentChatWorkbenchItem(item.rootId, item.id),
+      close: Object.freeze<AuxiliaryWorkbenchCloseAdapter>({
+        decide: ({ snapshot }) => snapshot.running
+          ? Object.freeze({
+              kind: "blocked" as const,
+              dialog: Object.freeze({
+                title: t("agent.closeDialog.activeTitle", { title: snapshot.title }),
+                detail: t("agent.closeDialog.activeDetail"),
+                actionLabel: t("agent.closeDialog.keepOpen"),
+              }),
+            })
+          : Object.freeze({ kind: "close" as const }),
+        commit: ({ item }) => closeAgentChatWorkbenchItem(item.rootId, item.id),
+      }),
     });
   }, [
     agentPreferredModel,
     agentPreferredRoute,
     agentPreferredRuntime,
+    agentChatRuntimeVisibility,
     desktopAgentChatEnabled,
     handleAgentOpenFile,
     handleAgentViewChanges,
+    localAgentsSettings,
     resolveAgentWorkspaceReference,
     setAgentPreferredModel,
     setAgentPreferredRoute,
     setAgentPreferredRuntime,
+    setLocalAgentsSettings,
     t,
   ]);
   const auxiliaryWorkbenchContributions = useMemo(

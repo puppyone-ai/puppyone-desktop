@@ -186,7 +186,7 @@
   width: 18px;
   height: 18px;
   flex-basis: 18px;
-  opacity: 0.72;
+  opacity: 0.9;
 }
 
 .desktop-settings-row .desktop-local-agent-row-copy {
@@ -198,7 +198,7 @@
 
 .desktop-local-agent-name {
   overflow: hidden;
-  color: var(--po-text-subtle);
+  color: var(--po-text);
   font-size: 12.5px;
   font-weight: var(--po-text-weight-regular, 400);
   line-height: 18px;
@@ -216,106 +216,66 @@
   white-space: nowrap;
 }
 
-.desktop-local-agent-hooks-section {
-  gap: 0;
-  padding-top: 10px;
-  border-top: 1px solid var(--po-border-subtle);
-}
-
-.desktop-settings-section + .desktop-local-agent-hooks-section {
-  margin-top: 10px;
-}
-
-.desktop-local-agent-hooks-disclosure {
-  width: 100%;
-}
-
-.desktop-local-agent-hooks-disclosure > summary {
-  display: flex;
-  min-height: 34px;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px;
-  border-radius: 6px;
-  color: var(--po-text-muted);
-  cursor: pointer;
-  list-style: none;
-}
-
-.desktop-local-agent-hooks-disclosure > summary::-webkit-details-marker {
-  display: none;
-}
-
-.desktop-local-agent-hooks-disclosure > summary:hover {
-  background: var(--po-hover);
-}
-
-.desktop-local-agent-hooks-icon {
+.desktop-local-agent-settings-layout {
   display: grid;
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  place-items: center;
-  color: var(--po-text-subtle);
-  opacity: 0.72;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 720px;
+  min-width: 0;
+  gap: 20px;
+  padding-inline: 10px;
 }
 
-.desktop-local-agent-hooks-summary-copy {
+.desktop-local-agent-settings-group {
   display: grid;
   min-width: 0;
-  flex: 1 1 auto;
-  gap: 2px;
+  gap: 7px;
 }
 
-.desktop-local-agent-hooks-summary-copy strong {
-  color: var(--po-text-subtle);
+.desktop-local-agent-group-header {
+  display: flex;
+  min-width: 0;
+  min-height: 20px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.desktop-local-agent-group-title {
+  display: block;
+  color: var(--po-text-muted);
   font-size: 12.5px;
-  font-weight: var(--po-text-weight-medium, 500);
+  font-weight: var(--po-text-weight-regular, 400);
   line-height: 18px;
 }
 
-.desktop-local-agent-hooks-summary-copy small,
-.desktop-local-agent-hooks-toolbar {
+.desktop-settings-row-action.desktop-local-agent-group-action {
+  height: 20px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 4px;
   color: var(--po-text-subtle);
   font-size: 11px;
-  font-weight: 400;
+  font-weight: var(--po-text-weight-regular, 400);
 }
 
-.desktop-local-agent-hooks-chevron {
-  display: grid;
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  place-items: center;
-  color: var(--po-text-subtle);
-  opacity: 0.7;
-  transition: transform 140ms ease;
+.desktop-local-agent-settings-table {
+  gap: 0;
+  overflow: hidden;
+  padding: 4px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 7px;
+  background: var(--po-panel);
 }
 
-.desktop-local-agent-hooks-disclosure[open] .desktop-local-agent-hooks-chevron {
-  transform: rotate(180deg);
+.desktop-local-agent-settings-table > .desktop-settings-row {
+  min-height: 34px;
+  padding-inline: 8px;
+  border-radius: 6px;
 }
 
-.desktop-local-agent-hooks-panel {
-  display: grid;
-  gap: 2px;
-  padding: 4px 0 0;
-}
-
-.desktop-local-agent-hooks-toolbar {
-  display: flex;
-  min-height: 30px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-block: 0;
-  padding-inline: 36px 10px;
-}
-
-.desktop-local-agent-hooks-toolbar .desktop-settings-row-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+.desktop-local-agent-settings-table > .desktop-settings-row-control:hover {
+  background: var(--po-hover);
 }
 
 .desktop-local-agent-hook-option {
@@ -334,12 +294,6 @@
   margin: 0;
   accent-color: var(--po-accent);
   cursor: pointer;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .desktop-local-agent-hooks-chevron {
-    transition: none;
-  }
 }
 
 .desktop-settings-code {

@@ -1,0 +1,89 @@
+:root[data-interface-style="default"] .desktop-workbench-close-dialog {
+  border-color: var(--po-border-subtle);
+  border-radius: 10px;
+  box-shadow: 0 18px 42px color-mix(in srgb, var(--po-shadow) 82%, transparent);
+}
+
+:root[data-interface-style="default"]
+  .desktop-workbench-close-dialog .desktop-dialog-header {
+  align-items: center;
+  padding: 14px 16px 6px;
+}
+
+:root[data-interface-style="default"]
+  .desktop-workbench-close-dialog .desktop-dialog-title-row {
+  align-items: center;
+  gap: 8px;
+}
+
+:root[data-interface-style="default"]
+  .desktop-workbench-close-dialog .desktop-dialog-title-row h2 {
+  color: var(--po-text-muted);
+  font-size: 13px;
+  font-weight: var(--po-text-weight-medium, 500);
+  line-height: 18px;
+}
+
+:root[data-interface-style="default"] .desktop-workbench-close-dialog-icon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--po-text-subtle);
+}
+
+:root[data-interface-style="default"] .desktop-workbench-close-dialog-icon.is-danger {
+  color: color-mix(in srgb, var(--po-danger) 74%, var(--po-text-muted));
+}
+
+:root[data-interface-style="default"]
+  .desktop-workbench-close-dialog .desktop-dialog-body {
+  padding: 6px 16px 16px 42px;
+  color: var(--po-text-subtle);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+:root[data-interface-style="default"]
+  .desktop-workbench-close-dialog .desktop-dialog-body p {
+  margin: 0;
+}
+
+:root[data-interface-style="default"]
+  .desktop-workbench-close-dialog .desktop-dialog-footer {
+  gap: 6px;
+  padding: 0 16px 14px;
+}
+
+:root[data-interface-style="default"]
+  .desktop-workbench-close-dialog-action.po-button {
+  min-height: 28px;
+  padding-inline: 10px;
+  font-size: 12px;
+  font-weight: var(--po-text-weight-medium, 500);
+}
+
+:root[data-interface-style="default"]
+  .desktop-workbench-close-dialog-action.po-button--neutral {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--po-text-muted);
+}
+
+:root[data-interface-style="default"]
+  .desktop-workbench-close-dialog-action.po-button--danger {
+  border: 1px solid color-mix(in srgb, var(--po-danger) 22%, transparent);
+  background: color-mix(in srgb, var(--po-danger) 10%, transparent);
+  color: color-mix(in srgb, var(--po-danger) 84%, var(--po-text));
+}
+
+:root[data-interface-style="default"]
+  .desktop-workbench-close-dialog-action.po-button--danger:hover:not(:disabled),
+:root[data-interface-style="default"]
+  .desktop-workbench-close-dialog-action.po-button--danger:focus-visible:not(:disabled) {
+  border-color: color-mix(in srgb, var(--po-danger) 30%, transparent);
+  background: color-mix(in srgb, var(--po-danger) 15%, transparent);
+  color: var(--po-danger);
+}

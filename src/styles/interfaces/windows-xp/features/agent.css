@@ -9,6 +9,8 @@
   --agent-row-hover-surface: #eaf2ff;
   --agent-row-selected-surface: #c6d7ef;
   --agent-composer-surface: #ffffff;
+  --agent-user-message-surface: #f5f4ef;
+  --agent-user-message-border: #c7c4b7;
   --agent-border: #7697c5;
   --agent-border-subtle: #aca899;
   --agent-sidebar-border: #7697c5;
@@ -18,25 +20,19 @@
 
 :root[data-interface-style="windows-xp"] .desktop-agent-composer {
   border: 1px solid var(--xp-field-border);
-  background: #ffffff;
+  background: var(--agent-composer-surface);
   box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.22), inset -1px -1px 0 #ffffff;
 }
 
 :root[data-interface-style="windows-xp"] .desktop-agent-composer:hover {
   border-color: #1059c9;
-  background: #ffffff;
+  background: var(--agent-composer-surface);
 }
 
 :root[data-interface-style="windows-xp"] .desktop-agent-composer:focus-within {
   border-color: #0054e3;
-  background: #ffffff;
+  background: var(--agent-composer-surface);
   box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.22), 0 0 0 1px #0054e3;
-}
-
-:root[data-interface-style="windows-xp"] .desktop-agent-composer textarea {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
 }
 
 :root[data-interface-style="windows-xp"] .desktop-agent-composer-action {

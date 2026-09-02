@@ -296,6 +296,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
   applyAppearance() {
     if (this.disposed || !this.container || !this.terminal) return;
     this.defaultColors = applyTerminalAppearance(this.terminal, this.container);
+    this.syncDefaultColorsToPty();
     this.syncScrollbarPresentation();
     this.scheduleFit();
   }
@@ -486,6 +487,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
         return;
       }
       this.ptyReady = true;
+      this.syncDefaultColorsToPty();
       this.onStatus(this.sessionId, "running", result.shell);
       this.syncSizeToPty(this.pendingPtySize ?? {
         cols: terminal.cols,
@@ -506,6 +508,14 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
         : formatTerminalLaunchError(error, this.getMessageFormatter());
       this.onStatus(this.sessionId, "error", undefined, errorMessage);
       this.writeSystemLine(errorMessage);
+    });
+  }
+
+  private syncDefaultColorsToPty() {
+    if (!this.ptyReady || !this.defaultColors) return;
+    window.puppyoneDesktop?.updateTerminalAppearance?.({
+      id: this.sessionId,
+      defaultColors: this.defaultColors,
     });
   }
 

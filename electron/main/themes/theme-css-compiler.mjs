@@ -214,6 +214,7 @@ export async function compileThemeCss({
   root.walkAtRules("charset", (rule) => rule.remove());
   validateAtRules(root);
   validateModeContract(root, supportedModes);
+  validateApplicationModeIsolation(root, { target, supportedModes });
   const firstPaint = extractFirstPaint(root, { target, supportedModes });
   scopeRules(root, { themeId, target });
   await rewriteAssetUrls(root, resolveAssetUrl);
@@ -287,6 +288,42 @@ function validateModeContract(root, supportedModes) {
       throw new TypeError("A light-only Sub Theme cannot declare dark selectors.");
     }
   });
+}
+
+function validateApplicationModeIsolation(root, { target, supportedModes }) {
+  if (target !== "application") return;
+  const modes = new Set(supportedModes ?? []);
+  if (!modes.has("light") || !modes.has("dark")) return;
+
+  const sharedStaticTokens = new Set();
+  const darkTokens = new Set();
+  root.walkRules((rule) => {
+    const selectors = splitSelectors(rule.selector);
+    const hasSharedSelector = selectors.some((selector) => !hasDarkSelector(selector));
+    const hasDarkVariantSelector = selectors.some((selector) => hasDarkSelector(selector));
+    for (const node of rule.nodes) {
+      if (node.type !== "decl") continue;
+      const property = node.prop.toLowerCase();
+      if (!applicationColorTokens.has(property)) continue;
+      if (hasDarkVariantSelector) darkTokens.add(property);
+      if (hasSharedSelector && !isModeAdaptiveTokenValue(node.value)) {
+        sharedStaticTokens.add(property);
+      }
+    }
+  });
+
+  const leakingTokens = [...sharedStaticTokens]
+    .filter((property) => !darkTokens.has(property))
+    .sort();
+  if (leakingTokens.length > 0) {
+    throw new TypeError(
+      `A dual-mode Application Sub Theme must override static color tokens in its dark variant: ${leakingTokens.join(", ")}.`,
+    );
+  }
+}
+
+function isModeAdaptiveTokenValue(value) {
+  return /(?:^|[^a-z-])var\s*\(/i.test(value) || /(?:^|[^a-z-])light-dark\s*\(/i.test(value);
 }
 
 function collectRules(root) {

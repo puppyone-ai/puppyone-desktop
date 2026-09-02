@@ -1,4 +1,4 @@
-import { canonicalizeResourcePath } from "./resourcePath";
+import { canonicalizeResourcePath, isRootedFilesystemPath } from "./resourcePath";
 
 declare const resourceUriBrand: unique symbol;
 
@@ -69,6 +69,9 @@ export function createWorkspaceResourceUri(
   rootUri: ResourceUri,
   resourcePath: string,
 ): ResourceUri {
+  if (isRootedFilesystemPath(resourcePath)) {
+    throw new TypeError("Host filesystem paths cannot be encoded as Workspace provider paths.");
+  }
   const root = parseResourceUri(rootUri);
   const relativePath = normalizeUriPath(resourcePath, { rejectRootEscape: true });
   if (!relativePath) return canonicalizeResourceUri(rootUri);

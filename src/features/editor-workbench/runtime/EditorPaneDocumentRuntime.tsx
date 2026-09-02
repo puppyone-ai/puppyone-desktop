@@ -1,4 +1,6 @@
 import { memo, useMemo } from "react";
+import { useLocalization } from "@puppyone/localization";
+import { PageLoading } from "../../../components/loading";
 import {
   FilePreview,
   isDocumentDataNode,
@@ -84,6 +86,7 @@ function RegularEditorPaneDocumentRuntime({
   workspaceRoot,
   markdownDialect,
 }: RegularEditorPaneDocumentRuntimeProps) {
+  const { t } = useLocalization();
   const invalidTreeNode = Boolean(treeNode && !isDocumentDataNode(treeNode));
   const fallbackNode = useMemo(
     () => editor && !invalidTreeNode ? createFallbackNode(editor.resource, editor.label) : null,
@@ -105,8 +108,15 @@ function RegularEditorPaneDocumentRuntime({
   );
 
   // A directory discovered after an editor was restored is invalid workbench
-  // state. Never route it through the unknown-file fallback viewer.
-  if (invalidTreeNode) return null;
+  // state. Never route it through the unknown-file fallback viewer or reduce
+  // the pane to an unexplained blank surface.
+  if (invalidTreeNode) {
+    return (
+      <div className="editor-state editor-state--stacked" role="alert">
+        <strong>{t("editor.unavailable.title")}</strong>
+      </div>
+    );
+  }
 
   return (
     <FilePreview
@@ -116,6 +126,13 @@ function RegularEditorPaneDocumentRuntime({
       fileUrlLoading={source.fileUrlLoading}
       fileUrlError={source.fileUrlError}
       loading={source.loading}
+      loadingIndicator={(
+        <PageLoading
+          variant="fill"
+          label={null}
+          ariaLabel={t("editor.loadingFile")}
+        />
+      )}
       error={source.error}
       aiEditFile={aiEditFile}
       showHeader={false}

@@ -3,12 +3,16 @@ import type { AuxiliaryWorkbenchItem } from "@puppyone/shared-ui";
 import type {
   AuxiliaryWorkbenchContribution,
   AuxiliaryWorkbenchCreationRecipe,
+  AuxiliaryWorkbenchHistoryTarget,
   AuxiliaryWorkbenchPreparationContext,
 } from "./types";
 
 export type AuxiliaryWorkbenchCreationFailure = Readonly<{
   kind: string;
   label: string;
+  code: string | null;
+  detail: string | null;
+  retryable: boolean;
 }>;
 
 type UseAuxiliaryWorkbenchContributionsOptions = Readonly<{
@@ -20,6 +24,7 @@ type UseAuxiliaryWorkbenchContributionsOptions = Readonly<{
     item: AuxiliaryWorkbenchItem,
     targetGroupId: string | null,
     recipe: AuxiliaryWorkbenchCreationRecipe | null,
+    historyTarget: AuxiliaryWorkbenchHistoryTarget | null,
   ) => string;
 }>;
 
@@ -63,9 +68,10 @@ export function useAuxiliaryWorkbenchContributions({
   const canCreate = useCallback((
     contribution: AuxiliaryWorkbenchContribution,
     recipe: AuxiliaryWorkbenchCreationRecipe | null = null,
+    historyTarget: AuxiliaryWorkbenchHistoryTarget | null = null,
   ) => (
     contributionByKindRef.current.get(contribution.kind) === contribution
-    && isRegisteredAvailableRecipe(contribution, recipe)
+    && isRegisteredCreationIntent(contribution, recipe, historyTarget)
     && !preparingKindsRef.current.has(contribution.kind)
     && countItemsOfKind(itemsRef.current, contribution.kind)
       < (contribution.maximumItems ?? Number.POSITIVE_INFINITY)
@@ -75,8 +81,9 @@ export function useAuxiliaryWorkbenchContributions({
     contribution: AuxiliaryWorkbenchContribution,
     targetGroupId: string | null,
     recipe: AuxiliaryWorkbenchCreationRecipe | null = null,
+    historyTarget: AuxiliaryWorkbenchHistoryTarget | null = null,
   ): Promise<string | null> => {
-    if (!canCreate(contribution, recipe)) return null;
+    if (!canCreate(contribution, recipe, historyTarget)) return null;
     preparingKindsRef.current.add(contribution.kind);
     setPreparingKinds(new Set(preparingKindsRef.current));
     setCreationFailure((current) => current?.kind === contribution.kind ? null : current);
@@ -84,12 +91,12 @@ export function useAuxiliaryWorkbenchContributions({
     let committed = false;
     try {
       const item = onReserveRef.current(contribution);
-      preparation = Object.freeze({ item, recipe });
+      preparation = Object.freeze({ item, recipe, historyTarget });
       await contribution.prepare?.(preparation);
       if (
         !mountedRef.current
         || contributionByKindRef.current.get(contribution.kind) !== contribution
-        || !isRegisteredAvailableRecipe(contribution, recipe)
+        || !isRegisteredCreationIntent(contribution, recipe, historyTarget)
         || countItemsOfKind(itemsRef.current, contribution.kind)
           >= (contribution.maximumItems ?? Number.POSITIVE_INFINITY)
       ) return null;
@@ -98,15 +105,13 @@ export function useAuxiliaryWorkbenchContributions({
         preparation.item,
         targetGroupId,
         recipe,
+        historyTarget,
       );
       committed = true;
       return itemId;
-    } catch {
+    } catch (error) {
       if (mountedRef.current) {
-        setCreationFailure(Object.freeze({
-          kind: contribution.kind,
-          label: contribution.label,
-        }));
+        setCreationFailure(creationFailureFromError(contribution, error));
       }
       return null;
     } finally {
@@ -134,14 +139,38 @@ export function useAuxiliaryWorkbenchContributions({
   };
 }
 
+function creationFailureFromError(
+  contribution: AuxiliaryWorkbenchContribution,
+  error: unknown,
+): AuxiliaryWorkbenchCreationFailure {
+  const candidate = error && typeof error === "object"
+    ? error as { code?: unknown; message?: unknown; retryable?: unknown }
+    : null;
+  const code = typeof candidate?.code === "string" && /^[A-Z0-9_]{1,80}$/.test(candidate.code)
+    ? candidate.code
+    : null;
+  const detail = typeof candidate?.message === "string"
+    ? candidate.message.trim().slice(0, 1_000) || null
+    : null;
+  return Object.freeze({
+    kind: contribution.kind,
+    label: contribution.label,
+    code,
+    detail,
+    retryable: candidate?.retryable === true,
+  });
+}
+
 function countItemsOfKind(items: readonly AuxiliaryWorkbenchItem[], kind: string) {
   return items.reduce((count, item) => count + (item.kind === kind ? 1 : 0), 0);
 }
 
-function isRegisteredAvailableRecipe(
+function isRegisteredCreationIntent(
   contribution: AuxiliaryWorkbenchContribution,
   recipe: AuxiliaryWorkbenchCreationRecipe | null,
+  historyTarget: AuxiliaryWorkbenchHistoryTarget | null,
 ) {
+  if (historyTarget) return Boolean(contribution.history) && recipe === null;
   if (!recipe) return contribution.creationRecipes === undefined;
   return contribution.creationRecipes?.includes(recipe) === true
     && recipe.status === "available";

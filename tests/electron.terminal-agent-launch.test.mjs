@@ -239,6 +239,24 @@ describe("Terminal Agent launch boundary", () => {
       id: "terminal_codex_colors",
       data: "beforemiddleafter\u001b[?1049h",
     });
+
+    expect(service.appearance(sender, {
+      id: "terminal_codex_colors",
+      defaultColors: {
+        foreground: [209, 206, 198],
+        background: [22, 20, 19],
+      },
+    })).toBe(true);
+    terminal.emitData("\u001b]10;?\u001b\\\u001b]11;?\u001b\\");
+    expect(terminal.write).toHaveBeenNthCalledWith(4, "\u001b]10;rgb:d1d1/cece/c6c6\u001b\\");
+    expect(terminal.write).toHaveBeenNthCalledWith(5, "\u001b]11;rgb:1616/1414/1313\u001b\\");
+    expect(service.appearance({ ...createSender(), id: 52 }, {
+      id: "terminal_codex_colors",
+      defaultColors: {
+        foreground: [0, 0, 0],
+        background: [255, 255, 255],
+      },
+    })).toBe(false);
   });
 
   it("closes the host shell if the Agent bootstrap cannot be written", async () => {

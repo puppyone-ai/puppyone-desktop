@@ -6,6 +6,7 @@ import {
   createAgentProjection,
 } from "../src/features/desktop-agent/agentProjection";
 import type { AgentEvent, AgentEventType } from "../src/features/desktop-agent/agentTypes";
+import { buildAgentTimeline } from "../src/features/desktop-agent/ui/agent-timeline-presentation";
 
 describe("Desktop Agent transcript projection", () => {
   it("concatenates assistant deltas and lets completed content finalize authoritatively", () => {
@@ -32,6 +33,91 @@ describe("Desktop Agent transcript projection", () => {
     });
   });
 
+  it("keeps first-observed timeline order immutable while blocks stream and settle", () => {
+    const events = [
+      event(1, "turn.started", { prompt: "Inspect it" }, "turn-order"),
+      event(2, "assistant.delta", { delta: "I will inspect it." }, "turn-order", "assistant-order"),
+      event(3, "tool.started", { kind: "command", label: "List", status: "running" }, "turn-order", "tool-order"),
+      event(4, "approval.requested", {
+        requestId: "approval-order",
+        kind: "command",
+        title: "List files",
+      }, "turn-order", "tool-order"),
+      event(5, "approval.resolved", { requestId: "approval-order", decision: "accept" }, "turn-order", "tool-order"),
+      event(6, "tool.completed", { kind: "command", label: "List", status: "completed" }, "turn-order", "tool-order"),
+      event(7, "assistant.completed", { text: "Inspection complete." }, "turn-order", "assistant-order"),
+      event(8, "turn.completed", { status: "completed" }, "turn-order"),
+    ] satisfies AgentEvent[];
+
+    const live = applyAgentEvents(createAgentProjection(), events.slice(0, 7));
+    const settled = applyAgentEvent(live, events[7]);
+    const replayed = applyAgentEvents(createAgentProjection(), events);
+    const visibleKinds = (projection: typeof settled) => buildAgentTimeline(projection).rows
+      .filter((row) => row.kind !== "turn-summary")
+      .map((row) => row.kind);
+
+    expect(visibleKinds(live)).toEqual(["user", "assistant", "command", "permission", "assistant"]);
+    expect(visibleKinds(settled)).toEqual(["user", "assistant", "command", "permission", "assistant"]);
+    expect(visibleKinds(replayed)).toEqual(["user", "assistant", "command", "permission", "assistant"]);
+    expect(live.parts.filter((part) => part.kind === "assistant")).toEqual([
+      expect.objectContaining({
+        sequence: 2,
+        updatedSequence: 2,
+        text: "I will inspect it.",
+        streaming: false,
+      }),
+      expect.objectContaining({
+        sequence: 7,
+        updatedSequence: 7,
+        text: "Inspection complete.",
+      }),
+    ]);
+    expect(live.parts.find((part) => part.kind === "command")).toMatchObject({
+      sequence: 3,
+      updatedSequence: 6,
+      status: "completed",
+    });
+    expect(live.parts.find((part) => part.kind === "permission")).toMatchObject({
+      sequence: 4,
+      updatedSequence: 5,
+      state: "resolved",
+    });
+    expect(JSON.stringify(replayed)).toBe(JSON.stringify(settled));
+  });
+
+  it("keeps a native assistant item segmented when its authoritative completion spans a tool", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Inspect" }, "turn-segments"),
+      event(2, "assistant.delta", { delta: "Before tool. " }, "turn-segments", "native-message"),
+      event(3, "tool.started", { kind: "command", label: "List", status: "running" }, "turn-segments", "tool"),
+      event(4, "tool.completed", { kind: "command", label: "List", status: "completed" }, "turn-segments", "tool"),
+      event(5, "assistant.delta", { delta: "After " }, "turn-segments", "native-message"),
+      event(6, "assistant.delta", { delta: "tool." }, "turn-segments", "native-message"),
+      event(7, "assistant.completed", { text: "Before tool. After tool." }, "turn-segments", "native-message"),
+    ]);
+
+    expect(projection.messages.filter((message) => message.role === "assistant").map((message) => message.text))
+      .toEqual(["Before tool. ", "After tool."]);
+    expect(buildAgentTimeline(projection).rows.map((row) => row.kind))
+      .toEqual(["user", "assistant", "command", "assistant"]);
+  });
+
+  it("seals rather than erases assistant text when a late completion adds nothing after a tool", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Inspect" }, "turn-seal"),
+      event(2, "assistant.delta", { delta: "I will inspect." }, "turn-seal", "native-message"),
+      event(3, "tool.started", { kind: "command", label: "List", status: "running" }, "turn-seal", "tool"),
+      event(4, "tool.completed", { kind: "command", label: "List", status: "completed" }, "turn-seal", "tool"),
+      event(5, "assistant.completed", { text: "I will inspect." }, "turn-seal", "native-message"),
+    ]);
+
+    expect(projection.messages.filter((message) => message.role === "assistant")).toEqual([
+      expect.objectContaining({ text: "I will inspect.", streaming: false, sequence: 2, updatedSequence: 5 }),
+    ]);
+    expect(buildAgentTimeline(projection).rows.map((row) => row.kind))
+      .toEqual(["user", "assistant", "command"]);
+  });
+
   it("prefers the provider's normalized turn duration over envelope timing", () => {
     const projection = applyAgentEvents(createAgentProjection(), [
       event(1, "turn.started", { prompt: "Measure" }, "turn-duration"),
@@ -39,6 +125,19 @@ describe("Desktop Agent transcript projection", () => {
     ]);
 
     expect(projection.turns[0]?.durationMs).toBe(2_450);
+  });
+
+  it("keeps usage metadata out of visible transcript rows", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Measure" }, "turn-usage"),
+      event(2, "usage.updated", { inputTokens: 20, outputTokens: 5 }, "turn-usage"),
+    ]);
+
+    expect(projection.usage).toEqual({ inputTokens: 20, outputTokens: 5 });
+    expect(projection.parts.find((part) => part.kind === "usage")).toMatchObject({
+      usage: { inputTokens: 20, outputTokens: 5 },
+    });
+    expect(projection.rows.some((row) => row.kind === "usage")).toBe(false);
   });
 
   it("ignores duplicates, marks gaps, and keeps partial assistant text after interruption", () => {
@@ -175,17 +274,86 @@ describe("Desktop Agent transcript projection", () => {
     expect(projection.parts.find((part) => part.kind === "tool")).toMatchObject({ status: "unknown" });
   });
 
-  it("preserves recoverable provider status metadata for connection-state presentation", () => {
-    const projection = applyAgentEvent(createAgentProjection(), event(1, "provider.warning", {
-      message: "Reconnecting… 2/5",
-      recoverable: true,
-    }, "turn-1", "retry-1"));
+  it("keeps connection recovery as one replaceable live state outside transcript history", () => {
+    const recovering = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Hello" }, "turn-1"),
+      event(2, "provider.connection.updated", {
+        state: "reconnecting",
+        message: "Reconnecting… 2/5",
+        attempt: 2,
+        maxAttempts: 5,
+      }, "turn-1"),
+      event(3, "provider.connection.updated", {
+        state: "reconnecting",
+        message: "Reconnecting… 3/5",
+        attempt: 3,
+        maxAttempts: 5,
+      }, "turn-1"),
+      event(4, "provider.connection.updated", {
+        state: "fallback",
+        message: "Switching connection transport.",
+      }, "turn-1"),
+    ]);
 
-    expect(projection.activities[0]).toMatchObject({
-      kind: "warning",
-      label: "Reconnecting… 2/5",
-      detail: { recoverable: true },
+    expect(recovering.connectionStatus).toMatchObject({
+      state: "fallback",
+      message: "Switching connection transport.",
+      turnId: "turn-1",
+      sequence: 4,
     });
+    expect(recovering.activities).toHaveLength(0);
+    expect(recovering.parts.filter((part) => part.kind === "warning")).toHaveLength(0);
+    expect(recovering.rows.filter((row) => row.kind === "warning")).toHaveLength(0);
+
+    const progressed = applyAgentEvent(recovering, event(5, "assistant.delta", { delta: "Recovered" }, "turn-1", "assistant-1"));
+    expect(progressed.connectionStatus).toBeNull();
+    expect(progressed.messages.find((message) => message.role === "assistant")?.text).toBe("Recovered");
+  });
+
+  it("migrates legacy retry and transport-fallback warnings without retaining historical cards", () => {
+    const projection = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Hello" }, "turn-1"),
+      event(2, "provider.warning", { message: "Reconnecting… 2/5", recoverable: true }, "turn-1", "retry-2"),
+      event(3, "provider.warning", { message: "Reconnecting… 3/5", recoverable: true }, "turn-1", "retry-3"),
+      event(4, "provider.warning", {
+        message: "Falling back from WebSockets to HTTPS transport. request timed out",
+      }, "turn-1", "fallback"),
+    ]);
+
+    expect(projection.connectionStatus).toMatchObject({ state: "fallback", sequence: 4 });
+    expect(projection.activities).toHaveLength(0);
+    expect(projection.parts.filter((part) => part.kind === "warning")).toHaveLength(0);
+    expect(projection.rows.filter((row) => row.kind === "warning")).toHaveLength(0);
+  });
+
+  it.each(["turn.completed", "turn.failed", "turn.interrupted"] as const)("clears live connection state on %s", (type) => {
+    const recovering = applyAgentEvent(createAgentProjection(), event(1, "provider.connection.updated", {
+      state: "reconnecting",
+      message: "Reconnecting… 5/5",
+    }, "turn-1"));
+
+    expect(applyAgentEvent(recovering, event(2, type, { status: type.slice(5) }, "turn-1")).connectionStatus).toBeNull();
+  });
+
+  it.each([
+    ["turn.completed", "completed"],
+    ["turn.failed", "failed"],
+    ["turn.interrupted", "interrupted"],
+  ] as const)("settles orphaned live activity and blocking state on %s", (type, expectedStatus) => {
+    const running = applyAgentEvents(createAgentProjection(), [
+      event(1, "turn.started", { prompt: "Run it" }, "turn-1"),
+      event(2, "tool.started", { kind: "command", label: "Long command", status: "running" }, "turn-1", "tool-1"),
+      event(3, "approval.requested", { requestId: "approval-1", kind: "command" }, "turn-1", "tool-1"),
+      event(4, "question.requested", { requestId: "question-1", questions: [] }, "turn-1", "question-1"),
+    ]);
+
+    const settled = applyAgentEvent(running, event(5, type, { status: expectedStatus }, "turn-1"));
+    expect(settled.activities[0]?.status).toBe(expectedStatus);
+    expect(settled.parts.find((part) => part.kind === "command")).toMatchObject({ status: expectedStatus });
+    expect(settled.parts.find((part) => part.kind === "permission")).toMatchObject({ state: "resolved" });
+    expect(settled.parts.find((part) => part.kind === "question")).toMatchObject({ state: "resolved" });
+    expect(settled.approvals).toHaveLength(0);
+    expect(settled.questions).toHaveLength(0);
   });
 
   it("collapses duplicate provider terminal errors for the same turn", () => {

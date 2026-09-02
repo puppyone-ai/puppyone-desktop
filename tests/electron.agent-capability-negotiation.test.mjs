@@ -18,6 +18,8 @@ import {
 } from "../electron/main/agent/runtimes/claude/claude-agent-sdk-adapter.mjs";
 import { CursorAcpAdapter } from "../electron/main/agent/runtimes/cursor/cursor-acp-adapter.mjs";
 import { assertAgentRuntimePort } from "../electron/main/agent/runtime/agent-runtime-port.mjs";
+import { assertAgentSessionHistoryCapabilities } from "../electron/main/agent/runtime/agent-session-history-port.mjs";
+import { PI_CAPABILITIES, PiRpcAdapter } from "../electron/main/agent/runtimes/pi/pi-rpc-adapter.mjs";
 
 describe("Agent capability negotiation", () => {
   it("preserves only bounded protocol metadata, constraints and the compatibility projection", () => {
@@ -31,6 +33,7 @@ describe("Agent capability negotiation", () => {
         extensions: { "cursor.askQuestion": 1, unsafe: "drop" },
       },
       constraints: { modelSwitch: "turn-boundary", forkRequiresIdle: true, unsafe: "drop" },
+      history: { discovery: "paged", exactOpen: "supported", hydration: "paged", unsafe: "drop" },
       unknownCapability: true,
     })).toMatchObject({
       streamingText: true,
@@ -42,12 +45,31 @@ describe("Agent capability negotiation", () => {
         extensions: { "cursor.askQuestion": 1 },
       },
       constraints: { modelSwitch: "turn-boundary", forkRequiresIdle: true },
+      history: { discovery: "paged", exactOpen: "supported", hydration: "paged" },
     });
   });
 
   it("rejects capabilities that do not have a corresponding runtime operation", () => {
     expect(() => assertAgentRuntimeCapabilities({}, { structuredQuestions: true }, "broken"))
       .toThrow(/structuredQuestions.*resolveQuestion/);
+  });
+
+  it("rejects a partial SessionHistoryPort method group", () => {
+    expect(() => assertAgentSessionHistoryCapabilities({ resumeSession() {} }, {
+      resume: true,
+      sessionHistory: true,
+      history: { discovery: "paged", exactOpen: "supported", hydration: "snapshot" },
+    }, "broken-history")).toThrow(/SessionHistoryPort\.discover/);
+  });
+
+  it("represents Pi resume hydration without pretending it can discover sessions", () => {
+    const adapter = Object.create(PiRpcAdapter.prototype);
+    expect(() => assertAgentSessionHistoryCapabilities(adapter, PI_CAPABILITIES, "pi")).not.toThrow();
+    expect(PI_CAPABILITIES.history).toEqual({
+      discovery: "unsupported",
+      exactOpen: "supported",
+      hydration: "snapshot",
+    });
   });
 
   it("keeps ACP data-url images below the JSONL frame budget", () => {
@@ -73,6 +95,7 @@ describe("Agent capability negotiation", () => {
     const adapter = Object.create(Adapter.prototype);
     expect(() => assertAgentRuntimePort(adapter, runtimeId)).not.toThrow();
     const normalized = assertAgentRuntimeCapabilities(adapter, capabilities, runtimeId);
+    expect(() => assertAgentSessionHistoryCapabilities(adapter, normalized, runtimeId)).not.toThrow();
     expect(normalized.revision).toMatch(/.+/);
     expect(normalized.protocol?.name).toMatch(/.+/);
   });

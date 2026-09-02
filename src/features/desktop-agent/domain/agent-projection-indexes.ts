@@ -47,5 +47,6 @@ export function cloneAgentProjection(value: AgentProjection): AgentProjection {
     turns: [...value.turns],
     parts: [...value.parts],
     rows: [...value.rows],
+    connectionStatus: value.connectionStatus ? { ...value.connectionStatus } : null,
   };
 }

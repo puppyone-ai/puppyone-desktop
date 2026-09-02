@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import { spawn as nodeSpawn } from "node:child_process";
 import { redactSecretText } from "../../agent-events.mjs";
+import { createCachedRuntimeDiscovery } from "../../connections/runtime-discovery-cache.mjs";
 import {
   buildAgentEnvironment,
   compareVersions,
@@ -15,13 +16,11 @@ import {
 export const MIN_SUPPORTED_CODEX_VERSION = "0.144.1";
 
 export function createCodexDiscovery(options = {}) {
-  let cached = null;
-  async function discover({ refresh = false } = {}) {
-    if (!refresh && cached) return cached;
-    cached = await discoverCodexExecutable(options);
-    return cached;
-  }
-  return { discover };
+  const { cache: cacheOptions, ...discoveryOptions } = options;
+  return createCachedRuntimeDiscovery(
+    () => discoverCodexExecutable(discoveryOptions),
+    cacheOptions,
+  );
 }
 
 export async function discoverCodexExecutable({

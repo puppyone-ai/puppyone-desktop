@@ -8,10 +8,9 @@ import {
 import type {
   AgentApprovalDecision,
   AgentQuestionResolution,
-  AgentSessionsListRequest,
-  AgentSessionsListResponse,
   AgentSessionSnapshot,
 } from "../domain/agent-contract";
+import { AgentSessionOpenError } from "../domain/agent-session-open-error";
 import { AgentEventSynchronizer, type AgentStreamFlushScheduler } from "./AgentEventSynchronizer";
 import { agentControllerTransitions, type AgentControllerState } from "./agent-controller-state";
 import { AgentKnownError, createAgentError, formatAgentError } from "./agent-error";
@@ -74,6 +73,7 @@ export class AgentSessionController {
       localConnectionsScannedAt: null,
       localConnectionsError: null,
       draft: "",
+      draftMentions: [],
       pendingPrompt: null,
       pendingIntent: null,
       sessionPreparation: "idle",
@@ -102,7 +102,7 @@ export class AgentSessionController {
       references: this.referenceDrafts,
       readState: this.getSnapshot,
       patch: (patch) => this.patch(patch),
-      writeDraft: (draft) => this.writeCurrentSessionUi({ draft }),
+      writeDraft: (draft, draftMentions) => this.writeCurrentSessionUi({ draft, draftMentions }),
       prepareSession: () => this.prepareSession(),
     });
     this.eventSynchronizer = new AgentEventSynchronizer(
@@ -140,10 +140,6 @@ export class AgentSessionController {
     return () => this.listeners.delete(listener);
   };
 
-  hasSubscribers() {
-    return this.listeners.size > 0;
-  }
-
   /** Releases renderer subscriptions only; it never sends a runtime stop. */
   dispose() {
     if (this.disposed) return;
@@ -164,6 +160,11 @@ export class AgentSessionController {
 
   async initialize(refresh = false) {
     return this.initializeRuntime(refresh, true);
+  }
+
+  /** Discover the runtime catalog without implicitly restoring any conversation. */
+  async inspectRuntimes(refresh = false) {
+    return this.initializeRuntime(refresh, false);
   }
 
   /** Selects a creation recipe before first discovery without restoring history. */
@@ -239,7 +240,8 @@ export class AgentSessionController {
       this.patch({ error: createAgentError("active-turn") });
       return false;
     }
-    const bridge = this.requireBridge("discoverAgentRuntimes", "resumeAgentSession");
+    this.eventSynchronizer.connect();
+    const bridge = this.requireBridge("discoverAgentRuntimes", "openAgentSession");
     await this.referenceDrafts.reset([
       ...this.state.references,
       ...this.submission.ownedReferences(),
@@ -281,41 +283,29 @@ export class AgentSessionController {
         initialized: true,
         phase: "restoring",
       });
-      const restored = await bridge.resumeAgentSession({
+      const result = await bridge.openAgentSession({
         rootPath: this.workspaceRoot,
         sessionId,
         runtimeId,
       });
-      if (!restored) {
-        this.patch({ phase: "ready", sessionPreparation: "idle" });
-        return false;
-      }
-      this.applySnapshot(restored);
+      if (result.status === "failed") throw new AgentSessionOpenError(result.error);
+      this.applySnapshot(result.snapshot);
       this.patch({
-        phase: restored.session.activeTurnId ? "running" : "ready",
+        phase: result.snapshot.session.activeTurnId ? "running" : "ready",
         sessionPreparation: "ready",
       });
       return true;
     } catch (error) {
       this.patch({ phase: "failed", error: formatAgentError(error), sessionPreparation: "failed" });
-      return false;
+      throw error;
     }
-  }
-
-  async listSavedSessions(
-    request: Omit<AgentSessionsListRequest, "rootPath"> = {},
-  ): Promise<AgentSessionsListResponse> {
-    return this.requireBridge("listAgentSessions").listAgentSessions({
-      rootPath: this.workspaceRoot,
-      includeArchived: false,
-      discoverNative: false,
-      ...request,
-    });
   }
 
   private async runInitialize(refresh: boolean, restoreLatest: boolean) {
     this.eventSynchronizer.connect();
-    const bridge = this.requireBridge("discoverAgentRuntimes", "resumeAgentSession");
+    const bridge = restoreLatest
+      ? this.requireBridge("discoverAgentRuntimes", "resumeAgentSession")
+      : this.requireBridge("discoverAgentRuntimes");
     this.patch({ phase: "discovering", error: null });
     try {
       const inspection = await bridge.discoverAgentRuntimes({
@@ -359,50 +349,80 @@ export class AgentSessionController {
   }
 
   selectProvider(providerId: string | null) {
-    if (this.state.projection.runningTurnId || this.state.sessionPreparation === "preparing" || this.state.pendingPrompt) return this.state.selectedModel;
+    if (this.state.projection.runningTurnId || this.state.pendingPrompt) return this.state.selectedModel;
     const selectedProviderId = providerId && listAgentInferenceProviders(this.state.inspection).some((provider) => provider.id === providerId)
       ? providerId
       : null;
     const selectedModel = chooseAgentModel(this.state.inspection, null, selectedProviderId);
     const selectedModelEntry = this.state.inspection?.models.find((model) => model.model === selectedModel);
+    const preparationInvalidated = selectedProviderId !== this.state.selectedProviderId
+      || selectedModel !== this.state.selectedModel
+      ? this.sessionPreparer.invalidateSelection()
+      : false;
     this.patch({
       selectedProviderId,
       selectedModel,
       selectedEffort: chooseAgentEffort(selectedModelEntry, null),
       error: null,
+      ...(preparationInvalidated ? { sessionPreparation: "idle" as const } : {}),
     });
     return selectedModel;
   }
 
   selectModel(model: string | null) {
-    if (this.state.projection.runningTurnId || this.state.sessionPreparation === "preparing" || this.state.pendingPrompt) return;
+    if (this.state.projection.runningTurnId || this.state.pendingPrompt) return;
     const selectedModelEntry = model
       ? this.state.inspection?.models.find((candidate) => candidate.model === model) ?? null
       : null;
     const selectedModel = selectedModelEntry?.model ?? null;
     const preserveEffort = selectedModel === this.state.selectedModel ? this.state.selectedEffort : null;
+    const selectedEffort = chooseAgentEffort(selectedModelEntry, preserveEffort);
+    const preparationInvalidated = selectedModel !== this.state.selectedModel || selectedEffort !== this.state.selectedEffort
+      ? this.sessionPreparer.invalidateSelection()
+      : false;
     this.patch({
       selectedProviderId: selectedModelEntry ? agentProviderIdForModel(selectedModelEntry) : this.state.selectedProviderId,
       selectedModel,
-      selectedEffort: chooseAgentEffort(selectedModelEntry, preserveEffort),
+      selectedEffort,
       error: null,
+      ...(preparationInvalidated ? { sessionPreparation: "idle" as const } : {}),
     });
   }
 
   selectEffort(effort: string | null) {
-    if (this.state.projection.runningTurnId || this.state.sessionPreparation === "preparing" || this.state.pendingPrompt) return;
+    if (this.state.projection.runningTurnId || this.state.pendingPrompt) return;
     const selectedModel = this.state.inspection?.models.find((model) => model.model === this.state.selectedModel);
-    this.patch({ selectedEffort: chooseAgentEffort(selectedModel, effort), error: null });
+    const selectedEffort = chooseAgentEffort(selectedModel, effort);
+    const preparationInvalidated = selectedEffort !== this.state.selectedEffort
+      ? this.sessionPreparer.invalidateSelection()
+      : false;
+    this.patch({
+      selectedEffort,
+      error: null,
+      ...(preparationInvalidated ? { sessionPreparation: "idle" as const } : {}),
+    });
   }
 
   selectMode(mode: string | null) {
-    if (this.state.sessionPreparation === "preparing" || this.state.pendingPrompt) return;
-    this.patch({ selectedMode: mode || null });
+    if (this.state.projection.runningTurnId || this.state.pendingPrompt) return;
+    const selectedMode = chooseAgentMode(this.state.inspection, mode);
+    const preparationInvalidated = selectedMode !== this.state.selectedMode
+      ? this.sessionPreparer.invalidateSelection()
+      : false;
+    this.patch({
+      selectedMode,
+      ...(preparationInvalidated ? { sessionPreparation: "idle" as const } : {}),
+    });
   }
 
   setDraft(draft: string) {
-    this.patch({ draft });
-    this.writeCurrentSessionUi({ draft });
+    this.setDraftDocument(draft, []);
+  }
+
+  setDraftDocument(draft: string, draftMentions: AgentControllerState["draftMentions"]) {
+    const mentions = draftMentions.map((mention) => ({ ...mention }));
+    this.patch({ draft, draftMentions: mentions });
+    this.writeCurrentSessionUi({ draft, draftMentions: mentions });
   }
 
   async addWorkspacePaths(
@@ -438,7 +458,7 @@ export class AgentSessionController {
     const value = text.trim();
     if (!value) return;
     const draft = this.state.draft ? `${this.state.draft}\n${value}` : value;
-    this.setDraft(draft);
+    this.setDraftDocument(draft, this.state.draftMentions);
   }
 
   rememberViewport(scrollTop: number, measurements: Record<string, number> = {}, pinned = true) {
@@ -470,6 +490,15 @@ export class AgentSessionController {
     ]);
     this.submission.clearQueue();
     return true;
+  }
+
+  /** Closes prepared native ownership before releasing renderer resources. */
+  async rollbackPreparation() {
+    try {
+      await this.sessionLifecycle.rollbackPreparation();
+    } finally {
+      this.dispose();
+    }
   }
 
   prepareSession() {

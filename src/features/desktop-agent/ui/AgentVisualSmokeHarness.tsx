@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { RENDERER_ASSET_PATHS, resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
+import { AGENT_BRAND_CATALOG, resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { DesktopOverlayPortal } from "../../app-shell/DesktopOverlayPortal";
 import { AgentComposer } from "./AgentComposer";
-import { AgentChangesPill } from "./AgentChangesPill";
+import { AgentChangesControl } from "./AgentChangesControl";
 import { AgentPanelLayout } from "./AgentPanelLayout";
 import { AgentRuntimePicker } from "./AgentRuntimePicker";
 import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
@@ -13,9 +13,11 @@ import { createAgentProjection } from "../domain/agent-projection";
 import type {
   AgentDraftReference,
   AgentModel,
+  AgentPromptReferenceMention,
   AgentReferenceInputCapabilities,
   AgentRuntimeCatalogEntry,
 } from "../domain/agent-contract";
+import type { AgentSessionControl } from "../domain/agent-session-controls";
 import "./desktop-agent.css";
 
 const agentRuntimes: AgentRuntimeCatalogEntry[] = [
@@ -56,7 +58,6 @@ const smokeReferences: AgentDraftReference[] = [
     id: "workspace-security",
     kind: "workspace-entry",
     entryType: "file",
-    path: "SECURITY.md",
     relativePath: "SECURITY.md",
     displayName: "SECURITY.md",
     mime: "text/markdown",
@@ -86,6 +87,7 @@ const smokeReferences: AgentDraftReference[] = [
 export function AgentVisualSmokeHarness() {
   const { t } = useLocalization();
   const [draft, setDraft] = useState("");
+  const [draftMentions, setDraftMentions] = useState<AgentPromptReferenceMention[]>([]);
   const [runtimeId, setRuntimeId] = useState(agentRuntimes[0].descriptor.id);
   const [selectedModel, setSelectedModel] = useState(modelsByRuntime[runtimeId][0].model);
   const [selectedEffort, setSelectedEffort] = useState("medium");
@@ -94,6 +96,23 @@ export function AgentVisualSmokeHarness() {
   const startupLoading = new URLSearchParams(window.location.search).get("state") === "loading";
   const selectedRuntime = agentRuntimes.find((entry) => entry.descriptor.id === runtimeId) ?? agentRuntimes[0];
   const models = modelsByRuntime[runtimeId];
+  const sessionControls: AgentSessionControl[] = [
+    {
+      id: "model",
+      value: selectedModel,
+      options: models.map((entry) => ({
+        value: entry.model,
+        label: entry.displayName,
+        description: entry.description || undefined,
+      })),
+    },
+    {
+      id: "effort",
+      value: selectedEffort,
+      options: (models.find((entry) => entry.model === selectedModel)?.variants ?? [])
+        .map((effort) => ({ value: effort, label: effort })),
+    },
+  ].filter((control) => control.options.length > 0) as AgentSessionControl[];
   const startupProjection = useMemo(() => createAgentProjection(), []);
   const projection = useMemo(() => {
     const value = createAgentProjection();
@@ -280,9 +299,14 @@ export function AgentVisualSmokeHarness() {
           conversation={<AgentTranscript projection={visibleProjection} loading={startupLoading} runtimeLabel={selectedRuntime.descriptor.displayName} />}
           dock={startupLoading ? null : <>
             <AgentComposer
-              floatingAccessory={<AgentChangesPill projection={visibleProjection} onViewChanges={() => {}} />}
+              floatingAccessory={<AgentChangesControl projection={visibleProjection} onViewChanges={() => {}} />}
               draft={draft}
+              draftMentions={draftMentions}
               onDraftChange={setDraft}
+              onDraftDocumentChange={(nextDraft, nextMentions) => {
+                setDraft(nextDraft);
+                setDraftMentions(nextMentions);
+              }}
               disabled={startupLoading}
               running={false}
               stopping={false}
@@ -290,23 +314,26 @@ export function AgentVisualSmokeHarness() {
               configurationDisabled={startupLoading}
               placeholder={t("agent.composer.placeholder.followUp")}
               runtimeLabel={selectedRuntime.descriptor.displayName}
-              models={models}
-              selectedModel={selectedModel}
-              onSelectModel={setSelectedModel}
-              efforts={models.find((entry) => entry.model === selectedModel)?.variants ?? []}
-              selectedEffort={selectedEffort}
-              onSelectEffort={setSelectedEffort}
+              sessionControls={sessionControls}
+              onSelectSessionControl={(id, value) => {
+                if (id === "model") setSelectedModel(value);
+                if (id === "effort") setSelectedEffort(value);
+              }}
               commands={[]}
               references={references}
               getReferencePreviewUrl={(id) => id === "attachment-capture"
-                ? resolveRendererPublicAssetUrl(RENDERER_ASSET_PATHS.icons.agents.codexLight)
+                ? resolveRendererPublicAssetUrl(AGENT_BRAND_CATALOG.codex.assets.light)
                 : null}
               referenceCapabilities={referenceCapabilities}
               onRemoveReference={(id) => setReferences((current) => current.filter((reference) => reference.id !== id))}
               onRetryReference={() => {}}
               onAddExternalFiles={() => {}}
               onPickWorkspaceReferences={() => {}}
-              onSubmit={async () => { setDraft(""); return true; }}
+              onSubmit={async () => {
+                setDraft("");
+                setDraftMentions([]);
+                return true;
+              }}
               onStop={() => {}}
             />
           </>}

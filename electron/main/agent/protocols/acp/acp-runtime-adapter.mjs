@@ -23,6 +23,7 @@ import {
   materializeAcpReferences,
 } from "./acp-prompt-input.mjs";
 import { AcpHistoryCollector } from "./acp-history-collector.mjs";
+import { AgentProviderSessionUnavailableError } from "../../runtime/agent-runtime-port.mjs";
 
 const METADATA_SETTLE_MS = 75;
 export { ACP_INLINE_IMAGE_MAX_BYTES } from "./acp-limits.mjs";
@@ -61,6 +62,7 @@ export const BASE_ACP_CAPABILITIES = Object.freeze({
   modeSelection: true,
   slashCommands: true,
   sessionHistory: false,
+  history: Object.freeze({ discovery: "unsupported", exactOpen: "unsupported", hydration: "unsupported" }),
   usage: true,
   accountState: true,
   mcp: true,
@@ -97,6 +99,15 @@ export const BASE_ACP_CAPABILITIES = Object.freeze({
 
 /** Provider-neutral, workspace-bound adapter for a local ACP Agent harness. */
 export class AcpRuntimeAdapter {
+  referenceMentionDelivery() { return "resource"; }
+
+  getSessionHistoryPort() {
+    return Object.freeze({
+      discover: (request) => this.discoverSessions(request),
+      hydrate: () => this.readHistory(),
+    });
+  }
+
   constructor({
     readiness,
     workspaceRoot,
@@ -177,56 +188,85 @@ export class AcpRuntimeAdapter {
       // newSession. A short bounded settle window captures them without
       // turning provider discovery into a full runtime boot.
       await delay(METADATA_SETTLE_MS);
-      const models = publicModels(this.sessionConfig, this.runtimeDescriptor.id);
-      const accountReady = models.length > 0 || Boolean(this.authenticationMethodId);
-      return {
-        account: {
-          account: accountReady ? {
-            type: this.accountType,
-            email: null,
-            planType: null,
-          } : null,
-          requiresOpenaiAuth: false,
-          requiresRuntimeSetup: !accountReady,
-          ...(!accountReady ? {
-            setupReason: "runtime-setup-required",
-            error: `${this.runtimeDescriptor.displayName} has no authenticated model available.`,
-          } : {}),
-        },
-        providers: publicProviders(models),
-        models,
-        modes: publicModes(this.sessionConfig),
-        commands: this.commands,
-        capabilities: this.#capabilities(),
-        runtime: {
-          ...this.runtimeDescriptor,
-          version: this.readiness.version ?? this.client.agentInfo?.version ?? null,
-          source: this.readiness.source ?? (this.managed ? "bundled" : "user-installed"),
-          compatibility: "acp-v1",
-        },
-        warnings: [],
-      };
+      return this.#inspection();
     } finally {
       await this.#disconnect(`${this.runtimeDescriptor.displayName} ACP metadata inspection completed.`);
     }
   }
 
   async createSession({ model = null, effort = null, mode = null } = {}) {
+    return (await this.bootstrapSession({ kind: "create", model, effort, mode })).providerSession;
+  }
+
+  /**
+   * Establish protocol/authentication and the requested native session on one
+   * connection. AgentService uses this atomic path instead of inspect-then-
+   * reconnect for ACP runtimes.
+   */
+  async bootstrapSession({
+    kind = "create",
+    threadId = null,
+    model = null,
+    effort = null,
+    mode = null,
+  } = {}) {
     this.#assertIdle();
     await this.#connect("session");
-    const response = await this.client.newSession({ cwd: this.workspaceRoot, mcpServers: [] });
-    this.sessionId = requiredId(response?.sessionId, `${this.runtimeDescriptor.displayName} ACP session id`);
-    this.#syncSession(response);
+    let response;
+    if (kind === "resume") {
+      this.historyCollector = new AcpHistoryCollector();
+      try {
+        const sessionId = requiredId(threadId, `${this.runtimeDescriptor.displayName} ACP session id`);
+        const native = this.client?.agentCapabilities ?? {};
+        const parameters = { cwd: this.workspaceRoot, mcpServers: [], sessionId };
+        try {
+          if (native.loadSession === true) {
+            response = await this.client.loadSession(parameters);
+          } else if (native.sessionCapabilities?.resume != null) {
+            response = await this.client.resumeSession(parameters);
+          } else {
+            const unsupported = new Error(`${this.runtimeDescriptor.displayName} does not support session load or resume.`);
+            unsupported.code = "AGENT_SESSION_RESUME_UNSUPPORTED";
+            throw unsupported;
+          }
+        } catch (error) {
+          if (isUnavailableAcpSessionError(error)) {
+            throw new AgentProviderSessionUnavailableError(
+              `The saved ${this.runtimeDescriptor.displayName} session is no longer available.`,
+            );
+          }
+          throw error;
+        }
+        this.sessionId = requiredId(
+          response?.sessionId ?? threadId,
+          `${this.runtimeDescriptor.displayName} ACP session id`,
+        );
+        this.#syncSession(response);
+        await delay(METADATA_SETTLE_MS);
+      } finally {
+        this.historicalEvents = this.historyCollector?.events(
+          safeId(response?.sessionId) ?? safeId(threadId),
+        ) ?? [];
+        this.historyCollector = null;
+      }
+    } else if (kind === "create") {
+      response = await this.client.newSession({ cwd: this.workspaceRoot, mcpServers: [] });
+      this.sessionId = requiredId(response?.sessionId, `${this.runtimeDescriptor.displayName} ACP session id`);
+      this.#syncSession(response);
+      await delay(METADATA_SETTLE_MS);
+    } else {
+      throw new TypeError("ACP session bootstrap kind is invalid.");
+    }
+    const inspection = this.#inspection();
     await this.#applySelection({ model, effort, mode });
-    const now = new Date().toISOString();
     return {
-      providerSessionId: this.sessionId,
-      title: this.sessionTitles.created,
-      model: this.sessionConfig.models.currentId ?? model,
-      effort: this.sessionConfig.efforts.currentId ?? effort,
-      mode: this.sessionConfig.modes.currentId ?? mode,
-      createdAt: now,
-      updatedAt: now,
+      inspection,
+      providerSession: this.#providerSession({
+        title: kind === "resume" ? this.sessionTitles.resumed : this.sessionTitles.created,
+        model,
+        effort,
+        mode,
+      }),
     };
   }
 
@@ -260,34 +300,13 @@ export class AcpRuntimeAdapter {
   }
 
   async resumeSession({ threadId, model = null, effort = null, mode = null } = {}) {
-    this.#assertIdle();
-    await this.#connect("session");
-    this.historyCollector = new AcpHistoryCollector();
-    let response;
-    try {
-      response = await this.client.loadSession({
-        cwd: this.workspaceRoot,
-        mcpServers: [],
-        sessionId: requiredId(threadId, `${this.runtimeDescriptor.displayName} ACP session id`),
-      });
-      await delay(METADATA_SETTLE_MS);
-    } finally {
-      this.historicalEvents = this.historyCollector?.events(safeId(response?.sessionId) ?? safeId(threadId)) ?? [];
-      this.historyCollector = null;
-    }
-    this.sessionId = requiredId(response?.sessionId ?? threadId, `${this.runtimeDescriptor.displayName} ACP session id`);
-    this.#syncSession(response);
-    await this.#applySelection({ model, effort, mode });
-    const now = new Date().toISOString();
-    return {
-      providerSessionId: this.sessionId,
-      title: this.sessionTitles.resumed,
-      model: this.sessionConfig.models.currentId ?? model,
-      effort: this.sessionConfig.efforts.currentId ?? effort,
-      mode: this.sessionConfig.modes.currentId ?? mode,
-      createdAt: now,
-      updatedAt: now,
-    };
+    return (await this.bootstrapSession({
+      kind: "resume",
+      threadId,
+      model,
+      effort,
+      mode,
+    })).providerSession;
   }
 
   async readHistory() {
@@ -494,6 +513,8 @@ export class AcpRuntimeAdapter {
 
   #capabilities() {
     const native = this.client?.agentCapabilities ?? {};
+    const canDiscoverHistory = Boolean(native.sessionCapabilities?.list);
+    const canOpenHistory = native.loadSession === true || Boolean(native.sessionCapabilities?.resume);
     const acceptsImages = Boolean(native.promptCapabilities?.image);
     const acceptsEmbeddedText = Boolean(
       this.referenceInputProfile.embeddedText && native.promptCapabilities?.embeddedContext,
@@ -502,7 +523,7 @@ export class AcpRuntimeAdapter {
       ...BASE_ACP_CAPABILITIES,
       resume: native.loadSession === true || Boolean(native.sessionCapabilities?.resume),
       fork: Boolean(native.sessionCapabilities?.fork),
-      sessionHistory: Boolean(native.sessionCapabilities?.list),
+      sessionHistory: canDiscoverHistory || canOpenHistory,
       structuredQuestions: this.questionMethods.size > 0,
       mcp: Boolean(native.mcpCapabilities?.http || native.mcpCapabilities?.sse),
       attachments: acceptsImages || acceptsEmbeddedText,
@@ -514,6 +535,11 @@ export class AcpRuntimeAdapter {
         extensions: extensionVersions(native?._meta),
       },
       ...this.capabilityOverrides,
+      history: {
+        discovery: canDiscoverHistory ? "paged" : "unsupported",
+        exactOpen: canOpenHistory ? "supported" : "unsupported",
+        hydration: canOpenHistory ? "push-replay" : "unsupported",
+      },
       referenceInputs: {
         ...BASE_ACP_CAPABILITIES.referenceInputs,
         ...(this.capabilityOverrides.referenceInputs ?? {}),
@@ -540,6 +566,51 @@ export class AcpRuntimeAdapter {
           ...(this.capabilityOverrides.referenceInputs?.limits ?? {}),
         },
       },
+    };
+  }
+
+  #inspection() {
+    const models = publicModels(this.sessionConfig, this.runtimeDescriptor.id);
+    const accountReady = models.length > 0 || Boolean(this.authenticationMethodId);
+    return {
+      account: {
+        account: accountReady ? {
+          type: this.accountType,
+          email: null,
+          planType: null,
+        } : null,
+        requiresOpenaiAuth: false,
+        requiresRuntimeSetup: !accountReady,
+        ...(!accountReady ? {
+          setupReason: "runtime-setup-required",
+          error: `${this.runtimeDescriptor.displayName} has no authenticated model available.`,
+        } : {}),
+      },
+      providers: publicProviders(models),
+      models,
+      modes: publicModes(this.sessionConfig),
+      commands: this.commands,
+      capabilities: this.#capabilities(),
+      runtime: {
+        ...this.runtimeDescriptor,
+        version: this.readiness.version ?? this.client?.agentInfo?.version ?? null,
+        source: this.readiness.source ?? (this.managed ? "bundled" : "user-installed"),
+        compatibility: "acp-v1",
+      },
+      warnings: [],
+    };
+  }
+
+  #providerSession({ title, model, effort, mode }) {
+    const now = new Date().toISOString();
+    return {
+      providerSessionId: this.sessionId,
+      title,
+      model: this.sessionConfig.models.currentId ?? model,
+      effort: this.sessionConfig.efforts.currentId ?? effort,
+      mode: this.sessionConfig.modes.currentId ?? mode,
+      createdAt: now,
+      updatedAt: now,
     };
   }
 
@@ -715,6 +786,12 @@ export class AcpRuntimeAdapter {
     if (this.disposed) throw new Error(`${this.runtimeDescriptor.displayName} ACP adapter is closed.`);
     if (!this.readiness.executablePath) throw new Error(`${this.runtimeDescriptor.displayName} ACP executable is unavailable.`);
   }
+}
+
+function isUnavailableAcpSessionError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return error?.code === -32602
+    || /invalid params|unknown session|session.{0,32}(?:not found|does not exist|unavailable)/iu.test(message);
 }
 
 function publicModels(config, fallbackProviderId) {

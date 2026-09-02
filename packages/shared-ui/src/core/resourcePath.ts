@@ -16,12 +16,22 @@ export function looksLikeResourceUri(value: string | null | undefined): boolean 
   return RESOURCE_URI_LIKE_PATTERN.test(candidate);
 }
 
+/** Rooted host filesystem paths are never provider-relative resource paths. */
+export function isRootedFilesystemPath(value: string | null | undefined): boolean {
+  if (typeof value !== "string") return false;
+  const candidate = value.trimStart().replaceAll("\\", "/");
+  return candidate.startsWith("/") || /^[A-Za-z]:\//.test(candidate);
+}
+
 /** Canonical comparison form for workspace-relative resource paths. */
 export function canonicalizeResourcePath(path: string): CanonicalResourcePath {
   if (looksLikeResourceUri(path)) {
     throw new TypeError(
       "Resource URI-like values cannot be canonicalized as provider-relative paths.",
     );
+  }
+  if (isRootedFilesystemPath(path)) {
+    throw new TypeError("Host filesystem paths cannot be used as provider-relative resource paths.");
   }
   const canonical = path
     .replaceAll("\\", "/")

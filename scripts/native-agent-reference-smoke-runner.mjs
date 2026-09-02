@@ -43,24 +43,26 @@ export async function runNativeAgentReferenceSmoke({
       tokens,
     });
 
-    stage = "unsupported-binary";
-    await requireUnsupportedBinaryRejection({
+    stage = "unsupported-input";
+    await requireUnsupportedReferenceRejection({
       service,
       sender,
       workspaceRoot,
       sessionId: activeSessionId,
-      reference: fixtures.unsupported,
+      fixtures,
       runtimeId,
       input,
     });
 
     stage = "model-visibility";
     const selected = selectSupportedReferences(input, fixtures, runtimeId);
+    const composed = composeReferencePrompt(selected.references, visibilityPrompt(selected.expected.length));
     const waiter = createTurnWaiter(sender, activeSessionId, timeoutMs);
     try {
       await service.startTurn(sender, {
         sessionId: activeSessionId,
-        prompt: visibilityPrompt(selected.expected.length),
+        prompt: composed.prompt,
+        promptMentions: composed.promptMentions,
         references: selected.references,
       }, workspaceRoot);
       const answer = await waiter.promise;
@@ -82,7 +84,7 @@ export async function runNativeAgentReferenceSmoke({
       runtimeId,
       model,
       status: "passed",
-      checks: Object.freeze(["capability", "unsupported-binary", "model-visibility", "close"]),
+      checks: Object.freeze(["capability", "unsupported-input", "model-visibility", "close"]),
       testedInputs: Object.freeze(selected.testedInputs),
     });
   } catch (error) {
@@ -131,29 +133,37 @@ function selectSupportedReferences(input, fixtures, runtimeId) {
   return { references, expected, testedInputs };
 }
 
-async function requireUnsupportedBinaryRejection({
+async function requireUnsupportedReferenceRejection({
   service,
   sender,
   workspaceRoot,
   sessionId,
-  reference,
+  fixtures,
   runtimeId,
   input,
 }) {
-  if (input.attachments.binary.accepted) {
-    throw new NativeAgentReferenceSmokeError(runtimeId, "capability", "unexpected-generic-binary-support");
-  }
+  const reference = input.attachments.binary.accepted !== true
+    ? fixtures.unsupported
+    : input.attachments.video.accepted !== true
+      ? fixtures.unsupportedVideo
+      : null;
+  if (!reference) return;
+  const composed = composeReferencePrompt(
+    [reference],
+    "This unsupported reference must be rejected before a native turn starts.",
+  );
   let result;
   try {
     result = await service.startTurn(sender, {
       sessionId,
-      prompt: "This unsupported reference must be rejected before a native turn starts.",
+      prompt: composed.prompt,
+      promptMentions: composed.promptMentions,
       references: [reference],
     }, workspaceRoot);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error ?? "");
-    if (/reference|attachment|binary|pdf|unsupported|does not accept/iu.test(message)) return;
-    throw new NativeAgentReferenceSmokeError(runtimeId, "unsupported-binary", "unexpected-rejection");
+    if (/reference|attachment|binary|pdf|video|unsupported|does not accept/iu.test(message)) return;
+    throw new NativeAgentReferenceSmokeError(runtimeId, "unsupported-input", "unexpected-rejection");
   }
   if (result?.turnId && typeof service.interruptTurn === "function") {
     await Promise.resolve(service.interruptTurn(sender, {
@@ -161,7 +171,22 @@ async function requireUnsupportedBinaryRejection({
       turnId: result.turnId,
     }, workspaceRoot)).catch(() => {});
   }
-  throw new NativeAgentReferenceSmokeError(runtimeId, "unsupported-binary", "unexpected-native-turn");
+  throw new NativeAgentReferenceSmokeError(runtimeId, "unsupported-input", "unexpected-native-turn");
+}
+
+function composeReferencePrompt(references, instruction) {
+  const promptMentions = [];
+  let prompt = "";
+  for (const reference of references) {
+    const token = `@${reference.displayName}`;
+    if (prompt) prompt += " ";
+    const start = prompt.length;
+    prompt += token;
+    promptMentions.push({ referenceId: reference.id, start, end: start + token.length });
+  }
+  if (prompt) prompt += "\n\n";
+  prompt += instruction;
+  return { prompt, promptMentions };
 }
 
 function visibilityPrompt(expectedCount) {

@@ -42,6 +42,7 @@ export function planAgentRuntimeSwitch(
       pendingIntent: null,
       sessionPreparation: "idle",
       references: [],
+      draftMentions: [],
       error: null,
     },
   };

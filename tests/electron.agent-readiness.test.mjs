@@ -38,6 +38,23 @@ describe("Agent readiness reason routing", () => {
     });
     expect(result.readiness.diagnostic).toMatch(/exit code 139.*fallback failed.*ACP handshake exited unexpectedly/i);
   });
+
+  it("single-flights concurrent protocol verification for one runtime and workspace", async () => {
+    const deferred = promiseWithResolvers();
+    const inspect = vi.fn(() => deferred.promise);
+    const catalog = catalogFor(cursorProbeFailure(), inspect);
+
+    const first = catalog.discover({ runtimeId: "cursor" }, "/workspace");
+    const second = catalog.discover({ runtimeId: "cursor" }, "/workspace");
+    await vi.waitFor(() => expect(inspect).toHaveBeenCalledTimes(1));
+    deferred.resolve(inspection());
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      expect.objectContaining({ readiness: expect.objectContaining({ status: "ready" }) }),
+      expect.objectContaining({ readiness: expect.objectContaining({ status: "ready" }) }),
+    ]);
+    expect(inspect).toHaveBeenCalledTimes(1);
+  });
 });
 
 function catalogFor(readiness, inspect) {
@@ -123,4 +140,14 @@ function inspection() {
     capabilities: {},
     warnings: [],
   };
+}
+
+function promiseWithResolvers() {
+  let resolve;
+  let reject;
+  const promise = new Promise((onResolve, onReject) => {
+    resolve = onResolve;
+    reject = onReject;
+  });
+  return { promise, resolve, reject };
 }

@@ -11,10 +11,18 @@ export function TerminalWorkbenchCreationFailure({
   onDismiss: () => void;
 }>) {
   const { t } = useLocalization();
+  const messageKey = failure.code ? OPEN_FAILURE_MESSAGE_KEYS[failure.code] : null;
+  const message = messageKey
+    ? t(messageKey)
+    : t("terminal.workbench.itemLoadFailed", { item: failure.label });
   return (
-    <div className="desktop-terminal-workbench-create-failure" role="alert">
+    <div
+      className="desktop-terminal-workbench-create-failure"
+      role="alert"
+      title={failure.detail || undefined}
+    >
       <AlertCircle size={14} strokeWidth={1.8} aria-hidden="true" />
-      <span>{t("terminal.workbench.itemLoadFailed", { item: failure.label })}</span>
+      <span>{message}</span>
       <DesktopMenuIconButton
         label={t("terminal.workbench.dismissError")}
         icon={<X size={12} strokeWidth={1.8} aria-hidden="true" />}
@@ -23,3 +31,14 @@ export function TerminalWorkbenchCreationFailure({
     </div>
   );
 }
+
+const OPEN_FAILURE_MESSAGE_KEYS: Readonly<Record<string, string>> = Object.freeze({
+  SESSION_NOT_FOUND: "agent.history.openError.sessionNotFound",
+  AUTH_REQUIRED: "agent.history.openError.authRequired",
+  AUTH_EXPIRED: "agent.history.openError.authExpired",
+  RUNTIME_UNAVAILABLE: "agent.history.openError.runtimeUnavailable",
+  RESUME_UNSUPPORTED: "agent.history.openError.unsupported",
+  RESUME_TIMED_OUT: "agent.history.openError.timedOut",
+  WORKSPACE_MISMATCH: "agent.history.openError.workspaceMismatch",
+  PROTOCOL_ERROR: "agent.history.openError.protocol",
+});

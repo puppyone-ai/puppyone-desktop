@@ -1,15 +1,15 @@
 import { FileSearch, FolderSearch, ListTree, Search, TerminalSquare } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
 import {
-  agentActivitySummary,
   commandForActivity,
   commandPresentationForActivity,
-  formatAgentActivityLabel,
   formatAgentToolName,
   outputForActivity,
 } from "../../domain/agent-activity-presentation";
 import type { AgentActivity } from "../../domain/agent-projection-types";
 import { AgentActivityShell } from "./AgentActivityShell";
+import { AgentToolEvidenceNode, AgentToolEvidenceTree } from "./AgentToolEvidenceTree";
+import { AgentToolTextEvidence } from "./AgentToolTextEvidence";
 
 export function AgentCommandActivity({ activity }: { activity: AgentActivity }) {
   const { t } = useLocalization();
@@ -19,19 +19,24 @@ export function AgentCommandActivity({ activity }: { activity: AgentActivity }) 
   return (
     <AgentActivityShell
       title={formatAgentToolName(presentation.tool, t)}
-      summary={presentation.summary || agentActivitySummary(activity) || formatAgentActivityLabel(activity, t)}
       status={activity.status}
       icon={commandIcon(presentation.tool)}
       className={`desktop-agent-command is-${presentation.tool}`}
     >
-      {(command || output) && <div className="desktop-agent-command-surface">
-        {command && <div className="desktop-agent-command-line"><span>$</span><code>{command}</code></div>}
-        {output && (
-          <pre className="desktop-agent-command-output" data-po-scrollbar="content">
-            {output}
-          </pre>
-        )}
-      </div>}
+      {(command || output) && (
+        <AgentToolEvidenceTree>
+          {command && (
+            <AgentToolEvidenceNode kind="command" marker="$">
+              <AgentToolTextEvidence text={command} className="desktop-agent-command-line" />
+            </AgentToolEvidenceNode>
+          )}
+          {output && (
+            <AgentToolEvidenceNode kind="result">
+              <AgentToolTextEvidence text={output} className="desktop-agent-command-output" />
+            </AgentToolEvidenceNode>
+          )}
+        </AgentToolEvidenceTree>
+      )}
     </AgentActivityShell>
   );
 }

@@ -4,7 +4,8 @@ export const AGENT_EVENT_TYPES = Object.freeze([
   "assistant.delta", "assistant.completed", "reasoning.summary.delta", "plan.updated",
   "tool.started", "tool.progress", "tool.completed", "command.output.delta",
   "file.change.updated", "usage.updated", "approval.requested", "approval.resolved",
-  "question.requested", "question.resolved", "provider.activity", "provider.warning", "provider.error",
+  "question.requested", "question.resolved", "provider.activity", "provider.connection.updated",
+  "provider.warning", "provider.error",
 ]);
 
 export const AGENT_RUNTIME_CAPABILITIES = Object.freeze([
@@ -15,7 +16,7 @@ export const AGENT_RUNTIME_CAPABILITIES = Object.freeze([
 ]);
 
 export const REQUIRED_AGENT_RUNTIME_METHODS = Object.freeze([
-  "inspect", "createSession", "resumeSession", "readHistory", "startTurn", "interruptTurn", "dispose",
+  "inspect", "createSession", "resumeSession", "startTurn", "interruptTurn", "dispose",
 ]);
 
 /**
@@ -47,9 +48,20 @@ export const AGENT_READINESS_CODE_STATUS = Object.freeze({
 
 export const AGENT_READINESS_CODES = Object.freeze(Object.keys(AGENT_READINESS_CODE_STATUS));
 
+export const AGENT_SESSION_OPEN_ERROR_CODES = Object.freeze([
+  "SESSION_NOT_FOUND",
+  "AUTH_REQUIRED",
+  "AUTH_EXPIRED",
+  "RUNTIME_UNAVAILABLE",
+  "RESUME_UNSUPPORTED",
+  "RESUME_TIMED_OUT",
+  "WORKSPACE_MISMATCH",
+  "PROTOCOL_ERROR",
+]);
+
 export const AGENT_IPC_CHANNELS = Object.freeze([
   "agent:providers-discover", "agent:local-connections-discover", "agent:models-list", "agent:account-read",
-  "agent:session-create", "agent:session-resume", "agent:session-replay", "agent:sessions-list",
+  "agent:session-create", "agent:session-resume", "agent:session-open", "agent:session-replay", "agent:sessions-list",
   "agent:session-fork", "agent:session-archive", "agent:session-delete", "agent:session-close",
   "agent:reference-stage", "agent:reference-revoke", "agent:reference-resolve-workspace",
   "agent:reference-pick-workspace",

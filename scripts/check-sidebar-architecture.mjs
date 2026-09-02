@@ -169,13 +169,34 @@ const collapsiblePaneResizeSource = read(absolute("packages/shared-ui/src/primit
 const paneResizeDragSource = read(absolute("packages/shared-ui/src/primitives/usePaneResizeDrag.ts"));
 const desktopDataWorkspaceSource = read(absolute("src/features/app-shell/DesktopDataWorkspaceSurface.tsx"));
 if (layoutStyle.includes("--desktop-right-sidebar-visible-width") || auxiliarySource.includes("desktop-right-sidebar-visible-width")) {
-  errors.push("AuxiliaryPanelHost must not split its host and content into separate rendered widths.");
+  errors.push("AuxiliaryPanelHost must not drive its content plane from the shrinking visibility width.");
 }
 if (dataWorkspaceStyle.includes("--data-explorer-min-width")) {
   errors.push("DataWorkspace content must follow the canonical Explorer track width.");
 }
-if (!collapsiblePaneResizeSource.includes("A pane has one rendered width")) {
-  errors.push("The shared collapsible pane resize contract must retain a single rendered-width invariant.");
+if (
+  !collapsiblePaneResizeSource.includes("canonical live resize width")
+  || !collapsiblePaneResizeSource.includes("last-expanded content plane")
+) {
+  errors.push("The shared collapsible pane resize contract must distinguish direct resize from visibility transitions.");
+}
+for (const token of [
+  'className="desktop-right-sidebar-viewport"',
+  "lastExpandedWidth",
+  'aria-hidden={open ? undefined : true}',
+]) {
+  if (!auxiliarySource.includes(token)) {
+    errors.push(`AuxiliaryPanelHost is missing its non-reflow visibility contract (${token}).`);
+  }
+}
+for (const token of [
+  "width: var(--desktop-right-sidebar-width)",
+  "min-width: var(--desktop-right-sidebar-width)",
+  "transition: transform 260ms",
+]) {
+  if (!layoutStyle.includes(token)) {
+    errors.push(`Right Sidebar is missing its fixed content-plane contract (${token}).`);
+  }
 }
 const paneEdgeHandle = sidebarPrimitiveStyle.match(/\.po-pane-edge-resize-handle\s*\{([^}]*)\}/s)?.[1] ?? "";
 for (const token of [

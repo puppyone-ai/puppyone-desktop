@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { AiEditRequest, Workspace } from "@puppyone/shared-ui";
+import {
+  qualifyDataResourcePath,
+  type AiEditRequest,
+  type ResourceUri,
+  type Workspace,
+} from "@puppyone/shared-ui";
 import {
   getLatestAiEditReviewRequest,
   subscribeAiEditReviewUpdates,
@@ -9,10 +14,12 @@ export function useAiEditReviewRequest({
   aiEditAssistEnabled,
   onWorkspaceContentChanged,
   workspace,
+  workspaceRootUri,
 }: {
   aiEditAssistEnabled: boolean;
   onWorkspaceContentChanged: () => void;
   workspace: Workspace | null;
+  workspaceRootUri: ResourceUri | null;
 }) {
   const [latestAiEditRequest, setLatestAiEditRequest] = useState<AiEditRequest | null>(null);
   const workspacePathRef = useRef<string | null>(null);
@@ -23,7 +30,7 @@ export function useAiEditReviewRequest({
   }, [workspace?.path]);
 
   useEffect(() => {
-    if (!workspace || !aiEditAssistEnabled) {
+    if (!workspace || !workspaceRootUri || !aiEditAssistEnabled) {
       setLatestAiEditRequest(null);
       return undefined;
     }
@@ -35,7 +42,7 @@ export function useAiEditReviewRequest({
     void getLatestAiEditReviewRequest(rootPath)
       .then((request) => {
         if (!cancelled && workspacePathRef.current === rootPath) {
-          setLatestAiEditRequest(request);
+          setLatestAiEditRequest(qualifyAiEditRequest(request, workspaceRootUri));
         }
       })
       .catch((error) => {
@@ -44,7 +51,7 @@ export function useAiEditReviewRequest({
 
     const unsubscribe = subscribeAiEditReviewUpdates((event) => {
       if (event.rootPath !== rootPath || workspacePathRef.current !== rootPath) return;
-      setLatestAiEditRequest(event.request);
+      setLatestAiEditRequest(qualifyAiEditRequest(event.request, workspaceRootUri));
       onWorkspaceContentChanged();
     });
 
@@ -52,7 +59,32 @@ export function useAiEditReviewRequest({
       cancelled = true;
       unsubscribe();
     };
-  }, [aiEditAssistEnabled, onWorkspaceContentChanged, workspace]);
+  }, [aiEditAssistEnabled, onWorkspaceContentChanged, workspace, workspaceRootUri]);
 
   return latestAiEditRequest;
+}
+
+export function qualifyAiEditRequest(
+  request: AiEditRequest | null,
+  workspaceRootUri: ResourceUri,
+): AiEditRequest | null {
+  if (!request) return null;
+  return {
+    ...request,
+    files: request.files.map((file) => ({
+      ...file,
+      path: qualifyProviderPath(file.path, workspaceRootUri),
+      ...(file.oldPath === undefined
+        ? {}
+        : {
+            oldPath: file.oldPath
+              ? qualifyProviderPath(file.oldPath, workspaceRootUri)
+              : file.oldPath,
+          }),
+    })),
+  };
+}
+
+function qualifyProviderPath(path: string, workspaceRootUri: ResourceUri): string {
+  return qualifyDataResourcePath(workspaceRootUri, path);
 }

@@ -12,8 +12,9 @@ import { CloudOverviewHostingIllustration } from "./CloudOverviewHostingIllustra
 import { useId, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import {
-  RENDERER_ASSET_PATHS,
-  resolveRendererPublicAssetUrl,
+  AgentBrandImage,
+  resolveAgentBrand,
+  type AgentBrandId,
 } from "@puppyone/shared-ui";
 import type { CloudWorkspaceSection } from "../types";
 import { CloudPublishFolderMark } from "./CloudPublishHeroMarks";
@@ -251,7 +252,7 @@ function CloudChannelFolder({ icon }: { icon: ReactNode }) {
   );
 }
 
-type AgentKind = "chatgpt" | "claude" | "cursor" | "manus" | "hermes" | "grok";
+type AgentKind = Extract<AgentBrandId, "chatgpt" | "claude" | "cursor" | "manus" | "hermes"> | "grok";
 
 function AgentTile({ label, kind }: { label: string; kind: AgentKind }) {
   return (
@@ -265,28 +266,9 @@ function AgentTile({ label, kind }: { label: string; kind: AgentKind }) {
 }
 
 function AgentMark({ kind }: { kind: AgentKind }) {
-  const agents = RENDERER_ASSET_PATHS.icons.agents;
-  if (kind === "chatgpt") {
-    return <img src={resolveRendererPublicAssetUrl(agents.chatgpt)} alt="" draggable={false} />;
-  }
-  if (kind === "claude") {
-    return <img src={resolveRendererPublicAssetUrl(agents.claudeCode)} alt="" draggable={false} />;
-  }
-  if (kind === "cursor") {
-    return <img src={resolveRendererPublicAssetUrl(agents.cursor)} alt="" draggable={false} />;
-  }
-  if (kind === "manus") {
-    return <img src={resolveRendererPublicAssetUrl(agents.manus)} alt="" draggable={false} />;
-  }
-  if (kind === "hermes") {
-    return (
-      <svg viewBox="0 0 40 40" fill="none" focusable="false">
-        <path d="M7 26.5c7.2-.1 14.8-4.8 20.3-12.8-2.6 8.7-8.7 15.1-18.9 17.4" />
-        <path d="M10.4 20.9c7-.5 12-3.9 16.3-9.8-2 7.2-7.1 12.2-14.7 14.5" />
-        <path d="M15.1 15.5c4.5-.8 7.7-2.7 10.4-6-1.3 4.4-4.7 7.8-9.8 9.4" />
-      </svg>
-    );
-  }
+  const brand = resolveAgentBrand({ id: kind });
+  if (brand) return <AgentBrandImage brandId={brand.id} />;
+
   return (
     <svg viewBox="0 0 40 40" fill="none" focusable="false">
       <path d="M29.8 13.4a12.2 12.2 0 1 0 1.3 11.4" />

@@ -321,7 +321,7 @@
   flex-basis: var(--desktop-right-sidebar-width);
   width: var(--desktop-right-sidebar-width);
   border-inline-start-width: 1px;
-  border-inline-start-color: var(--po-shell-divider, var(--po-divider));
+  border-inline-start-color: var(--po-sidebar-divider, var(--po-divider));
 }
 
 .desktop-right-sidebar:not(.is-open) {
@@ -357,6 +357,7 @@ body.desktop-right-sidebar-resizing * {
 }
 
 body.desktop-right-sidebar-resizing .desktop-surface,
+body.desktop-right-sidebar-resizing .desktop-right-sidebar-viewport,
 body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   pointer-events: none;
 }
@@ -366,23 +367,57 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   transition: border-color 260ms ease;
 }
 
-.desktop-right-sidebar-inner {
+/*
+ * The outer sidebar is the animated layout track. This viewport clips one
+ * fixed-width content plane so opening and closing never recomputes text
+ * wrapping. Intentional pointer resizing still updates the fixed width.
+ */
+.desktop-right-sidebar-viewport {
   position: absolute;
-  inset-block: 0;
-  inset-inline-end: 0;
+  inset: 0;
   width: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  overflow: clip;
   pointer-events: none;
 }
 
+.desktop-right-sidebar-inner {
+  --desktop-right-sidebar-exit-translate: 100%;
+
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  width: var(--desktop-right-sidebar-width);
+  min-width: var(--desktop-right-sidebar-width);
+  min-height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateX(var(--desktop-right-sidebar-exit-translate));
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.desktop-right-sidebar.is-open .desktop-right-sidebar-viewport,
 .desktop-right-sidebar.is-open .desktop-right-sidebar-inner {
   pointer-events: auto;
 }
 
+.desktop-right-sidebar.is-open .desktop-right-sidebar-inner {
+  transform: translateX(0);
+}
+
+[dir="rtl"] .desktop-right-sidebar-inner {
+  --desktop-right-sidebar-exit-translate: -100%;
+}
+
+body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .desktop-right-sidebar {
+  .desktop-right-sidebar,
+  .desktop-right-sidebar-inner {
     transition: none;
   }
 }

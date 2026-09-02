@@ -19,6 +19,7 @@ describe("window Workspace composition service", () => {
 
     expect(events).toEqual(["persisted", "published"]);
     expect(result).toMatchObject({ status: "attached-current", path: "/b" });
+    expect(result.workspaceId).toBe(state.workspaceId);
     expect(result.workspaces.map((workspace) => workspace.id)).toEqual(["a", "b"]);
     expect(state.folderPaths).toEqual(["/a", "/b"]);
     expect(indexedPaths.get("/b")).toBe(window);
@@ -93,6 +94,7 @@ describe("window Workspace composition service", () => {
 
     expect(events).toEqual(["persisted", "published", "cleaned"]);
     expect(result).toMatchObject({ status: "detached-current", path: "/b" });
+    expect(result.workspaceId).toBe(state.workspaceId);
     expect(result.workspaces.map((item) => item.id)).toEqual(["a"]);
     expect(state.folderPaths).toEqual(["/a"]);
     expect(indexedPaths.has("/b")).toBe(false);
@@ -157,7 +159,7 @@ function createService({
 }
 
 function stateWith(...ids) {
-  const state = new WindowWorkspaceState();
+  const state = new WindowWorkspaceState({ initialWorkspaceId: "workbench:test-window" });
   state.replaceFolders(ids.map((id) => ({ path: `/${id}`, workspace: workspace(id) })));
   return state;
 }

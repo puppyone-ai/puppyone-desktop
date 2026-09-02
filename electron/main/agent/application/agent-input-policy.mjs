@@ -6,6 +6,10 @@ import {
   AGENT_REFERENCE_ERROR_CODES,
   agentReferenceError,
 } from "../domain/agent-reference-error.mjs";
+import {
+  agentReferenceMentionText,
+  normalizeAgentWorkspaceRelativePath,
+} from "../../../../shared/agent-contract/reference-identity.mjs";
 
 const MAX_REFERENCE_SNAPSHOT_URL_LENGTH = Math.ceil(512 * 1024 * 4 / 3) + 256;
 
@@ -29,12 +33,6 @@ export function readinessWithAccountState(readiness, accountState, runtimeName =
     };
   }
   return readiness;
-}
-
-export function assertReady(readiness, runtimeName = "Agent runtime") {
-  if (readiness?.status !== "ready") {
-    throw new Error(readiness?.message || `${runtimeName} is not ready.`);
-  }
 }
 
 export function assertAuthenticated(accountState, runtimeName = "Agent runtime") {
@@ -112,21 +110,84 @@ export function normalizeAuthorizedReferences(value) {
     }
     const kind = entry.kind;
     const entryType = entry.entryType === "directory" ? "directory" : "file";
+    const relativePath = kind === "workspace-entry"
+      ? normalizeAgentWorkspaceRelativePath(entry.relativePath)
+      : null;
+    if (kind === "workspace-entry" && !relativePath) {
+      throw new Error("Agent workspace reference identity is invalid.");
+    }
     return {
+      authorized: true,
       id: normalizeReferenceId(entry.id, entry.path),
       kind,
       ...(kind === "workspace-entry" ? { entryType } : {}),
       path: entry.path,
-      name: normalizeOptionalString(entry.name ?? entry.displayName),
-      displayName: normalizeOptionalString(entry.displayName ?? entry.name) || "reference",
-      ...(kind === "workspace-entry" && typeof entry.relativePath === "string"
-        ? { relativePath: entry.relativePath.slice(0, 4_096) }
+      name: normalizeReferenceDisplayName(entry.name ?? entry.displayName),
+      displayName: normalizeReferenceDisplayName(entry.displayName ?? entry.name) || "reference",
+      ...(kind === "workspace-entry"
+        ? { relativePath }
         : {}),
       mime: normalizeOptionalString(entry.mime),
       size: Number.isSafeInteger(entry.size) && entry.size >= 0 ? entry.size : 0,
       ...(isBoundedDataUrl(entry.snapshotUrl) ? { snapshotUrl: entry.snapshotUrl } : {}),
     };
   });
+}
+
+export function normalizePromptReferenceMentions(value, prompt, references) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.length > 32) throw new Error("Agent prompt reference mentions are invalid.");
+  const byId = new Map(references.map((reference) => [reference.id, reference]));
+  let boundary = 0;
+  return value.map((entry) => {
+    if (!entry || typeof entry !== "object") throw new Error("Agent prompt reference mention is invalid.");
+    const referenceId = normalizeRequiredId(entry.referenceId, "Reference mention id");
+    const reference = byId.get(referenceId);
+    if (!reference) throw new Error("Agent prompt reference mention is not backed by an authorized reference.");
+    if (reference.mime?.startsWith("image/")) throw new Error("Image references must use the native media input channel.");
+    const start = Number.isSafeInteger(entry.start) ? entry.start : -1;
+    const end = Number.isSafeInteger(entry.end) ? entry.end : -1;
+    if (start < boundary || end <= start || end > prompt.length) throw new Error("Agent prompt reference mention range is invalid.");
+    const expected = agentReferenceMentionText(reference);
+    if (prompt.slice(start, end) !== expected) throw new Error("Agent prompt reference mention text does not match its authorized reference.");
+    boundary = end;
+    return { referenceId, start, end };
+  });
+}
+
+/** Bind protocol delivery metadata without mutating main-authorized records. */
+export function bindPromptReferenceMentionDelivery(
+  references,
+  mentions,
+  deliveryForReference = () => "resource",
+) {
+  const mentionedIds = new Set(mentions.map((mention) => mention.referenceId));
+  return references.map((reference) => mentionedIds.has(reference.id)
+    ? {
+        ...reference,
+        inlineMentioned: true,
+        mentionDelivery: deliveryForReference(reference) === "path" ? "path" : "resource",
+      }
+    : reference);
+}
+
+export function compileAgentPromptReferenceMentions(prompt, mentions, references) {
+  if (!mentions.length) return prompt;
+  const byId = new Map(references.map((reference) => [reference.id, reference]));
+  let compiled = prompt;
+  for (let index = mentions.length - 1; index >= 0; index -= 1) {
+    const mention = mentions[index];
+    const reference = byId.get(mention.referenceId);
+    if (!reference) throw new Error("Agent prompt reference mention lost its authorized reference.");
+    if (reference.mentionDelivery === "path") {
+      compiled = `${compiled.slice(0, mention.start)}${quoteNativePath(reference.path)}${compiled.slice(mention.end)}`;
+    }
+  }
+  return compiled;
+}
+
+function quoteNativePath(filename) {
+  return `\`${String(filename).replace(/`/g, "\\`")}\``;
 }
 
 export function requireSupportedAgentReferences(capabilities, references) {
@@ -199,13 +260,17 @@ export function normalizeReferenceDisplays(references) {
     kind: reference.kind === "staged-attachment"
       ? "attachment"
       : reference.entryType === "directory" ? "workspace-directory" : "workspace-file",
-    displayName: normalizeOptionalString(reference.displayName ?? reference.name) || "reference",
+    displayName: normalizeReferenceDisplayName(reference.displayName ?? reference.name) || "reference",
     ...(reference.kind === "workspace-entry" && typeof reference.relativePath === "string"
       ? { relativePath: reference.relativePath.slice(0, 4_096) }
       : {}),
     ...(reference.kind === "staged-attachment" && reference.mime ? { mime: reference.mime } : {}),
     ...(reference.kind === "staged-attachment" && Number.isSafeInteger(reference.size) ? { size: reference.size } : {}),
   }));
+}
+
+function normalizeReferenceDisplayName(value) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim().slice(0, 512) : null;
 }
 
 export function normalizeQuestionAnswers(value, questions) {

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   buildAcpPromptBlocks,
@@ -87,6 +88,21 @@ describe("ACP native reference mapping", () => {
       workspaceRoot: "/workspace-a",
       references: [{ kind: "workspace-entry", path: "/workspace-b/secret.txt" }],
     })).toThrow(/invalid workspace reference/i);
+  });
+
+  it("keeps an inline display mention while delivering workspace data as an ACP resource link", async () => {
+    const root = await temporaryRoot();
+    const filename = path.join(root, "notes.md");
+    await fs.promises.writeFile(filename, "notes");
+
+    expect(buildAcpPromptBlocks({
+      prompt: "Review @notes.md",
+      workspaceRoot: root,
+      references: [{ kind: "workspace-entry", path: filename, name: "notes.md", inlineMentioned: true }],
+    })).toEqual([
+      { type: "text", text: "Review @notes.md" },
+      { type: "resource_link", uri: pathToFileURL(filename).href, name: "notes.md", title: "notes.md" },
+    ]);
   });
 });
 

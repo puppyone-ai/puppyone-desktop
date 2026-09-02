@@ -3,6 +3,10 @@ import {
   buildCodexTurnInput,
   CODEX_NATIVE_IMAGE_MIME_TYPES,
 } from "./codex-reference-input.mjs";
+import {
+  readCodexHistory,
+  requestCodexMetadataOnlyThread,
+} from "./codex-history-reader.mjs";
 import { JsonlRpcConnection } from "../../transports/jsonl-rpc-connection.mjs";
 import { boundRendererValue, redactSecrets, redactSecretText } from "../../agent-events.mjs";
 import { AgentProviderSessionUnavailableError } from "../../runtime/agent-runtime-port.mjs";
@@ -26,6 +30,7 @@ export const CODEX_CAPABILITIES = Object.freeze({
   modeSelection: false,
   slashCommands: false,
   sessionHistory: true,
+  history: Object.freeze({ discovery: "paged", exactOpen: "supported", hydration: "paged" }),
   usage: true,
   accountState: true,
   mcp: true,
@@ -44,10 +49,10 @@ export const CODEX_CAPABILITIES = Object.freeze({
     workspace: Object.freeze({ files: true, directories: true }),
     attachments: Object.freeze({
       image: Object.freeze({ accepted: true, mimeTypes: CODEX_NATIVE_IMAGE_MIME_TYPES }),
-      text: Object.freeze({ accepted: false }),
+      text: Object.freeze({ accepted: true }),
       audio: Object.freeze({ accepted: false }),
       video: Object.freeze({ accepted: false }),
-      binary: Object.freeze({ accepted: false }),
+      binary: Object.freeze({ accepted: true }),
     }),
     limits: Object.freeze({
       maxCount: 32,
@@ -60,6 +65,15 @@ export const CODEX_CAPABILITIES = Object.freeze({
 });
 
 export class CodexAppServerAdapter {
+  referenceMentionDelivery() { return "path"; }
+
+  getSessionHistoryPort() {
+    return Object.freeze({
+      discover: (request) => this.discoverSessions(request),
+      hydrate: () => this.readHistory(),
+    });
+  }
+
   constructor({
     executablePath,
     environment,
@@ -223,12 +237,16 @@ export class CodexAppServerAdapter {
     this.sessionLifecycleType = "session.resumed";
     let result;
     try {
-      result = await this.connection.request("thread/resume", {
-        threadId,
-        cwd: this.workspaceRoot,
-        approvalPolicy: "on-request",
-        sandbox: "workspace-write",
-        ...(model ? { model } : {}),
+      result = await requestCodexMetadataOnlyThread({
+        request: (method, params) => this.connection.request(method, params),
+        method: "thread/resume",
+        params: {
+          threadId,
+          cwd: this.workspaceRoot,
+          approvalPolicy: "on-request",
+          sandbox: "workspace-write",
+          ...(model ? { model } : {}),
+        },
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -243,17 +261,13 @@ export class CodexAppServerAdapter {
     return { ...normalizeProviderSession(result), effort };
   }
 
-  async readThread() {
-    if (!this.threadId) throw new Error("No Codex thread is active.");
-    const result = await this.connection.request("thread/read", {
-      threadId: this.threadId,
-      includeTurns: true,
-    });
-    return result?.thread ?? null;
-  }
-
   async readHistory() {
-    return normalizeHistoricalThread(await this.readThread());
+    if (!this.threadId) throw new Error("No Codex thread is active.");
+    const thread = await readCodexHistory({
+      request: (method, params) => this.connection.request(method, params),
+      threadId: this.threadId,
+    });
+    return normalizeHistoricalThread(thread);
   }
 
   async startTurn({ prompt, model = null, effort: requestedEffort = null, references = [], attachments = [], contextReferences = [] }) {
@@ -301,9 +315,13 @@ export class CodexAppServerAdapter {
   async forkSession({ messageId = null } = {}) {
     if (!this.threadId) throw new Error("No Codex thread is active.");
     if (this.activeTurnId) throw new Error("Stop the active Codex turn before forking.");
-    const result = await this.connection.request("thread/fork", {
-      threadId: this.threadId,
-      ...(messageId ? { messageId } : {}),
+    const result = await requestCodexMetadataOnlyThread({
+      request: (method, params) => this.connection.request(method, params),
+      method: "thread/fork",
+      params: {
+        threadId: this.threadId,
+        ...(messageId ? { messageId } : {}),
+      },
     });
     return { providerSessionId: requireString(result?.thread?.id, "Codex thread/fork did not return a thread id.") };
   }
@@ -629,15 +647,31 @@ export function normalizeCodexNotification(message) {
       return [{ type: "usage.updated", providerSessionId: threadId, turnId, payload: boundRendererValue(params.tokenUsage ?? {}) }];
     case "error":
       return [{
-        type: params.willRetry ? "provider.warning" : "provider.error",
+        type: params.willRetry ? "provider.connection.updated" : "provider.error",
         providerSessionId: threadId,
         turnId,
-        payload: { message: formatCodexErrorMessage(params.error, "Codex reported an error."), recoverable: Boolean(params.willRetry) },
+        payload: params.willRetry
+          ? {
+            state: "reconnecting",
+            message: formatCodexErrorMessage(params.error, "Codex is reconnecting."),
+            ...(Number.isSafeInteger(params.attempt) ? { attempt: params.attempt } : {}),
+            ...(Number.isSafeInteger(params.maxAttempts) ? { maxAttempts: params.maxAttempts } : {}),
+          }
+          : { message: formatCodexErrorMessage(params.error, "Codex reported an error."), recoverable: false },
       }];
     case "warning":
+      return [{
+        type: "provider.connection.updated",
+        providerSessionId: threadId,
+        turnId,
+        payload: { state: "fallback", message: formatProviderWarning(params) },
+      }];
     case "configWarning":
-    case "deprecationNotice":
       return [{ type: "provider.warning", providerSessionId: threadId, turnId, payload: { message: formatProviderWarning(params) } }];
+    case "deprecationNotice":
+      // App-server migration diagnostics are for the integration owner. They
+      // must never become user-authored or assistant-authored transcript rows.
+      return [];
     default:
       return [];
   }

@@ -182,7 +182,10 @@ async function runProductionLayoutSmoke() {
     url.searchParams.set("theme", theme);
     url.hash = "agent-visual-smoke";
     await window.loadURL(url.href);
-    await waitForRenderer(window, "document.querySelectorAll('.desktop-agent-reference-cards > .desktop-agent-reference-card').length", (value) => value === 3);
+    await waitForRenderer(window, `(() => ({
+      cards: document.querySelectorAll('.desktop-agent-reference-cards > .desktop-agent-reference-card').length,
+      mentions: document.querySelectorAll('.desktop-agent-prompt-mention').length,
+    }))()`, (value) => value?.cards === 2 && value?.mentions === 1);
     for (const width of [420, 560, 760]) {
       window.setContentSize(width, 820);
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -190,21 +193,31 @@ async function runProductionLayoutSmoke() {
         const boundary = document.querySelector('.desktop-agent-boundary');
         const trigger = document.querySelector('.desktop-agent-reference-trigger');
         const error = document.querySelector('.desktop-agent-reference-card.is-error small');
+        const promptContent = document.querySelector('.desktop-agent-prompt-editor .cm-content');
         const modelTrigger = document.querySelector('.desktop-agent-composer-picker.is-model .desktop-agent-picker-trigger');
         const effortTrigger = document.querySelector('.desktop-agent-composer-picker.is-effort .desktop-agent-picker-trigger');
+        const promptStyle = promptContent ? getComputedStyle(promptContent) : null;
         const modelStyle = modelTrigger ? getComputedStyle(modelTrigger) : null;
         const effortStyle = effortTrigger ? getComputedStyle(effortTrigger) : null;
+        const textStart = (element, style) => element && style
+          ? element.getBoundingClientRect().left + Number.parseFloat(style.paddingInlineStart || '0')
+          : null;
         return {
           theme: document.querySelector('[data-smoke-theme]')?.getAttribute('data-smoke-theme'),
           width: Math.round(boundary?.getBoundingClientRect().width || 0),
           viewport: window.innerWidth,
           overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
           draftCards: document.querySelectorAll('.desktop-agent-reference-cards > .desktop-agent-reference-card').length,
-          markdownCards: document.querySelectorAll('.desktop-agent-reference-card.is-file-card').length,
+          fileCards: document.querySelectorAll('.desktop-agent-reference-card.is-file-card').length,
+          inlineMentions: document.querySelectorAll('.desktop-agent-prompt-mention').length,
           imageCards: document.querySelectorAll('.desktop-agent-reference-card.is-image-card img').length,
-          transcriptChips: document.querySelectorAll('.desktop-agent-message-references > span').length,
+          transcriptMediaChips: document.querySelectorAll('.desktop-agent-message-references > span').length,
           addLabel: trigger?.getAttribute('aria-label') || '',
           visibleError: error?.textContent || '',
+          composerTextStarts: {
+            prompt: textStart(promptContent, promptStyle),
+            model: textStart(modelTrigger, modelStyle),
+          },
           pickerPadding: [modelStyle, effortStyle].map((style) => ({
             start: Number.parseFloat(style?.paddingInlineStart || '0'),
             end: Number.parseFloat(style?.paddingInlineEnd || '0'),
@@ -213,10 +226,15 @@ async function runProductionLayoutSmoke() {
       })()`, true);
       const pickerPaddingIsBalanced = snapshot.pickerPadding.length === 2
         && snapshot.pickerPadding.every(({ start, end }) => start >= 8 && end >= 8 && start === end);
+      const composerTextIsAligned = snapshot.composerTextStarts.prompt !== null
+        && snapshot.composerTextStarts.model !== null
+        && Math.abs(snapshot.composerTextStarts.prompt - snapshot.composerTextStarts.model) <= 0.5;
       if (snapshot.theme !== theme || snapshot.width <= 0 || snapshot.width > snapshot.viewport
-        || snapshot.overflow || snapshot.draftCards !== 3 || snapshot.markdownCards < 1
-        || snapshot.imageCards !== 1 || snapshot.transcriptChips < 2
-        || !snapshot.addLabel || !snapshot.visibleError || !pickerPaddingIsBalanced) {
+        || snapshot.overflow || snapshot.draftCards !== 2 || snapshot.fileCards !== 1
+        || snapshot.inlineMentions !== 1
+        || snapshot.imageCards !== 1 || snapshot.transcriptMediaChips !== 1
+        || !snapshot.addLabel || !snapshot.visibleError || !pickerPaddingIsBalanced
+        || !composerTextIsAligned) {
         throw new Error(`Production Agent reference layout smoke failed: ${JSON.stringify(snapshot)}`);
       }
       matrix.push(`${theme}:${width}`);

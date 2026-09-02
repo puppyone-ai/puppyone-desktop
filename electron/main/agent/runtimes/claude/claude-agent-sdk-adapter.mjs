@@ -42,6 +42,7 @@ export const CLAUDE_CAPABILITIES = Object.freeze({
   modeSelection: true,
   slashCommands: true,
   sessionHistory: true,
+  history: Object.freeze({ discovery: "paged", exactOpen: "supported", hydration: "snapshot" }),
   usage: true,
   accountState: true,
   mcp: true,
@@ -64,10 +65,10 @@ export const CLAUDE_CAPABILITIES = Object.freeze({
         mimeTypes: CLAUDE_NATIVE_IMAGE_MIME_TYPES,
         maxBytes: CLAUDE_NATIVE_IMAGE_MAX_BYTES,
       }),
-      text: Object.freeze({ accepted: false }),
+      text: Object.freeze({ accepted: true }),
       audio: Object.freeze({ accepted: false }),
       video: Object.freeze({ accepted: false }),
-      binary: Object.freeze({ accepted: false }),
+      binary: Object.freeze({ accepted: true }),
     }),
     limits: Object.freeze({
       maxCount: 32,
@@ -80,6 +81,15 @@ export const CLAUDE_CAPABILITIES = Object.freeze({
 });
 
 export class ClaudeAgentSdkAdapter {
+  referenceMentionDelivery() { return "path"; }
+
+  getSessionHistoryPort() {
+    return Object.freeze({
+      discover: (request) => this.discoverSessions(request),
+      hydrate: () => this.readHistory(),
+    });
+  }
+
   constructor({
     readiness,
     workspaceRoot,

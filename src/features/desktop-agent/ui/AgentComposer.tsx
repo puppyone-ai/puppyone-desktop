@@ -1,19 +1,25 @@
-import { useRef, type ClipboardEventHandler, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type {
   AgentCommand,
   AgentDraftReference,
-  AgentModel,
+  AgentPromptReferenceMention,
   AgentReferenceInputCapabilities,
 } from "../domain/agent-contract";
+import type { AgentSessionControl, AgentSessionControlId } from "../domain/agent-session-controls";
 import { AgentCommandSuggestions, visibleAgentCommands } from "./composer/AgentCommandSuggestions";
 import { AgentComposerToolbar } from "./composer/AgentComposerToolbar";
 import { AgentDraftReferenceList } from "./composer/AgentDraftReferenceList";
+import { AgentPromptEditor } from "./composer/AgentPromptEditor";
+import { isAgentMediaReference } from "../domain/agent-prompt-mentions";
+import type { AgentReferenceDropEvent } from "./agentReferenceDropEvent";
 
 type AgentComposerProps = {
   draft: string;
+  draftMentions?: AgentPromptReferenceMention[];
   onDraftChange: (draft: string) => void;
+  onDraftDocumentChange?: (draft: string, mentions: AgentPromptReferenceMention[]) => void;
   disabled: boolean;
   hideConfiguration?: boolean;
   inputDisabled?: boolean;
@@ -24,12 +30,8 @@ type AgentComposerProps = {
   floatingAccessory?: ReactNode;
   runtimeLabel?: string;
   configurationDisabled?: boolean;
-  models?: AgentModel[];
-  selectedModel?: string | null;
-  onSelectModel?: (model: string) => void;
-  efforts?: string[];
-  selectedEffort?: string | null;
-  onSelectEffort?: (effort: string) => void;
+  sessionControls?: AgentSessionControl[];
+  onSelectSessionControl?: (id: AgentSessionControlId, value: string) => void;
   commands?: AgentCommand[];
   references?: AgentDraftReference[];
   getReferencePreviewUrl?: (id: string) => string | null;
@@ -40,17 +42,19 @@ type AgentComposerProps = {
   onRetryReference?: (id: string) => void;
   onAddExternalFiles?: (files: File[]) => void;
   onPickWorkspaceReferences?: () => void;
-  onPaste?: ClipboardEventHandler<HTMLTextAreaElement>;
+  onDrop?: (event: AgentReferenceDropEvent) => void;
+  onPaste?: (event: { clipboardData: DataTransfer; preventDefault: () => void; defaultPrevented: boolean }) => void;
   onSubmit: (prompt: string) => Promise<boolean>;
   onStop: () => void;
 };
 
 export const DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID = "agent.composer.placeholder.default";
-const COMPOSER_CONTROL_SELECTOR = "textarea, button, a[href], input, select, [role='button'], [role='option'], [contenteditable='true']";
 
 export function AgentComposer({
   draft,
+  draftMentions = [],
   onDraftChange,
+  onDraftDocumentChange,
   disabled,
   hideConfiguration = false,
   inputDisabled = false,
@@ -61,12 +65,8 @@ export function AgentComposer({
   floatingAccessory = null,
   runtimeLabel: runtimeLabelProp,
   configurationDisabled = false,
-  models = [],
-  selectedModel = null,
-  onSelectModel,
-  efforts = [],
-  selectedEffort = null,
-  onSelectEffort,
+  sessionControls = [],
+  onSelectSessionControl,
   commands = [],
   references = [],
   getReferencePreviewUrl,
@@ -77,12 +77,12 @@ export function AgentComposer({
   onRetryReference,
   onAddExternalFiles,
   onPickWorkspaceReferences,
+  onDrop,
   onPaste,
   onSubmit,
   onStop,
 }: AgentComposerProps) {
   const { t } = useLocalization();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const runtimeLabel = runtimeLabelProp || t("agent.name");
   const resolvedPlaceholder = placeholder.trim() || t(DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID);
   const visibleCommands = visibleAgentCommands(draft, commands);
@@ -98,20 +98,14 @@ export function AgentComposer({
 
   const submit = async () => {
     if (!canSubmit) return;
-    await onSubmit(draft.trim());
+    await onSubmit(draft);
   };
-  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-    event.preventDefault();
-    void submit();
+  const updateDraftDocument = (nextDraft: string, nextMentions: AgentPromptReferenceMention[]) => {
+    if (onDraftDocumentChange) onDraftDocumentChange(nextDraft, nextMentions);
+    else onDraftChange(nextDraft);
   };
-  const handleSurfaceMouseDown = (event: MouseEvent<HTMLDivElement>) => {
-    if (inputDisabled || event.button !== 0) return;
-    const target = event.target;
-    if (!(target instanceof Element) || target.closest(COMPOSER_CONTROL_SELECTOR)) return;
-    event.preventDefault();
-    textareaRef.current?.focus();
-  };
+  // Failed inputs stay actionable while successful files live only in the prompt.
+  const mediaReferences = references.filter((reference) => isAgentMediaReference(reference) || reference.status === "error");
   return (
     <div className="desktop-agent-composer-shell">
       {floatingAccessory && visibleCommands.length === 0 && (
@@ -119,46 +113,43 @@ export function AgentComposer({
       )}
       <AgentCommandSuggestions
         commands={visibleCommands}
-        onSelect={(command) => onDraftChange(`/${command.name} `)}
+        onSelect={(command) => updateDraftDocument(`/${command.name} `, [])}
       />
       <div
         className="desktop-agent-composer"
         data-input-disabled={inputDisabled || undefined}
-        onMouseDown={handleSurfaceMouseDown}
       >
         <div className="desktop-agent-composer-row">
           <div className="desktop-agent-composer-input-row">
             <AgentDraftReferenceList
-              references={references}
+              references={mediaReferences}
               getPreviewUrl={getReferencePreviewUrl}
               onRemove={onRemoveReference}
               onRetry={onRetryReference}
             />
-            <textarea
-              ref={textareaRef}
-              data-po-scrollbar="content"
-              value={draft}
-              disabled={inputDisabled}
-              rows={1}
-              aria-label={t("agent.composer.message", { agent: bidiIsolate(runtimeLabel) })}
-              placeholder={resolvedPlaceholder}
-              dir="auto"
-              onChange={(event) => onDraftChange(event.target.value)}
-              onKeyDown={handleKeyDown}
-              onPaste={onPaste}
-            />
+            <div className="desktop-agent-prompt-editor-host">
+              <AgentPromptEditor
+                value={draft}
+                mentions={draftMentions}
+                references={references}
+                disabled={inputDisabled}
+                placeholder={resolvedPlaceholder}
+                ariaLabel={t("agent.composer.message", { agent: bidiIsolate(runtimeLabel) })}
+                onChange={updateDraftDocument}
+                onRemoveReference={onRemoveReference}
+                onDrop={onDrop}
+                onPaste={onPaste}
+                onSubmit={() => void submit()}
+              />
+            </div>
           </div>
           <AgentComposerToolbar
             hideConfiguration={hideConfiguration}
             inputDisabled={inputDisabled}
             configurationDisabled={configurationDisabled}
             running={running}
-            models={models}
-            selectedModel={selectedModel}
-            onSelectModel={onSelectModel}
-            efforts={efforts}
-            selectedEffort={selectedEffort}
-            onSelectEffort={onSelectEffort}
+            sessionControls={sessionControls}
+            onSelectSessionControl={onSelectSessionControl}
             referenceCapabilities={referenceCapabilities}
             onAddExternalFiles={onAddExternalFiles}
             onPickWorkspaceReferences={onPickWorkspaceReferences}

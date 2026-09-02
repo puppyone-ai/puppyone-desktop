@@ -290,6 +290,11 @@
   --po-tree-row-font-size: var(--desktop-sidebar-font-size);
   --po-tree-row-font-weight: var(--desktop-sidebar-font-weight);
   --po-tree-row-line-height: var(--desktop-sidebar-line-height);
+  --po-tree-workspace-group-color: var(--desktop-sidebar-section-title-color);
+  --po-tree-workspace-group-font-size: var(--desktop-sidebar-section-title-font-size);
+  --po-tree-workspace-group-font-weight: var(--desktop-sidebar-section-title-font-weight);
+  --po-tree-workspace-group-line-height: var(--desktop-sidebar-section-title-line-height);
+  --po-tree-workspace-group-divider: var(--po-sidebar-divider, var(--po-divider));
   --po-tree-root-top-gap: var(--desktop-sidebar-section-top-gap);
   --po-tree-no-root-top-gap: var(--desktop-sidebar-list-padding-block);
   --po-tree-list-bottom-gap: var(--desktop-sidebar-list-padding-block);

@@ -200,7 +200,7 @@ describe("desktop side-pane resize interactions", () => {
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
   });
 
-  it("grows the right sidebar pointer-synchronously up to the layout-supplied maximum", () => {
+  it("previews the right-sidebar width pointer-synchronously and commits it at gesture end", () => {
     vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
       callback(0);
       return 1;
@@ -229,11 +229,13 @@ describe("desktop side-pane resize interactions", () => {
     });
 
     expect(panel.style.getPropertyValue("--desktop-right-sidebar-width")).toBe("720px");
-    expect(onWidthChange).toHaveBeenLastCalledWith(720);
+    expect(onWidthChange).not.toHaveBeenCalled();
 
     act(() => {
       window.dispatchEvent(pointerEvent("pointerup", -300, 8));
     });
+
+    expect(onWidthChange).toHaveBeenCalledExactlyOnceWith(720);
   });
 
   it("follows the pointer down to the right-sidebar minimum, then holds while collapse is armed", () => {
@@ -266,21 +268,29 @@ describe("desktop side-pane resize interactions", () => {
     });
 
     expect(panel.style.getPropertyValue("--desktop-right-sidebar-width")).toBe("500px");
-    expect(onWidthChange).toHaveBeenLastCalledWith(500);
+    expect(onWidthChange).not.toHaveBeenCalled();
 
     act(() => {
       window.dispatchEvent(pointerEvent("pointerup", 200, 6));
+    });
+
+    expect(onWidthChange).toHaveBeenCalledExactlyOnceWith(500);
+
+    act(() => {
       handle.dispatchEvent(pointerEvent("pointerdown", 0, 6));
       window.dispatchEvent(pointerEvent("pointermove", 300, 6));
     });
 
     expect(panel.style.getPropertyValue("--desktop-right-sidebar-width")).toBe("420px");
-    expect(onWidthChange).toHaveBeenLastCalledWith(420);
+    expect(onWidthChange).toHaveBeenCalledExactlyOnceWith(500);
     expect(onOpenChange).not.toHaveBeenCalled();
 
     act(() => {
       window.dispatchEvent(pointerEvent("pointerup", 300, 6));
     });
+
+    expect(onWidthChange).toHaveBeenLastCalledWith(420);
+    expect(onWidthChange).toHaveBeenCalledTimes(2);
   });
 
   it("reveals a closed right sidebar immediately while dragging out and snaps back below half width", () => {
@@ -312,6 +322,42 @@ describe("desktop side-pane resize interactions", () => {
     });
 
     expect(onOpenChange.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it("keeps the auxiliary content at its expanded width while the outer track collapses", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(withTestLocalization(
+      <AuxiliaryPanelHost
+        expandedWidth={560}
+        maxWidth={900}
+        minWidth={320}
+        open
+        width={560}
+      >
+        <div>Text that must never reflow during collapse</div>
+      </AuxiliaryPanelHost>,
+    )));
+
+    const panel = requireHandle(container, ".desktop-right-sidebar");
+    expect(panel.style.getPropertyValue("--desktop-right-sidebar-width")).toBe("560px");
+
+    act(() => root?.render(withTestLocalization(
+      <AuxiliaryPanelHost
+        expandedWidth={560}
+        maxWidth={900}
+        minWidth={320}
+        open={false}
+        width={0}
+      >
+        <div>Text that must never reflow during collapse</div>
+      </AuxiliaryPanelHost>,
+    )));
+
+    expect(panel.style.getPropertyValue("--desktop-right-sidebar-width")).toBe("560px");
+    expect(container.querySelector(".desktop-right-sidebar-viewport .desktop-right-sidebar-inner")).not.toBeNull();
   });
 });
 

@@ -26,6 +26,31 @@ afterEach(() => {
 });
 
 describe("Unified Workbench blank launcher flow", () => {
+  it("intersects discovered Agents with the Active Chat visibility settings", async () => {
+    installTerminalAgentBridge(["codex", "claude"]);
+    const contribution = fakeChatContribution(new Map());
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const render = (hiddenAgentIds: readonly string[]) => withTestLocalization(
+      <RightTerminalPanel
+        active
+        contributions={[contribution]}
+        hiddenAgentIds={hiddenAgentIds}
+        workspace={WORKSPACE}
+      />,
+    );
+    await act(async () => {
+      root?.render(render([]));
+    });
+
+    await vi.waitFor(() => expect(document.body.textContent).toContain("Codex"));
+    expect(document.body.textContent).toContain("Claude Code");
+
+    act(() => root?.render(render(["claude"])));
+    expect(document.body.textContent).not.toContain("Claude Code");
+  });
+
   it("opens the launcher from plus and resolves an Agent choice into a Chat Tab", async () => {
     installTerminalAgentBridge();
     const selectedRecipeByItemId = new Map<string, string>();
@@ -61,7 +86,7 @@ describe("Unified Workbench blank launcher flow", () => {
     expect(document.querySelector('[role="menu"]')).toBeNull();
     expect(document.querySelectorAll('[role="tab"]')).toHaveLength(2);
     expect(document.querySelector(".desktop-terminal-launcher-group.is-agents")).not.toBeNull();
-    expect(document.querySelector(".desktop-terminal-launcher-group.is-shell")).not.toBeNull();
+    expect(document.querySelector(".desktop-terminal-launcher-divider")).not.toBeNull();
 
     await clickButton("Claude Code");
     await vi.waitFor(() => {
@@ -100,6 +125,36 @@ describe("Unified Workbench blank launcher flow", () => {
     expect(document.body.textContent).not.toContain("PuppyOne");
     expect(document.querySelector('[role="menu"]')).toBeNull();
   });
+
+  it("opens global Chat history explicitly and commits a restored Chat only after preparation", async () => {
+    installTerminalAgentBridge();
+    const preparedByItemId = new Map<string, string>();
+    const contribution = fakeChatContribution(preparedByItemId);
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(withTestLocalization(
+        <RightTerminalPanel
+          active
+          contributions={[contribution]}
+          hiddenAgentIds={[]}
+          workspace={WORKSPACE}
+        />,
+      ));
+    });
+
+    expect(document.querySelector(".desktop-terminal-launcher-group.is-history-entry")).not.toBeNull();
+    await clickButton("Chat history");
+    expect(document.querySelector('[data-fake-history="true"]')).not.toBeNull();
+    expect(document.querySelectorAll('[role="tab"]')).toHaveLength(0);
+
+    await clickButton("Restore saved chat");
+    await vi.waitFor(() => {
+      expect(document.querySelector('[data-fake-chat="history:saved-chat"]')).not.toBeNull();
+    });
+    expect(document.querySelectorAll('[role="tab"]')).toHaveLength(1);
+  });
 });
 
 const WORKSPACE: Workspace = Object.freeze({
@@ -130,15 +185,41 @@ function fakeChatContribution(
       resourceId: null,
     }),
     minimumSize: Object.freeze({ width: 320, height: 260 }),
-    prepare: async ({ item, recipe }: AuxiliaryWorkbenchPreparationContext) => {
-      selectedRecipeByItemId.set(item.id, recipe?.id ?? "unknown");
+    history: Object.freeze({
+      label: "Chat history",
+      iconKey: null,
+      renderBrowser: ({ onBack, onOpen }) => (
+        <div data-fake-history="true">
+          <button type="button" onClick={onBack}>Back</button>
+          <button
+            type="button"
+            onClick={() => onOpen({
+              id: "saved-chat",
+              title: "Saved chat",
+              iconKey: "codex",
+              payload: { runtimeId: "codex" },
+            })}
+          >
+            Restore saved chat
+          </button>
+        </div>
+      ),
+    }),
+    prepare: async ({ item, recipe, historyTarget }: AuxiliaryWorkbenchPreparationContext) => {
+      selectedRecipeByItemId.set(
+        item.id,
+        historyTarget ? `history:${historyTarget.id}` : recipe?.id ?? "unknown",
+      );
     },
     renderItem: ({ item }) => (
       <div data-fake-chat={selectedRecipeByItemId.get(item.id)}>
         {selectedRecipeByItemId.get(item.id)}
       </div>
     ),
-    requestClose: async () => true,
+    close: Object.freeze({
+      decide: () => Object.freeze({ kind: "close" as const }),
+      commit: async () => true,
+    }),
   });
 }
 

@@ -31,6 +31,8 @@
     --po-surface-inset: #0e0b08;
     --po-surface-editor: #18130f;
     --po-canvas: #18130f;
+    --po-header: color-mix(in srgb, var(--po-surface-chrome) 40%, var(--po-surface-editor));
+    --po-sidebar: color-mix(in srgb, var(--po-surface-chrome) 40%, var(--po-surface-editor));
     --po-text: #f8f1e7;
     --po-text-muted: #b9aa98;
     --po-text-subtle: #837565;

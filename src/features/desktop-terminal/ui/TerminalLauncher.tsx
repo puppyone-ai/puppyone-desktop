@@ -1,6 +1,11 @@
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, History, RefreshCw } from "lucide-react";
+import { useState } from "react";
 import { useLocalization } from "@puppyone/localization/react";
-import type { AuxiliaryWorkbenchCreationRecipe } from "../../app-shell/auxiliary-workbench/types";
+import type {
+  AuxiliaryWorkbenchCreationRecipe,
+  AuxiliaryWorkbenchHistoryContribution,
+  AuxiliaryWorkbenchHistoryTarget,
+} from "../../app-shell/auxiliary-workbench/types";
 import type {
   AvailableTerminalAgentId,
   TerminalAgentDiscoveryPhase,
@@ -31,7 +36,12 @@ type TerminalLauncherProps = {
   launching?: boolean;
   terminalEnabled?: boolean;
   titleId?: string;
+  history?: AuxiliaryWorkbenchHistoryContribution | null;
+  historyRootId?: string;
+  historyRootPath?: string;
+  excludedHistoryResourceIds?: readonly string[];
   onCreateChat?: (recipe: AuxiliaryWorkbenchCreationRecipe) => void;
+  onRestoreHistoryTarget?: (target: AuxiliaryWorkbenchHistoryTarget) => Promise<boolean>;
   onLaunch: (launcherId: DesktopTerminalLauncherId) => void;
   onRefresh: () => void;
 };
@@ -50,13 +60,21 @@ export function TerminalLauncher({
   chatRecipes = [],
   launchError = null,
   launching = false,
+  history = null,
+  historyRootId = "",
+  historyRootPath = "",
+  excludedHistoryResourceIds = [],
   onLaunch,
   onCreateChat,
+  onRestoreHistoryTarget,
   onRefresh,
   terminalEnabled = true,
   titleId = "desktop-terminal-launcher-title",
 }: TerminalLauncherProps) {
   const { t } = useLocalization();
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [openingTargetId, setOpeningTargetId] = useState<string | null>(null);
+  const [historyRevision, setHistoryRevision] = useState(0);
   const shell = getDesktopTerminalLauncher("shell");
   const scanning = discoveryPhase === "idle" || discoveryPhase === "loading";
   const busy = launching || chatPreparing;
@@ -73,6 +91,35 @@ export function TerminalLauncher({
       : agentMode === "terminal" && terminalAgentLaunchers.length === 0
         ? "terminal.launcher.noneInstalled"
         : null;
+
+  if (historyOpen && history && onRestoreHistoryTarget) {
+    return (
+      <section className="desktop-terminal-launcher is-history" aria-label={history.label}>
+        {history.renderBrowser({
+          instanceId: `${titleId}:${historyRevision}`,
+          rootId: historyRootId,
+          rootPath: historyRootPath,
+          excludedResourceIds: excludedHistoryResourceIds,
+          openingTargetId,
+          onBack: () => {
+            if (!openingTargetId) setHistoryOpen(false);
+          },
+          onOpen: (target) => {
+            if (openingTargetId) return;
+            setOpeningTargetId(target.id);
+            void onRestoreHistoryTarget(target).then((opened) => {
+              if (!opened) {
+                setOpeningTargetId(null);
+                // The main process may have tombstoned a stale locator. Remount
+                // the locator-only browser so its catalog projection catches up.
+                setHistoryRevision((current) => current + 1);
+              }
+            });
+          },
+        })}
+      </section>
+    );
+  }
 
   return (
     <section className="desktop-terminal-launcher" aria-labelledby={titleId}>
@@ -135,6 +182,23 @@ export function TerminalLauncher({
                 ))}
           </div>
 
+          {terminalEnabled && (
+            <>
+              <div className="desktop-terminal-launcher-divider" role="separator" />
+              <button
+                type="button"
+                className="desktop-terminal-launcher-shell"
+                onClick={() => onLaunch(shell.id)}
+                disabled={busy}
+                aria-label={`${t("terminal.title")}. ${t(shell.descriptionMessage)}`}
+                title={t(shell.descriptionMessage)}
+              >
+                <WorkbenchLauncherIcon launcherId="shell" />
+                <span>{t("terminal.title")}</span>
+              </button>
+            </>
+          )}
+
           {availabilityMessage && (
             <div className="desktop-terminal-launcher-availability" aria-live="polite">
               <span>{t(availabilityMessage)}</span>
@@ -142,25 +206,26 @@ export function TerminalLauncher({
           )}
         </div>
 
-        {terminalEnabled && (
-          <div className="desktop-terminal-launcher-group is-shell">
+        {history && onRestoreHistoryTarget && (
+          <div className="desktop-terminal-launcher-group is-history-entry">
             <header className="desktop-terminal-launcher-heading">
               <h2>
                 <span>
-                  {t("terminal.launcher.shell.title")}
+                  {t("agent.history.continueTitle")}
                 </span>
               </h2>
             </header>
             <button
               type="button"
-              className="desktop-terminal-launcher-shell"
-              onClick={() => onLaunch(shell.id)}
+              className="desktop-terminal-launcher-history"
+              onClick={() => setHistoryOpen(true)}
               disabled={busy}
-              aria-label={`${t("terminal.launcher.shell.action")}. ${t(shell.descriptionMessage)}`}
-              title={t(shell.descriptionMessage)}
+              aria-label={history.label}
             >
-              <WorkbenchLauncherIcon launcherId="shell" />
-              <span>{t("terminal.launcher.shell.action")}</span>
+              {history.iconKey
+                ? <WorkbenchLauncherIcon iconKey={history.iconKey} />
+                : <History size={18} strokeWidth={1.45} aria-hidden="true" />}
+              <span>{history.label}</span>
             </button>
           </div>
         )}

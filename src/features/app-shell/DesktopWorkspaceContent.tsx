@@ -8,6 +8,7 @@ import {
   type AiEditRequest,
   type DataNode,
   type EditorInteractionPreferences,
+  type ResourceUri,
   type Workspace,
   type WorkspaceContentChange,
   type WorkspaceFolder,
@@ -155,6 +156,11 @@ export function DesktopWorkspaceContent({
     preferences.experimentalSettings.enableEditorSaveStatus,
     preferences.experimentalSettings.enableMarkdownBlockDrag,
   ]);
+  const workspaceRootUri = (
+    workspaceFolders.find((folder) => folder.workspace.path === workspace.path)?.uri
+    ?? workspaceFolders[0]?.uri
+    ?? null
+  ) as ResourceUri | null;
   const {
     availableSurfaceIds,
     cloudHubNavigationEnabled,
@@ -188,6 +194,7 @@ export function DesktopWorkspaceContent({
     },
     viewerPluginsEnabled,
     workspace,
+    workspaceRootUri,
   });
 
   if (!dataPort) {

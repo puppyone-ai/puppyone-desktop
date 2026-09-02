@@ -38,7 +38,8 @@ export async function buildClaudeUserMessageContent({ prompt, references = [], w
       imageBlocks.push(await materializeImage(reference, filename));
       continue;
     }
-    if (referenceKind === "workspace-entry") {
+    if (referenceKind === "workspace-entry" || (referenceKind === "staged-attachment"
+      && reference.inlineMentioned === true && reference.mentionDelivery === "path")) {
       workspaceReferences.push({ ...reference, kind: referenceKind, path: filename });
       continue;
     }

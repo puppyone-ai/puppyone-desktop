@@ -30,6 +30,33 @@ export type AuxiliaryWorkbenchItemRenderContext = Readonly<{
   onPresentationChange: (snapshot: AuxiliaryWorkbenchItemSnapshot) => void;
 }>;
 
+/**
+ * Opaque resource chosen from a contribution-owned history browser.
+ * Workbench transports the target but never interprets a Harness session id.
+ */
+export type AuxiliaryWorkbenchHistoryTarget = Readonly<{
+  id: string;
+  title: string;
+  iconKey: string | null;
+  payload: unknown;
+}>;
+
+export type AuxiliaryWorkbenchHistoryBrowserContext = Readonly<{
+  instanceId: string;
+  rootId: string;
+  rootPath: string;
+  excludedResourceIds: readonly string[];
+  openingTargetId: string | null;
+  onBack: () => void;
+  onOpen: (target: AuxiliaryWorkbenchHistoryTarget) => void;
+}>;
+
+export type AuxiliaryWorkbenchHistoryContribution = Readonly<{
+  label: string;
+  iconKey: string | null;
+  renderBrowser: (context: AuxiliaryWorkbenchHistoryBrowserContext) => ReactNode;
+}>;
+
 export type AuxiliaryWorkbenchCreationRecipe = Readonly<{
   id: string;
   label: string;
@@ -40,6 +67,43 @@ export type AuxiliaryWorkbenchCreationRecipe = Readonly<{
 export type AuxiliaryWorkbenchPreparationContext = Readonly<{
   item: AuxiliaryWorkbenchItem;
   recipe: AuxiliaryWorkbenchCreationRecipe | null;
+  historyTarget: AuxiliaryWorkbenchHistoryTarget | null;
+}>;
+
+export type AuxiliaryWorkbenchCloseContext = Readonly<{
+  item: AuxiliaryWorkbenchItem;
+  snapshot: AuxiliaryWorkbenchItemSnapshot;
+}>;
+
+export type AuxiliaryWorkbenchCloseDialogCopy = Readonly<{
+  title: string;
+  detail: string;
+  actionLabel: string;
+}>;
+
+/**
+ * A close request is evaluated before native ownership is released. Keeping
+ * this decision explicit prevents lifecycle state from leaking into generic
+ * Tab chrome and gives every contribution the same confirmation boundary.
+ */
+export type AuxiliaryWorkbenchCloseDecision =
+  | Readonly<{ kind: "close" }>
+  | Readonly<{
+    kind: "confirm";
+    tone: "danger" | "primary";
+    dialog: AuxiliaryWorkbenchCloseDialogCopy;
+  }>
+  | Readonly<{
+    kind: "blocked";
+    dialog: AuxiliaryWorkbenchCloseDialogCopy;
+  }>;
+
+export type AuxiliaryWorkbenchCloseAdapter = Readonly<{
+  decide: (
+    context: AuxiliaryWorkbenchCloseContext,
+  ) => AuxiliaryWorkbenchCloseDecision | Promise<AuxiliaryWorkbenchCloseDecision>;
+  /** Returns true only after feature-owned resources are safe to detach. */
+  commit: (context: AuxiliaryWorkbenchCloseContext) => boolean | Promise<boolean>;
 }>;
 
 export type AuxiliaryWorkbenchContribution = Readonly<{
@@ -50,10 +114,12 @@ export type AuxiliaryWorkbenchContribution = Readonly<{
   maximumItems?: number;
   minimumSize: WorkbenchSplitMinimumSize;
   creationRecipes?: readonly AuxiliaryWorkbenchCreationRecipe[];
+  /** Optional feature-owned browser for explicitly restoring durable resources. */
+  history?: AuxiliaryWorkbenchHistoryContribution;
   /** Resolve feature code and creation prerequisites before topology commits. */
   prepare?: (context: AuxiliaryWorkbenchPreparationContext) => Promise<void>;
   /** Dispose feature state prepared for an Item that admission never committed. */
   discardPreparedItem?: (context: AuxiliaryWorkbenchPreparationContext) => void | Promise<void>;
   renderItem: (context: AuxiliaryWorkbenchItemRenderContext) => ReactNode;
-  requestClose: (item: AuxiliaryWorkbenchItem) => Promise<boolean>;
+  close: AuxiliaryWorkbenchCloseAdapter;
 }>;

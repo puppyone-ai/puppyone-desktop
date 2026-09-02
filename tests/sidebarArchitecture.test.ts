@@ -106,7 +106,7 @@ describe("Sidebar architecture", () => {
     );
   });
 
-  it("keeps each pane on one canonical width from host edge through content", () => {
+  it("keeps direct resize canonical while visibility transitions preserve content width", () => {
     expect(dataShellCss).toMatch(
       /\.data-content\[data-resizable-explorer="true"\]\s*\{[^}]*grid-template-columns:[^}]*var\(--data-explorer-width[^}]*minmax/s,
     );
@@ -118,18 +118,27 @@ describe("Sidebar architecture", () => {
       /\.desktop-right-sidebar\.is-open\s*\{[^}]*flex-basis:\s*var\(--desktop-right-sidebar-width\)[^}]*width:\s*var\(--desktop-right-sidebar-width\)/s,
     );
     expect(layoutCss).toMatch(
-      /\.desktop-right-sidebar-inner\s*\{[^}]*position:\s*absolute[^}]*inset-inline-end:\s*0[^}]*width:\s*100%[^}]*min-width:\s*0[^}]*pointer-events:\s*none/s,
+      /\.desktop-right-sidebar-viewport\s*\{[^}]*position:\s*absolute[^}]*inset:\s*0[^}]*width:\s*100%[^}]*overflow:\s*clip[^}]*pointer-events:\s*none/s,
+    );
+    expect(layoutCss).toMatch(
+      /\.desktop-right-sidebar-inner\s*\{[^}]*position:\s*absolute[^}]*inset-inline-end:\s*0[^}]*width:\s*var\(--desktop-right-sidebar-width\)[^}]*min-width:\s*var\(--desktop-right-sidebar-width\)[^}]*pointer-events:\s*none/s,
     );
     expect(layoutCss).toMatch(
       /\.desktop-right-sidebar\.is-open \.desktop-right-sidebar-inner\s*\{[^}]*pointer-events:\s*auto/s,
     );
-    expect(layoutCss).not.toMatch(
-      /\.desktop-right-sidebar-inner\s*\{[^}]*(?:opacity|visibility|transition):/s,
+    expect(layoutCss).toMatch(
+      /\.desktop-right-sidebar-inner\s*\{[^}]*width:\s*var\(--desktop-right-sidebar-width\)[^}]*transform:\s*translateX\(var\(--desktop-right-sidebar-exit-translate\)\)[^}]*transition:\s*transform 260ms/s,
     );
+    expect(layoutCss).not.toMatch(/\.desktop-right-sidebar-inner\s*\{[^}]*transition:[^}]*(?:width|min-width|flex-basis)/s);
+    expect(layoutCss).not.toMatch(/\.desktop-right-sidebar-viewport\s*\{[^}]*(?:opacity|visibility|transition):/s);
     expect(layoutCss).not.toContain("--desktop-right-sidebar-visible-width");
     expect(auxiliaryHostSource).not.toContain("desktop-right-sidebar-visible-width");
+    expect(auxiliaryHostSource).toContain('className="desktop-right-sidebar-viewport"');
+    expect(auxiliaryHostSource).toContain("lastExpandedWidth");
+    expect(auxiliaryHostSource).toContain('widthChangeMode: "end"');
     expect(sharedDataWorkspaceCss).not.toContain("--data-explorer-min-width");
-    expect(collapsiblePaneResizeSource).toContain("A pane has one rendered width");
+    expect(collapsiblePaneResizeSource).toContain("canonical live resize width");
+    expect(collapsiblePaneResizeSource).toContain("last-expanded content plane");
     expect(auxiliaryHostSource).toContain("aria-hidden={open ? undefined : true}");
     expect(auxiliaryHostSource).toContain('{...(!open ? { inert: "" } : {})}');
   });

@@ -64,16 +64,19 @@ export async function createNativeReferenceSmokeFixtures({ workspaceRoot, attach
   const imagePath = path.join(attachmentRoot, "visual-context.png");
   const externalTextPath = path.join(attachmentRoot, "external-context.txt");
   const unsupportedPath = path.join(attachmentRoot, "unsupported-document.pdf");
+  const unsupportedVideoPath = path.join(attachmentRoot, "unsupported-video.mp4");
   await fs.promises.writeFile(workspacePath, `${normalized.workspace}\n`, { mode: 0o600 });
   await fs.promises.writeFile(imagePath, renderTokenPng(normalized.image), { mode: 0o600 });
   await fs.promises.writeFile(externalTextPath, `${normalized.externalText}\n`, { mode: 0o600 });
   await fs.promises.writeFile(unsupportedPath, "%PDF-1.4\n% PuppyOne unsupported reference smoke\n", { mode: 0o600 });
+  await fs.promises.writeFile(unsupportedVideoPath, Buffer.from([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70]), { mode: 0o600 });
 
-  const [workspaceStat, imageStat, externalTextStat, unsupportedStat] = await Promise.all([
+  const [workspaceStat, imageStat, externalTextStat, unsupportedStat, unsupportedVideoStat] = await Promise.all([
     fs.promises.stat(workspacePath),
     fs.promises.stat(imagePath),
     fs.promises.stat(externalTextPath),
     fs.promises.stat(unsupportedPath),
+    fs.promises.stat(unsupportedVideoPath),
   ]);
   return Object.freeze({
     tokens: normalized,
@@ -110,6 +113,14 @@ export async function createNativeReferenceSmokeFixtures({ workspaceRoot, attach
       displayName: "unsupported-document.pdf",
       mime: "application/pdf",
       size: unsupportedStat.size,
+    }),
+    unsupportedVideo: authorizedReference({
+      id: "smoke-unsupported-video",
+      kind: "staged-attachment",
+      filePath: unsupportedVideoPath,
+      displayName: "unsupported-video.mp4",
+      mime: "video/mp4",
+      size: unsupportedVideoStat.size,
     }),
   });
 }

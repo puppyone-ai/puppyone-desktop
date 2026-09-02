@@ -1,7 +1,7 @@
 {
   "name": "@puppyone/desktop",
   "private": true,
-  "version": "0.3.15",
+  "version": "0.3.16",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -65,12 +65,14 @@
     "smoke:markdown-pane-focus-continuity": "electron scripts/smoke-markdown-pane-focus-continuity.mjs",
     "smoke:markdown-line-geometry": "npm run build && electron scripts/smoke-markdown-line-geometry.mjs",
     "smoke:appearance-visual": "electron scripts/smoke-appearance-visual-matrix.mjs",
+    "smoke:appearance-dialog": "electron scripts/smoke-appearance-visual-matrix.mjs --dialog-only",
     "smoke:workspace-menu": "electron scripts/smoke-workspace-menu-visual.mjs",
     "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
     "smoke:native-agents": "node scripts/smoke-native-agent-roundtrip.mjs",
     "smoke:native-agent-references": "node scripts/smoke-native-agent-references.mjs",
     "smoke:terminal-p0": "electron scripts/smoke-terminal-p0.mjs",
     "smoke:agent-references": "electron scripts/smoke-agent-reference-ingestion.mjs",
+    "smoke:agent-tool-stability": "npm run build && node scripts/run-agent-tool-stability-smoke.mjs",
     "smoke:viewer-pack": "electron scripts/smoke-viewer-pack.mjs",
     "smoke:app-preview": "electron scripts/smoke-app-preview-iframe.mjs",
     "smoke:pdf-preview": "electron scripts/smoke-pdf-preview.mjs",

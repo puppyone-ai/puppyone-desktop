@@ -8,7 +8,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const rendererPath = path.join(repoRoot, "dist", "index.html");
+const dialogOnly = process.argv.includes("--dialog-only");
 const styles = ["default", "windows-xp"];
+const matrixStyles = dialogOnly ? [] : styles;
 const expectedFamilies = ["document", "code", "grid", "canvas", "media", "embedded", "fallback"];
 const screenshotDirectory = process.env.PUPPYONE_APPEARANCE_SCREENSHOT_DIR;
 const userDataPath = path.join(os.tmpdir(), `puppyone-appearance-smoke-${process.pid}`);
@@ -26,7 +28,7 @@ const windows = [];
 async function runSmoke() {
   nativeTheme.themeSource = "light";
   try {
-    for (const style of styles) {
+    for (const style of matrixStyles) {
     const window = new BrowserWindow({
       show: true,
       width: 1280,
@@ -604,8 +606,11 @@ async function runSmoke() {
     }
     window.hide();
     }
-    await runDialogSmoke();
-    console.log(`appearance visual smoke passed: ${styles.length} Styles × ${expectedFamilies.length} Surface Families + XP dialog`);
+    await runDefaultDialogSmoke();
+    await runWindowsXpDialogSmoke();
+    console.log(dialogOnly
+      ? "appearance dialog visual smoke passed"
+      : `appearance visual smoke passed: ${matrixStyles.length} Styles × ${expectedFamilies.length} Surface Families + Default/XP dialogs`);
   } finally {
     for (const window of windows) {
       if (!window.isDestroyed()) window.destroy();
@@ -614,7 +619,7 @@ async function runSmoke() {
   app.quit();
 }
 
-async function runDialogSmoke() {
+async function openDialogSmokeWindow(style) {
   const window = new BrowserWindow({
     show: true,
     width: 960,
@@ -630,28 +635,85 @@ async function runDialogSmoke() {
   });
   windows.push(window);
   const url = pathToFileURL(rendererPath);
-  url.searchParams.set("style", "windows-xp");
+  url.searchParams.set("style", style);
   url.searchParams.set("dialog", "terminal-close");
   url.hash = "appearance-visual-smoke";
   await window.loadURL(url.href);
   await waitForReady(window);
-  await waitForSelector(window, ".desktop-terminal-close-dialog");
+  await waitForSelector(window, ".desktop-workbench-close-dialog");
   await window.webContents.executeJavaScript(
     "new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))",
     true,
   );
   await new Promise((resolve) => setTimeout(resolve, 180));
 
+  return window;
+}
+
+async function runDefaultDialogSmoke() {
+  const window = await openDialogSmokeWindow("default");
+  const snapshot = await window.webContents.executeJavaScript(`(() => {
+    const dialog = document.querySelector('.desktop-workbench-close-dialog');
+    const title = dialog.querySelector('.desktop-dialog-title-row h2');
+    const body = dialog.querySelector('.desktop-dialog-body');
+    const actions = [...dialog.querySelectorAll('.desktop-workbench-close-dialog-action')];
+    const confirm = actions.find((button) => button.textContent.trim() === 'Close terminal');
+    const rect = (element) => {
+      const value = element.getBoundingClientRect();
+      return { width: Math.round(value.width), height: Math.round(value.height) };
+    };
+    const style = (element) => {
+      const value = getComputedStyle(element);
+      return {
+        backgroundColor: value.backgroundColor,
+        borderRadius: value.borderRadius,
+        color: value.color,
+        fontSize: value.fontSize,
+        fontWeight: value.fontWeight,
+      };
+    };
+    return {
+      rootStyle: document.documentElement.dataset.interfaceStyle,
+      dialog: { ...rect(dialog), ...style(dialog) },
+      title: style(title),
+      body: style(body),
+      actions: actions.map((action) => ({ ...rect(action), ...style(action) })),
+      confirmClasses: [...confirm.classList],
+      confirmPaint: style(confirm),
+    };
+  })()`, true);
+
+  assert(snapshot.rootStyle === "default", `Default dialog: root Style did not resolve (${snapshot.rootStyle})`);
+  assert(snapshot.dialog.width === 380, `Default dialog: width drifted from 380px (${snapshot.dialog.width}px)`);
+  assert(snapshot.dialog.borderRadius === "10px", `Default dialog: radius drifted (${snapshot.dialog.borderRadius})`);
+  assert(snapshot.title.fontSize === "13px" && snapshot.title.fontWeight === "500", `Default dialog: title typography drifted (${JSON.stringify(snapshot.title)})`);
+  assert(snapshot.body.fontSize === "12px", `Default dialog: body typography drifted (${snapshot.body.fontSize})`);
+  assert(snapshot.actions.every((action) => action.height === 28), `Default dialog: action height drifted (${JSON.stringify(snapshot.actions)})`);
+  assert(snapshot.confirmClasses.includes("po-button--danger"), "Default dialog: destructive action lost its semantic tone");
+  assert(snapshot.confirmPaint.backgroundColor !== "rgba(0, 0, 0, 0)", "Default dialog: destructive action lost its restrained danger fill");
+
+  const capture = await window.capturePage();
+  assert(!capture.isEmpty(), "Default dialog: screenshot capture was empty");
+  assert(hasVisualDiversity(capture), "Default dialog: screenshot capture was visually blank");
+  if (screenshotDirectory) {
+    await writeFile(path.join(screenshotDirectory, "appearance-default-close-dialog.png"), capture.toPNG());
+  }
+  window.hide();
+}
+
+async function runWindowsXpDialogSmoke() {
+  const window = await openDialogSmokeWindow("windows-xp");
+
   const snapshot = await window.webContents.executeJavaScript(`(() => {
     const titlebar = document.querySelector('.desktop-titlebar');
-    const dialog = document.querySelector('.desktop-terminal-close-dialog');
+    const dialog = document.querySelector('.desktop-workbench-close-dialog');
     const header = dialog.querySelector('.desktop-dialog-header');
     const leading = dialog.querySelector('.desktop-dialog-leading');
     const close = dialog.querySelector('.desktop-dialog-icon-button');
     const shellClose = document.querySelector('.desktop-window-control.is-close');
-    const cancel = [...dialog.querySelectorAll('.desktop-dialog-button')]
+    const cancel = [...dialog.querySelectorAll('.po-button')]
       .find((button) => button.textContent.trim() === 'Cancel');
-    const confirm = [...dialog.querySelectorAll('.desktop-dialog-button')]
+    const confirm = [...dialog.querySelectorAll('.po-button')]
       .find((button) => button.textContent.trim() === 'Close terminal');
     const rect = (element) => {
       const value = element.getBoundingClientRect();
@@ -689,7 +751,7 @@ async function runDialogSmoke() {
   })()`, true);
 
   const closePoint = await window.webContents.executeJavaScript(`(() => {
-    const value = document.querySelector('.desktop-terminal-close-dialog .desktop-dialog-icon-button')
+    const value = document.querySelector('.desktop-workbench-close-dialog .desktop-dialog-icon-button')
       .getBoundingClientRect();
     return {
       x: Math.round(value.left + value.width / 2),
@@ -702,7 +764,7 @@ async function runDialogSmoke() {
   window.webContents.sendInputEvent({ type: "mouseMove", ...closePoint });
   await new Promise((resolve) => setTimeout(resolve, 140));
   const hoverSnapshot = await window.webContents.executeJavaScript(`(() => {
-    const close = document.querySelector('.desktop-terminal-close-dialog .desktop-dialog-icon-button');
+    const close = document.querySelector('.desktop-workbench-close-dialog .desktop-dialog-icon-button');
     const rect = close.getBoundingClientRect();
     const style = getComputedStyle(close);
     const visualStyle = getComputedStyle(close, '::before');
@@ -740,7 +802,7 @@ async function runDialogSmoke() {
   assert(hoverSnapshot.visualBackgroundPosition === "50% 50%", `XP dialog: close asset moves off-center on hover (${hoverSnapshot.visualBackgroundPosition})`);
   assert(hoverSnapshot.visualBackgroundSize === "100% 100%", `XP dialog: close asset changes scale on hover (${hoverSnapshot.visualBackgroundSize})`);
   assert(snapshot.leadingBackground === "rgba(0, 0, 0, 0)", `XP dialog: leading icon retained a modern tile (${snapshot.leadingBackground})`);
-  assert(snapshot.confirmClasses.includes("primary") && snapshot.confirmClasses.includes("destructive"), "XP dialog: destructive action lost its semantic modifiers");
+  assert(snapshot.confirmClasses.includes("po-button--danger"), "XP dialog: destructive action lost its semantic tone");
   assert(snapshot.confirm.backgroundImage === snapshot.cancel.backgroundImage, "XP dialog: destructive action bypasses Windows button chrome");
   assert(snapshot.confirm.color === "rgb(0, 0, 0)", `XP dialog: destructive action kept modern inverse text (${snapshot.confirm.color})`);
   assert(snapshot.confirm.boxShadow !== snapshot.cancel.boxShadow, "XP dialog: default action lost its Windows focus ring");

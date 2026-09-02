@@ -183,6 +183,10 @@ export function ExplorerTree({
     loadingPaths: resolvedLoadingPaths,
     loadingLabel: resolvedLoadingLabel,
   }), [expandedPaths, nodes, resolvedLoadingLabel, resolvedLoadingPaths]);
+  const softWorkspaceGrouping = useMemo(
+    () => nodes.filter((node) => node.workspaceFolderRoot).length > 1,
+    [nodes],
+  );
   const nodeIndex = useMemo(() => buildExplorerNodeIndex(nodes), [nodes]);
   const selectedDragNodes = useMemo(
     () => collectTopLevelSelectedNodes(nodeIndex, selectedPaths),
@@ -549,6 +553,7 @@ export function ExplorerTree({
   return (
     <div
       className={`explorer-tree-shell ${showRoot ? "has-root" : "no-root"} ${scrollable ? "is-scrollable" : ""} ${draggedNodes.length > 0 ? "is-dragging-node" : ""} ${dropTarget && draggedNodes.length === 0 ? "is-importing-files" : ""}`}
+      data-workspace-grouping={softWorkspaceGrouping ? "soft" : undefined}
       data-scroll-at-bottom={scrollEdgeState.atBottom ? "true" : "false"}
       data-scroll-at-top={scrollEdgeState.atTop ? "true" : "false"}
       style={{
@@ -644,22 +649,29 @@ export function ExplorerTree({
                 <div
                   key={row.key}
                   className="explorer-tree-virtual-row"
-                  data-depth={row.depth}
+                  data-depth={getExplorerPresentationDepth(row.depth, softWorkspaceGrouping)}
                   style={{
-                    "--depth": row.depth,
+                    "--depth": getExplorerPresentationDepth(row.depth, softWorkspaceGrouping),
                     transform: `translateY(${row.index * EXPLORER_VIRTUAL_ROW_SIZE}px)`,
                   } as CSSProperties}
                 >
                   <ExplorerVirtualMotionShell
-                    depth={row.depth}
+                    depth={getExplorerPresentationDepth(row.depth, softWorkspaceGrouping)}
                     generation={motionPlan?.generation ?? 0}
                     instruction={motionPlan?.instructions.get(row.key)}
                   >
                     {row.kind === "meta" ? (
-                      <ExplorerTreeMetaRow depth={row.depth} loading={row.loading}>{row.label}</ExplorerTreeMetaRow>
+                      <ExplorerTreeMetaRow
+                        depth={getExplorerPresentationDepth(row.depth, softWorkspaceGrouping)}
+                        loading={row.loading}
+                      >
+                        {row.label}
+                      </ExplorerTreeMetaRow>
                     ) : (
                       <TreeNodeRow
                         row={row}
+                        presentationDepth={getExplorerPresentationDepth(row.depth, softWorkspaceGrouping)}
+                        softWorkspaceGrouping={softWorkspaceGrouping}
                         isExpanded={row.node.type === "folder" && expandedPaths.has(row.path)}
                         focusable={activePath ? activePath === row.path : row.index === firstNavigableIndex}
                         interaction={selectExplorerRowInteraction(row.path, rowStateSources)}
@@ -679,20 +691,22 @@ export function ExplorerTree({
                 <div
                   key={`exit:${motionPlan.generation}:${row.key}`}
                   className="explorer-tree-virtual-row explorer-tree-exit-ghost"
-                  data-depth={row.depth}
+                  data-depth={getExplorerPresentationDepth(row.depth, softWorkspaceGrouping)}
                   style={{
-                    "--depth": row.depth,
+                    "--depth": getExplorerPresentationDepth(row.depth, softWorkspaceGrouping),
                     transform: `translateY(${top}px)`,
                   } as CSSProperties}
                   aria-hidden="true"
                 >
                   <ExplorerVirtualMotionShell
-                    depth={row.depth}
+                    depth={getExplorerPresentationDepth(row.depth, softWorkspaceGrouping)}
                     generation={motionPlan.generation}
                     exitPhase={reveal}
                   >
                     <ExplorerExitGhostRow
                       row={row}
+                      presentationDepth={getExplorerPresentationDepth(row.depth, softWorkspaceGrouping)}
+                      softWorkspaceGrouping={softWorkspaceGrouping}
                       expandedPaths={expandedPaths}
                       fileIconTheme={fileIconTheme}
                     />
@@ -717,6 +731,8 @@ export function ExplorerTree({
 
 type TreeNodeRowProps = {
   row: ExplorerVisibleNodeRow;
+  presentationDepth: number;
+  softWorkspaceGrouping: boolean;
   isExpanded: boolean;
   focusable: boolean;
   interaction: ExplorerRowInteractionState;
@@ -731,6 +747,8 @@ type TreeNodeRowProps = {
 
 const TreeNodeRow = memo(function TreeNodeRow({
   row,
+  presentationDepth,
+  softWorkspaceGrouping,
   isExpanded,
   focusable,
   interaction,
@@ -743,8 +761,9 @@ const TreeNodeRow = memo(function TreeNodeRow({
   renderRowActions,
 }: TreeNodeRowProps) {
   const { t } = useLocalization();
-  const { node, depth, siblingDisplayNameCounts } = row;
+  const { node, siblingDisplayNameCounts } = row;
   const isFolder = node.type === "folder";
+  const workspaceGroupHeader = softWorkspaceGrouping && Boolean(node.workspaceFolderRoot);
   const hoverExpandTimer = useRef<number | null>(null);
   const rowActions = renderRowActions(node);
   const displayName = useMemo(() => getExplorerDisplayName(node), [node]);
@@ -796,7 +815,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
   return (
     <div
       id={getExplorerRowDomId(row.index)}
-      className={`tree-row ${isFolder ? "folder" : "file"} ${node.workspaceFolderRoot ? "workspace-folder-root" : ""} ${interaction.selected ? "selected" : ""} ${interaction.active ? "active" : ""} ${interaction.cut ? "clipboard-cut" : ""} ${interaction.loading ? "loading" : ""} ${interaction.dragging ? "dragging" : ""} ${interaction.dropOver ? "drop-target" : ""} ${interaction.dropParentOver ? "drop-parent-target" : ""} ${interaction.dropInvalid ? "drop-invalid" : ""} ${node.status ? `status-${node.status}` : ""}`}
+      className={`tree-row ${isFolder ? "folder" : "file"} ${node.workspaceFolderRoot ? "workspace-folder-root" : ""} ${workspaceGroupHeader ? "workspace-group-header" : ""} ${interaction.selected ? "selected" : ""} ${interaction.active ? "active" : ""} ${interaction.cut ? "clipboard-cut" : ""} ${interaction.loading ? "loading" : ""} ${interaction.dragging ? "dragging" : ""} ${interaction.dropOver ? "drop-target" : ""} ${interaction.dropParentOver ? "drop-parent-target" : ""} ${interaction.dropInvalid ? "drop-invalid" : ""} ${node.status ? `status-${node.status}` : ""}`}
       role="treeitem"
       data-explorer-path={node.path}
       draggable={!node.workspaceFolderRoot && dragController.enabled}
@@ -849,7 +868,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
         if (!interaction.selected) onSelectNode(node);
         onNodeContextMenu(node, event);
       } : undefined}
-      style={{ "--depth": depth } as CSSProperties}
+      style={{ "--depth": presentationDepth } as CSSProperties}
     >
       <span className="tree-row-content">
         <span
@@ -862,7 +881,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
           }}
         >
           {isFolder ? (
-            <TreeDisclosureMarker expanded={isExpanded} />
+            <TreeDisclosureMarker expanded={isExpanded} size={workspaceGroupHeader ? 10 : 12} />
           ) : (
             <FileGlyphIcon name={node.name} type={node.type} size={18} theme={fileIconTheme} />
           )}
@@ -875,6 +894,9 @@ const TreeNodeRow = memo(function TreeNodeRow({
             </span>
           )}
         </span>
+        {workspaceGroupHeader && (
+          <span className="tree-workspace-group-divider" aria-hidden="true" />
+        )}
         {node.status && node.status !== "clean" && (
           <span className={`tree-status ${node.status}`}>{shortStatus(node.status)}</span>
         )}
@@ -897,6 +919,8 @@ const TreeNodeRow = memo(function TreeNodeRow({
 
 function areTreeNodeRowPropsEqual(left: TreeNodeRowProps, right: TreeNodeRowProps): boolean {
   return left.row === right.row
+    && left.presentationDepth === right.presentationDepth
+    && left.softWorkspaceGrouping === right.softWorkspaceGrouping
     && left.isExpanded === right.isExpanded
     && left.focusable === right.focusable
     && equalExplorerRowInteraction(left.interaction, right.interaction)
@@ -996,15 +1020,19 @@ function useExplorerElementMotion({
 
 function ExplorerExitGhostRow({
   row,
+  presentationDepth,
+  softWorkspaceGrouping,
   expandedPaths,
   fileIconTheme,
 }: {
   row: ExplorerVisibleRow;
+  presentationDepth: number;
+  softWorkspaceGrouping: boolean;
   expandedPaths: ReadonlySet<string>;
   fileIconTheme: FileIconThemeId;
 }) {
   if (row.kind === "meta") {
-    return <ExplorerTreeMetaRow depth={row.depth} loading={row.loading}>{row.label}</ExplorerTreeMetaRow>;
+    return <ExplorerTreeMetaRow depth={presentationDepth} loading={row.loading}>{row.label}</ExplorerTreeMetaRow>;
   }
 
   const displayName = getExplorerDisplayName(row.node);
@@ -1013,10 +1041,11 @@ function ExplorerExitGhostRow({
       && (row.siblingDisplayNameCounts.get(getDisplayNameKey(displayName.primary)) ?? 0) > 1,
   );
   const isFolder = row.node.type === "folder";
+  const workspaceGroupHeader = softWorkspaceGrouping && Boolean(row.node.workspaceFolderRoot);
   return (
     <div
-      className={`tree-row explorer-tree-exit-ghost-row ${isFolder ? "folder" : "file"}`}
-      style={{ "--depth": row.depth } as CSSProperties}
+      className={`tree-row explorer-tree-exit-ghost-row ${isFolder ? "folder" : "file"} ${row.node.workspaceFolderRoot ? "workspace-folder-root" : ""} ${workspaceGroupHeader ? "workspace-group-header" : ""}`}
+      style={{ "--depth": presentationDepth } as CSSProperties}
     >
       <span className="tree-row-content">
         <span
@@ -1024,7 +1053,7 @@ function ExplorerExitGhostRow({
           data-file-kind={isFolder ? undefined : getFileVisualKind(row.node.name, row.node.type)}
         >
           {isFolder ? (
-            <TreeDisclosureMarker expanded={expandedPaths.has(row.path)} />
+            <TreeDisclosureMarker expanded={expandedPaths.has(row.path)} size={workspaceGroupHeader ? 10 : 12} />
           ) : (
             <FileGlyphIcon name={row.node.name} type={row.node.type} size={18} theme={fileIconTheme} />
           )}
@@ -1035,6 +1064,9 @@ function ExplorerExitGhostRow({
             <span className="tree-label-extension" aria-hidden="true">{displayName.extension}</span>
           )}
         </span>
+        {workspaceGroupHeader && (
+          <span className="tree-workspace-group-divider" aria-hidden="true" />
+        )}
         {row.node.status && row.node.status !== "clean" && (
           <span className={`tree-status ${row.node.status}`}>{shortStatus(row.node.status)}</span>
         )}
@@ -1151,6 +1183,10 @@ function findNavigableRowIndex(
 
 function getExplorerRowDomId(index: number): string {
   return `${EXPLORER_ROW_DOM_ID_PREFIX}-${index}`;
+}
+
+function getExplorerPresentationDepth(depth: number, softWorkspaceGrouping: boolean): number {
+  return softWorkspaceGrouping ? Math.max(0, depth - 1) : depth;
 }
 
 function getSelectionIntent(event: ReactMouseEvent<HTMLElement>): ExplorerSelectionIntent {

@@ -13,11 +13,13 @@ describe("first project starter architecture", () => {
     expect(app).toContain('activeWorkspaceEntryKind === "created"');
   });
 
-  it("keeps starter writes explicit, bounded to one file, and outside the workspace tree renderer", () => {
+  it("keeps starter writes explicit, root-qualified, and outside the workspace tree renderer", () => {
     const surface = source("src/features/app-shell/DesktopDataWorkspaceSurface.tsx");
     const dialog = source("src/features/app-shell/EmptyWorkspaceOnboardingDialog.tsx");
 
-    expect(surface).toContain("await dataPort.createFile(selection.file.path, selection.file.content)");
+    expect(surface).toContain("qualifyDataResourcePath(activeWorkspaceRootPath, selection.file.path)");
+    expect(surface).toContain("await dataPort.createFile(resourcePath, selection.file.content)");
+    expect(surface).toContain("workspaceFolderId: folder.id");
     expect(dialog).toContain('id: "blank"');
     expect(dialog).toContain('file: null');
     expect(dialog).not.toContain("createFolder(");

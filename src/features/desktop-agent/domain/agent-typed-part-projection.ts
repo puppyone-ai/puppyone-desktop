@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentTurnTerminalState } from "./agent-contract";
+import type { AgentEvent } from "./agent-contract";
 import type {
   AgentActivity,
   AgentPart,
@@ -16,46 +16,50 @@ import {
 } from "./agent-projection-readers";
 import {
   isNonDiagnosticProviderStatusMessage,
+  legacyProviderConnectionUpdate,
   providerActivityIdentity,
 } from "./agent-provider-notice-policy";
 import { parseAgentEventTime, readAgentTurnDurationMs } from "./agent-turn-timing";
+import { agentTurnTerminalState } from "./agent-turn-lifecycle";
 
 export function projectTypedPart(projection: AgentProjection, event: AgentEvent) {
+  if (event.type === "provider.connection.updated") return;
   const turn = updateTurn(projection, event);
-  if (isTerminalTurnEvent(event)) {
-    const terminalState = event.type.slice("turn.".length) as AgentTurnTerminalState;
-    const indexes = projectionIndexes(projection);
-    for (const partId of turn?.partIds ?? []) {
-      const partIndex = indexes.parts.get(partId);
-      const part = partIndex === undefined ? null : projection.parts[partIndex];
-      if (partIndex !== undefined && part?.kind === "assistant") {
-        projection.parts[partIndex] = { ...part, streaming: false, terminalState };
-      }
-    }
-  }
   const part = partForEvent(projection, event);
   if (!part) return;
   const indexes = projectionIndexes(projection);
   const existingIndex = indexes.parts.get(part.id);
-  if (existingIndex !== undefined) projection.parts[existingIndex] = part;
+  const existingPart = existingIndex === undefined ? null : projection.parts[existingIndex];
+  const projectedPart: AgentPart = {
+    ...part,
+    sequence: existingPart?.sequence ?? part.sequence,
+    updatedSequence: event.sequence,
+  };
+  if (existingIndex !== undefined) projection.parts[existingIndex] = projectedPart;
   else {
-    indexes.parts.set(part.id, projection.parts.length);
-    projection.parts.push(part);
+    indexes.parts.set(projectedPart.id, projection.parts.length);
+    projection.parts.push(projectedPart);
   }
-  if (turn && !turn.partIds.includes(part.id)) {
+  if (turn && !turn.partIds.includes(projectedPart.id)) {
     const turnIndex = indexes.turns.get(turn.id);
-    const nextTurn = { ...turn, partIds: [...turn.partIds, part.id] };
+    const nextTurn = { ...turn, partIds: [...turn.partIds, projectedPart.id] };
     if (turnIndex !== undefined) projection.turns[turnIndex] = nextTurn;
   }
+  // Usage is session metadata, not visible transcript content. Keep the typed
+  // part for consumers that need it, but never allocate virtual-list geometry.
+  if (projectedPart.kind === "usage") return;
+  const rowId = `row:${projectedPart.id}`;
+  const rowIndex = indexes.rows.get(rowId);
+  const existingRow = rowIndex === undefined ? null : projection.rows[rowIndex];
   const row: TimelineRow = {
-    id: `row:${part.id}`,
-    partId: part.id,
-    turnId: part.turnId,
-    kind: part.kind,
-    sequence: part.sequence,
-    estimatedHeight: estimatePartHeight(part),
+    id: rowId,
+    partId: projectedPart.id,
+    turnId: projectedPart.turnId,
+    kind: projectedPart.kind,
+    sequence: existingRow?.sequence ?? projectedPart.sequence,
+    updatedSequence: event.sequence,
+    estimatedHeight: estimatePartHeight(projectedPart),
   };
-  const rowIndex = indexes.rows.get(row.id);
   if (rowIndex !== undefined) projection.rows[rowIndex] = row;
   else {
     indexes.rows.set(row.id, projection.rows.length);
@@ -82,10 +86,11 @@ function updateTurn(projection: AgentProjection, event: AgentEvent) {
     indexes.turns.set(event.turnId, turnIndex);
     projection.turns.push(turn);
   }
-  if (isTerminalTurnEvent(event)) {
+  const terminalState = agentTurnTerminalState(event);
+  if (terminalState) {
     turn = {
       ...turn,
-      status: event.type.slice("turn.".length) as AgentTurnTerminalState,
+      status: terminalState,
       completedAtSequence: event.sequence,
       durationMs: readAgentTurnDurationMs(event.payload.durationMs, turn.startedAtMs, event.emittedAt),
     };
@@ -103,9 +108,13 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
     return message ? messagePart(message) : null;
   }
   if (event.type === "assistant.delta" || event.type === "assistant.completed") {
-    const id = `assistant:${event.itemId ?? event.turnId ?? event.sequence}`;
-    const messageIndex = projectionIndexes(projection).messages.get(id);
-    const message = messageIndex === undefined ? null : projection.messages[messageIndex];
+    const baseId = `assistant:${event.itemId ?? event.turnId ?? event.sequence}`;
+    const message = [...projection.messages].reverse().find((entry) => (
+      entry.role === "assistant"
+      && entry.turnId === event.turnId
+      && (event.itemId ? entry.itemId === event.itemId : entry.id === baseId)
+      && (entry.updatedSequence ?? entry.sequence) === event.sequence
+    )) ?? null;
     return message ? messagePart(message) : null;
   }
   if (event.type === "reasoning.summary.delta" || event.type === "plan.updated"
@@ -117,6 +126,7 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
   }
   if (event.type === "provider.warning" || event.type === "provider.error") {
     const label = readProviderMessage(event.payload.message);
+    if (legacyProviderConnectionUpdate(event, label)) return null;
     if (label && isNonDiagnosticProviderStatusMessage(label)) return null;
     const activityIndex = projectionIndexes(projection).activities.get(providerActivityIdentity(
       projection,
@@ -134,6 +144,7 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
       kind: "usage",
       usage: pickUsage(event.payload),
       sequence: event.sequence,
+      updatedSequence: event.sequence,
     };
   }
   if (event.type === "approval.requested" || event.type === "approval.resolved") {
@@ -147,6 +158,7 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
       requestId,
       state: event.type.endsWith("resolved") ? "resolved" : "pending",
       sequence: event.sequence,
+      updatedSequence: event.sequence,
     };
   }
   if (event.type === "question.requested" || event.type === "question.resolved") {
@@ -160,6 +172,7 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
       requestId,
       state: event.type.endsWith("resolved") ? "resolved" : "pending",
       sequence: event.sequence,
+      updatedSequence: event.sequence,
     };
   }
   if (event.type.startsWith("session.") || event.type.startsWith("turn.")) return null;
@@ -172,6 +185,7 @@ function partForEvent(projection: AgentProjection, event: AgentEvent): AgentPart
     label: "",
     labelCode: "unsupported-event",
     sequence: event.sequence,
+    updatedSequence: event.sequence,
   };
 }
 
@@ -189,10 +203,4 @@ function estimatePartHeight(part: AgentPart) {
   if (part.kind === "turn-summary") return 30;
   if (part.kind === "permission" || part.kind === "question" || part.kind === "usage") return 36;
   return 42;
-}
-
-function isTerminalTurnEvent(event: AgentEvent) {
-  return event.type === "turn.completed"
-    || event.type === "turn.failed"
-    || event.type === "turn.interrupted";
 }

@@ -14,12 +14,21 @@ import type {
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
 import type {
+  AuxiliaryWorkbenchCloseDecision,
   AuxiliaryWorkbenchContribution,
   AuxiliaryWorkbenchCreationRecipe,
+  AuxiliaryWorkbenchHistoryTarget,
 } from "../../app-shell/auxiliary-workbench/types";
+import { filterAgentChatCreationRecipesByLocalAgentIds } from "../../app-shell/auxiliary-workbench/agentChatCreationRecipes";
+import { AuxiliaryWorkbenchCloseDialog } from "../../app-shell/auxiliary-workbench/AuxiliaryWorkbenchCloseDialog";
 import { useAuxiliaryWorkbenchContributions } from "../../app-shell/auxiliary-workbench/useAuxiliaryWorkbenchContributions";
+import {
+  useAuxiliaryWorkbenchCloseCoordinator,
+  type AuxiliaryWorkbenchCloseTarget,
+} from "../../app-shell/auxiliary-workbench/useAuxiliaryWorkbenchCloseCoordinator";
 import { useTerminalAgentLocator } from "../controller/useTerminalAgentLocator";
 import { useTerminalTabMoveDrag } from "../interactions/useTerminalTabMoveDrag";
+import { getTerminalClosePolicy } from "../model/terminalClosePolicy";
 import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
 import {
   canPlaceTerminalSplit,
@@ -36,7 +45,6 @@ import { TerminalContributionItemHost } from "../workbench/TerminalContributionI
 import { TerminalWorkbenchCreationFailure } from "../workbench/TerminalWorkbenchCreationFailure";
 import { useTerminalWorkbenchSnapshots } from "../workbench/useTerminalWorkbenchSnapshots";
 import { TerminalWorkbenchViewport } from "../workbench/TerminalWorkbenchViewport";
-import { TerminalCloseConfirmationDialog } from "./TerminalCloseConfirmationDialog";
 import { TerminalLauncher } from "./TerminalLauncher";
 import { TerminalSessionHost } from "./TerminalSessionHost";
 import "@xterm/xterm/css/xterm.css";
@@ -50,6 +58,9 @@ type RightTerminalPanelProps = Readonly<{
   contributions?: readonly AuxiliaryWorkbenchContribution[];
 }>;
 
+const EMPTY_CHAT_RECIPES: readonly AuxiliaryWorkbenchCreationRecipe[] = Object.freeze([]);
+const CLOSE_NOW: AuxiliaryWorkbenchCloseDecision = Object.freeze({ kind: "close" });
+
 export function RightTerminalPanel({
   workspace,
   active,
@@ -59,7 +70,6 @@ export function RightTerminalPanel({
 }: RightTerminalPanelProps) {
   const { t } = useLocalization();
   const panelRef = useRef<HTMLElement>(null);
-  const closingItemIdsRef = useRef(new Set<string>());
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const workbench = useTerminalWorkbench({ messageFormatter: t });
   const currentRoot = useMemo(
@@ -99,11 +109,15 @@ export function RightTerminalPanel({
     item: AuxiliaryWorkbenchItem,
     targetGroupId: string | null,
     recipe: AuxiliaryWorkbenchCreationRecipe | null,
+    historyTarget: AuxiliaryWorkbenchHistoryTarget | null,
   ) => {
     const itemId = workbench.commitContributionItem(item, targetGroupId);
     setInitialSnapshot(itemId, Object.freeze({
       ...contribution.initialSnapshot,
-      iconKey: recipe?.iconKey ?? contribution.initialSnapshot.iconKey,
+      title: historyTarget?.title ?? contribution.initialSnapshot.title,
+      accessibleLabel: historyTarget?.title ?? contribution.initialSnapshot.accessibleLabel,
+      iconKey: historyTarget?.iconKey ?? recipe?.iconKey ?? contribution.initialSnapshot.iconKey,
+      resourceId: historyTarget?.id ?? contribution.initialSnapshot.resourceId,
     }));
     return itemId;
   }, [setInitialSnapshot, workbench]);
@@ -121,12 +135,13 @@ export function RightTerminalPanel({
   });
   const hosts = usePersistentTerminalSessionHosts(itemIds);
   const agentChatContribution = contributionByKind.get(AGENT_CHAT_WORKBENCH_ITEM_KIND) ?? null;
+  const agentChatHistory = agentChatContribution?.history ?? null;
   const agentLauncherMode = agentChatContribution ? "chat" : "terminal";
-  const chatRecipes = agentChatContribution?.creationRecipes ?? [];
-  const canCreateChat = Boolean(agentChatContribution && chatRecipes.some((recipe) => (
-    canCreateContribution(agentChatContribution, recipe)
-  )));
+  const registeredChatRecipes = agentChatContribution?.creationRecipes ?? EMPTY_CHAT_RECIPES;
   const chatPreparing = preparingKinds.has(AGENT_CHAT_WORKBENCH_ITEM_KIND);
+  const openAgentSessionIds = useMemo(() => Array.from(snapshotById.values()).flatMap(
+    (snapshot) => snapshot.resourceId ? [snapshot.resourceId] : [],
+  ), [snapshotById]);
 
   const presentedTerminalSessions = useMemo(() => workbench.presentedItemIds.flatMap(
     (itemId) => {
@@ -149,6 +164,13 @@ export function RightTerminalPanel({
     const hidden = new Set(hiddenAgentIds);
     return availableAgentIds.filter((agentId) => !hidden.has(agentId));
   }, [availableAgentIds, hiddenAgentIds]);
+  const chatRecipes = useMemo(
+    () => filterAgentChatCreationRecipesByLocalAgentIds(registeredChatRecipes, visibleAgentIds),
+    [registeredChatRecipes, visibleAgentIds],
+  );
+  const canCreateChat = Boolean(agentChatContribution && chatRecipes.some((recipe) => (
+    canCreateContribution(agentChatContribution, recipe)
+  )));
   const canLaunch = useCallback((launcherId: DesktopTerminalLauncherId) => (
     terminalEnabled && (
       launcherId === "shell"
@@ -158,6 +180,41 @@ export function RightTerminalPanel({
       )
     )
   ), [agentLauncherMode, terminalEnabled, visibleAgentIds]);
+  const resolveCloseTarget = useCallback((itemId: string): AuxiliaryWorkbenchCloseTarget | null => {
+    const item = itemById.get(itemId);
+    const snapshot = snapshotById.get(itemId);
+    if (!item || !snapshot) return null;
+    const context = Object.freeze({ item, snapshot });
+    if (item.kind === TERMINAL_WORKBENCH_ITEM_KIND) {
+      const session = workbench.terminalById.get(itemId);
+      if (!session) return null;
+      return Object.freeze({
+        context,
+        adapter: Object.freeze({
+          decide: (): AuxiliaryWorkbenchCloseDecision => (
+            getTerminalClosePolicy(session.status) === "close"
+              ? CLOSE_NOW
+              : Object.freeze({
+                  kind: "confirm",
+                  tone: "danger",
+                  dialog: Object.freeze({
+                    title: t("terminal.closeDialog.title", { title: snapshot.title }),
+                    detail: t("terminal.closeDialog.detail"),
+                    actionLabel: t("terminal.closeDialog.confirm"),
+                  }),
+                })
+          ),
+          commit: () => workbench.commitCloseTerminal(itemId),
+        }),
+      });
+    }
+    const contribution = contributionByKind.get(item.kind);
+    return contribution ? Object.freeze({ context, adapter: contribution.close }) : null;
+  }, [contributionByKind, itemById, snapshotById, t, workbench]);
+  const closeCoordinator = useAuxiliaryWorkbenchCloseCoordinator({
+    resolveTarget: resolveCloseTarget,
+    onClosed: workbench.removeItem,
+  });
   const createDetectedTerminal = useCallback((launcherId: DesktopTerminalLauncherId) => {
     if (terminalEnabled && canLaunch(launcherId)) {
       workbench.createTerminal(currentRoot, launcherId);
@@ -190,8 +247,24 @@ export function RightTerminalPanel({
       targetGroupId,
       recipe,
     );
-    if (createdItemId) workbench.requestCloseTerminal(launcherItemId);
-  }, [agentChatContribution, createContributionItem, workbench]);
+    if (createdItemId) await closeCoordinator.requestClose(launcherItemId);
+  }, [agentChatContribution, closeCoordinator, createContributionItem, workbench.groups]);
+  const restoreChat = useCallback(async (
+    target: AuxiliaryWorkbenchHistoryTarget,
+    targetGroupId: string | null,
+    launcherItemId: string | null = null,
+  ) => {
+    if (!agentChatContribution) return false;
+    const createdItemId = await createContributionItem(
+      agentChatContribution,
+      targetGroupId,
+      null,
+      target,
+    );
+    if (!createdItemId) return false;
+    if (launcherItemId) await closeCoordinator.requestClose(launcherItemId);
+    return true;
+  }, [agentChatContribution, closeCoordinator, createContributionItem]);
 
   useEffect(() => {
     if (!presentedTerminalSessions.some((session) => session.launchError)) return;
@@ -255,23 +328,6 @@ export function RightTerminalPanel({
     }
   }, [canDropItem, workbench]);
 
-  const requestCloseItem = useCallback(async (itemId: string) => {
-    const item = itemById.get(itemId);
-    if (!item || closingItemIdsRef.current.has(itemId)) return;
-    if (item.kind === TERMINAL_WORKBENCH_ITEM_KIND) {
-      workbench.requestCloseTerminal(itemId);
-      return;
-    }
-    const contribution = contributionByKind.get(item.kind);
-    if (!contribution) return;
-    closingItemIdsRef.current.add(itemId);
-    try {
-      if (await contribution.requestClose(item)) workbench.removeItem(itemId);
-    } finally {
-      closingItemIdsRef.current.delete(itemId);
-    }
-  }, [contributionByKind, itemById, workbench]);
-
   useTerminalAppearanceSync(panelRef, workbench.runtimeRegistry);
   return (
     <section ref={panelRef} className="desktop-terminal-panel" aria-label={t("terminal.title")}>
@@ -290,10 +346,15 @@ export function RightTerminalPanel({
             chatCreationAvailable={canCreateChat}
             chatPreparing={chatPreparing}
             chatRecipes={chatRecipes}
+            history={agentChatHistory}
+            historyRootId={workspace.id}
+            historyRootPath={workspace.path}
+            excludedHistoryResourceIds={openAgentSessionIds}
             onCreateChat={agentChatContribution
               ? (recipe) => { if (!chatPreparing) void createChat(recipe, null); }
               : undefined}
             onLaunch={createDetectedTerminal}
+            onRestoreHistoryTarget={(target) => restoreChat(target, null)}
             onRefresh={() => void refreshAvailableAgents()}
             terminalEnabled={terminalEnabled}
           />
@@ -308,7 +369,7 @@ export function RightTerminalPanel({
             root={workbench.root}
             itemMove={itemMove}
             onActivateItem={workbench.activateItem}
-            onCloseItem={(itemId) => { void requestCloseItem(itemId); }}
+            onCloseItem={(itemId) => { void closeCoordinator.requestClose(itemId); }}
             onCreateItem={(groupId) => workbench.createTerminalLauncher(currentRoot, groupId)}
             onMoveByKeyboard={moveItemByKeyboard}
             onResizeSplit={workbench.resizeSplit}
@@ -324,6 +385,9 @@ export function RightTerminalPanel({
                 chatCreationAvailable={canCreateChat}
                 chatPreparing={chatPreparing}
                 chatRecipes={chatRecipes}
+                history={agentChatHistory}
+                historyRootId={workspace.id}
+                excludedHistoryResourceIds={openAgentSessionIds}
                 focused={active && workbench.activeItemId === item.id}
                 onFocus={() => {
                   setFocusedItemId(item.id);
@@ -333,6 +397,12 @@ export function RightTerminalPanel({
                 onCreateChat={agentChatContribution
                   ? (recipe) => { void createChatFromLauncher(item.id, recipe); }
                   : undefined}
+                onRestoreHistoryTarget={(target) => {
+                  const targetGroupId = workbench.groups.find(
+                    (group) => group.itemIds.includes(item.id),
+                  )?.id ?? null;
+                  return restoreChat(target, targetGroupId, item.id);
+                }}
                 onRefresh={() => void refreshAvailableAgents()}
                 presented={active && presentedItemIdSet.has(item.id)}
                 runtime={workbench.runtimeRegistry.get(item.id)}
@@ -359,11 +429,12 @@ export function RightTerminalPanel({
           item.id,
         ))}
       </div>
-      {workbench.pendingCloseTerminal && (
-        <TerminalCloseConfirmationDialog
-          title={t("terminal.sessionTitle", { number: workbench.pendingCloseTerminal.ordinal })}
-          onCancel={workbench.cancelCloseTerminal}
-          onConfirm={workbench.confirmCloseTerminal}
+      {closeCoordinator.pending && (
+        <AuxiliaryWorkbenchCloseDialog
+          pending={closeCoordinator.pending}
+          committing={closeCoordinator.committing}
+          onDismiss={closeCoordinator.dismiss}
+          onConfirm={() => { void closeCoordinator.confirm(); }}
         />
       )}
     </section>

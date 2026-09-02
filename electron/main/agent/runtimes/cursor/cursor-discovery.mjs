@@ -1,17 +1,15 @@
 import os from "node:os";
 import { redactSecretText } from "../../agent-events.mjs";
+import { createCachedRuntimeDiscovery } from "../../connections/runtime-discovery-cache.mjs";
 import { probeCursorLocal } from "../../connections/probes/cursor-local-probe.mjs";
 import { resolveFirstExecutable } from "../../connections/probes/executable-candidates.mjs";
 
 export function createCursorDiscovery(options = {}) {
-  let cached = null;
-  return {
-    async discover({ refresh = false } = {}) {
-      if (!refresh && cached) return cached;
-      cached = await discoverCursorBackend(options);
-      return cached;
-    },
-  };
+  const { cache: cacheOptions, ...discoveryOptions } = options;
+  return createCachedRuntimeDiscovery(
+    () => discoverCursorBackend(discoveryOptions),
+    cacheOptions,
+  );
 }
 
 export async function discoverCursorBackend({

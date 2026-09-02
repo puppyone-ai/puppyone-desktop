@@ -24,6 +24,8 @@ import type {
   AgentSessionCreateRequest,
   AgentSessionExitEvent,
   AgentSessionMutationRequest,
+  AgentSessionOpenRequest,
+  AgentSessionOpenResult,
   AgentSessionResumeRequest,
   AgentSessionSnapshot,
   AgentSessionsListRequest,
@@ -392,6 +394,14 @@ export type TerminalCreateRequest = {
   };
 };
 
+export type TerminalAppearanceRequest = {
+  id: string;
+  defaultColors: {
+    foreground: [number, number, number];
+    background: [number, number, number];
+  };
+};
+
 export type TerminalAgentId = Exclude<DesktopTerminalLauncherId, "shell">;
 
 export type TerminalAgentLocationSnapshot = {
@@ -627,6 +637,7 @@ export type GitRepositoryWindowFocusEvent = {
 };
 
 export type LastWorkspaceResult = {
+  workspaceId: string | null;
   path: string | null;
   workspace: Workspace | null;
   workspaces?: Workspace[];
@@ -648,12 +659,14 @@ export type RecentWorkspacesResult = {
 
 export type WorkspaceOpenResult = {
   status: "opened-current" | "opened-new-window" | "focused-existing";
+  workspaceId: string | null;
   path: string | null;
   workspace: Workspace | null;
 };
 
 export type WorkspaceAttachResult = {
   status: "attached-current" | "already-attached" | "focused-existing";
+  workspaceId: string;
   path: string | null;
   workspace: Workspace | null;
   workspaces: Workspace[];
@@ -661,6 +674,7 @@ export type WorkspaceAttachResult = {
 
 export type WorkspaceDetachResult = {
   status: "detached-current" | "not-attached";
+  workspaceId: string;
   path: string | null;
   workspace: Workspace | null;
   workspaces: Workspace[];
@@ -1355,6 +1369,7 @@ declare global {
       readAgentAccount: (request?: AgentAccountReadRequest) => Promise<AgentAccountState | null>;
       createAgentSession: (request: AgentSessionCreateRequest) => Promise<AgentSessionSnapshot>;
       resumeAgentSession: (request: AgentSessionResumeRequest) => Promise<AgentSessionSnapshot | null>;
+      openAgentSession: (request: AgentSessionOpenRequest) => Promise<AgentSessionOpenResult>;
       replayAgentSession: (request: AgentReplayRequest) => Promise<AgentSessionSnapshot>;
       listAgentSessions: (request: AgentSessionsListRequest) => Promise<AgentSessionsListResponse>;
       forkAgentSession: (request: AgentSessionMutationRequest) => Promise<AgentSessionSnapshot>;
@@ -1422,6 +1437,7 @@ declare global {
       createTerminal: (request: TerminalCreateRequest) => Promise<TerminalCreateResult>;
       writeTerminal: (request: TerminalInputRequest) => void;
       resizeTerminal: (request: TerminalResizeRequest) => void;
+      updateTerminalAppearance: (request: TerminalAppearanceRequest) => void;
       closeTerminal: (id: string) => Promise<void>;
       onTerminalData: (callback: (event: TerminalDataEvent) => void) => () => void;
       onTerminalExit: (callback: (event: TerminalExitEvent) => void) => () => void;
