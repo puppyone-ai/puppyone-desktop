@@ -1,7 +1,6 @@
 import { useLocalization } from "@puppyone/localization";
 import { FolderOpen, Plus } from "lucide-react";
 import {
-  getCompatibleSubThemes,
   listSelectableSubThemes,
 } from "../../themes/builtinSubThemes";
 import type { SubThemeCatalogController } from "../../themes/useSubThemeCatalog";

@@ -59,6 +59,8 @@ import { registerCloudPublishIpcHandlers } from "./main/ipc/cloud-publish-ipc.mj
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
 import {
   attachMarkdownFormatShortcuts,
+  dispatchMarkdownEditorCommand,
+  isMarkdownEditorActive,
   registerMarkdownFormatIpcHandlers,
 } from "./main/ipc/markdown-format-ipc.mjs";
 import { registerNativeSurfaceOcclusionIpcHandlers } from "./main/ipc/native-surface-occlusion-ipc.mjs";
@@ -249,6 +251,15 @@ const nativeMenuService = createDesktopNativeMenuService({
   t: (messageId, values) => localeService.t(messageId, values),
   onNewWindow: () => createWindow(),
   onCheckForUpdates: checkForUpdatesFromNativeMenu,
+  isMarkdownEditorActive: () => {
+    const window = getLastFocusedWindow();
+    return Boolean(window && !window.isDestroyed() && isMarkdownEditorActive(window.webContents.id));
+  },
+  onMarkdownCommand: (command) => {
+    const window = getLastFocusedWindow();
+    if (!window || window.isDestroyed()) return;
+    dispatchMarkdownEditorCommand(window.webContents, command);
+  },
   onSelectTheme: (request) => {
     const window = getLastFocusedWindow();
     if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
@@ -437,6 +448,7 @@ async function createWindow(options = {}) {
   window.on("focus", () => {
     reapplyNativeWindowChrome(window);
     lastFocusedWindowId = webContentsId;
+    nativeMenuService.refresh();
     const state = windowStateById.get(webContentsId);
     state?.markFocused();
     gitAutoCommitHost.reconcileWindow(webContentsId);
@@ -553,6 +565,7 @@ async function createWindow(options = {}) {
     if (lastFocusedWindowId === webContentsId) {
       lastFocusedWindowId = getLastFocusedWindow()?.webContents.id ?? null;
     }
+    nativeMenuService.refresh();
   });
 
   return window;
@@ -842,6 +855,7 @@ function registerIpcHandlers() {
   });
   registerMarkdownFormatIpcHandlers({
     ipcMain: trustedIpcMain,
+    onActiveChange: () => nativeMenuService.refresh(),
   });
   registerWorkspaceNavigationIpcHandlers({
     ipcMain: trustedIpcMain,

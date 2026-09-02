@@ -15,6 +15,8 @@ export function createDesktopNativeMenuService({
   t,
   onNewWindow,
   onCheckForUpdates,
+  onMarkdownCommand = () => undefined,
+  isMarkdownEditorActive = () => false,
   onSelectTheme = () => undefined,
   onOpenThemesDirectory = () => undefined,
   logger = console,
@@ -28,6 +30,8 @@ export function createDesktopNativeMenuService({
   if (typeof onCheckForUpdates !== "function") {
     throw new TypeError("onCheckForUpdates must be a function.");
   }
+  if (typeof onMarkdownCommand !== "function") throw new TypeError("onMarkdownCommand must be a function.");
+  if (typeof isMarkdownEditorActive !== "function") throw new TypeError("isMarkdownEditorActive must be a function.");
   if (typeof onSelectTheme !== "function") throw new TypeError("onSelectTheme must be a function.");
   if (typeof onOpenThemesDirectory !== "function") throw new TypeError("onOpenThemesDirectory must be a function.");
 
@@ -106,10 +110,63 @@ export function createDesktopNativeMenuService({
     ],
   });
 
+  const markdownAction = (command) => action(`markdown.${command}`, () => onMarkdownCommand(command));
+  const markdownItem = (command, messageId, accelerator) => ({
+    id: `markdown.${command}`,
+    label: t(messageId),
+    enabled: isMarkdownEditorActive(),
+    ...(accelerator ? { accelerator } : {}),
+    click: markdownAction(command),
+  });
+
+  const createParagraphMenu = () => ({
+    id: "paragraph",
+    label: t("native.menu.paragraph"),
+    enabled: isMarkdownEditorActive(),
+    submenu: [
+      markdownItem("paragraph", "native.menu.paragraph.text"),
+      { type: "separator" },
+      ...([1, 2, 3, 4, 5, 6].map((level) => (
+        markdownItem(`heading-${level}`, `native.menu.paragraph.heading${level}`, `CmdOrCtrl+${level}`)
+      ))),
+      { type: "separator" },
+      markdownItem("bullet-list", "native.menu.paragraph.bulletList", "CmdOrCtrl+Shift+8"),
+      markdownItem("ordered-list", "native.menu.paragraph.orderedList", "CmdOrCtrl+Shift+7"),
+      markdownItem("task-list", "native.menu.paragraph.taskList", "CmdOrCtrl+Shift+9"),
+      { type: "separator" },
+      markdownItem("quote", "native.menu.paragraph.quote", "CmdOrCtrl+Shift+."),
+      markdownItem("code-block", "native.menu.paragraph.codeBlock"),
+      markdownItem("math-block", "native.menu.paragraph.mathBlock"),
+      { type: "separator" },
+      markdownItem("outdent", "native.menu.paragraph.outdent", "CmdOrCtrl+["),
+      markdownItem("indent", "native.menu.paragraph.indent", "CmdOrCtrl+]"),
+    ],
+  });
+
+  const createFormatMenu = () => ({
+    id: "format",
+    label: t("native.menu.format"),
+    enabled: isMarkdownEditorActive(),
+    submenu: [
+      markdownItem("strong", "native.menu.format.strong", "CmdOrCtrl+B"),
+      markdownItem("emphasis", "native.menu.format.emphasis", "CmdOrCtrl+I"),
+      markdownItem("underline", "native.menu.format.underline", "CmdOrCtrl+U"),
+      markdownItem("strike", "native.menu.format.strike", "CmdOrCtrl+Shift+X"),
+      { type: "separator" },
+      markdownItem("inline-code", "native.menu.format.inlineCode", "CmdOrCtrl+E"),
+      markdownItem("inline-math", "native.menu.format.inlineMath"),
+      markdownItem("link", "native.menu.format.link", "CmdOrCtrl+K"),
+      { type: "separator" },
+      markdownItem("clear-format", "native.menu.format.clear", "CmdOrCtrl+\\"),
+    ],
+  });
+
   const createApplicationMenuTemplate = () => [
     createAppMenu(),
     createFileMenu(),
     { role: "editMenu" },
+    createParagraphMenu(),
+    createFormatMenu(),
     { role: "viewMenu" },
     createThemeMenu(),
     { role: "windowMenu" },

@@ -18,6 +18,13 @@ export {
 export {
   MARKDOWN_FORMAT_ACTIVE_EVENT,
   MARKDOWN_FORMAT_SHORTCUT_EVENT,
+  MARKDOWN_EDITOR_COMMAND_EVENT,
   isMarkdownFormatCommand,
   type MarkdownFormatCommand,
 } from "./core/commands/markdownFormatHotkeys";
+export {
+  MARKDOWN_EDITOR_COMMANDS,
+  applyMarkdownEditorCommand,
+  isMarkdownEditorCommand,
+  type MarkdownEditorCommand,
+} from "./core/commands/markdownEditorCommands";

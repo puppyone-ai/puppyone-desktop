@@ -45,6 +45,8 @@ const MARKDOWN_ELEMENT_CAPABILITIES = {
   inlineCode: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
   link: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
   list: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
+  mathBlock: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
+  mathInline: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: false },
   mdxComponent: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
   rule: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
   strike: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
@@ -210,7 +212,7 @@ function isSelectableInlineFormat(element: MarkdownElement): boolean {
   return !(element.kind === "inlineHtml" && element.inlineHtml?.status !== "complete");
 }
 
-export type MarkdownInlineFormatKind = "emphasis" | "inlineCode" | "strike" | "strong" | "underline";
+export type MarkdownInlineFormatKind = "emphasis" | "inlineCode" | "mathInline" | "strike" | "strong" | "underline";
 
 export type MarkdownInlineFormatCoverage = {
   formats: MarkdownElement[];
