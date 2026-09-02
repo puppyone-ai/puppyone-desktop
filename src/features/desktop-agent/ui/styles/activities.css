@@ -60,7 +60,8 @@
 .desktop-agent-inline-part.is-muted { opacity: 0.72; }
 
 /* Cursor-style work evidence: compact disclosures, not a Research timeline. */
-.desktop-agent-tool-call {
+.desktop-agent-tool-call,
+.desktop-agent-tool-group {
   --agent-tool-row-padding-inline: 4px;
   --agent-tool-icon-size: 16px;
   --agent-evidence-rail-inline: calc(var(--agent-tool-row-padding-inline) + var(--agent-tool-icon-size) / 2);
@@ -68,6 +69,8 @@
   --agent-evidence-column-gap: 6px;
   --agent-evidence-row-height: 26px;
   --agent-evidence-row-center: calc(var(--agent-evidence-row-height) / 2);
+}
+.desktop-agent-tool-call {
   min-width: 0;
   margin: 0 4px var(--agent-work-handoff-gap);
   padding: 0;
@@ -76,6 +79,40 @@
   background: transparent;
   color: var(--agent-text-muted);
 }
+.desktop-agent-tool-group {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0 4px;
+  margin: 0 4px var(--agent-work-handoff-gap);
+}
+.desktop-agent-tool-group-item {
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
+}
+.desktop-agent-tool-group-item .desktop-agent-tool-call { margin: 0; }
+.desktop-agent-tool-group-item .desktop-agent-tool-row {
+  width: max-content;
+  max-width: 100%;
+  flex: 0 1 auto;
+  grid-template-columns: auto minmax(0, auto) auto;
+}
+.desktop-agent-tool-group-item .desktop-agent-tool-name {
+  max-width: 15ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.desktop-agent-tool-group-item .desktop-agent-tool-summary { display: none; }
+.desktop-agent-tool-group-item .desktop-agent-tool-status { grid-column: 3; }
+.desktop-agent-tool-group-detail {
+  width: 100%;
+  min-width: 0;
+  flex: 0 0 100%;
+}
+.desktop-agent-tool-group-detail:empty { display: none; }
+.desktop-agent-tool-group-detail > .desktop-agent-tool-branch { margin-block-end: 4px; }
 .desktop-agent-tool-header {
   display: flex;
   min-width: 0;

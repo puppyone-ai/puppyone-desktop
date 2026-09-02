@@ -1,7 +1,9 @@
 import { Check, Circle, CircleAlert, CircleSlash2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useLocalization } from "@puppyone/localization/react";
 import type { AgentActivityStatus } from "../../domain/agent-projection-types";
+import { useAgentToolGroupDisclosure } from "../AgentToolGroupContext";
 
 type AgentActivityShellProps = {
   title: string;
@@ -22,9 +24,24 @@ export function AgentActivityShell({
   className = "",
   defaultExpanded = false,
 }: AgentActivityShellProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const groupDisclosure = useAgentToolGroupDisclosure();
+  const [standaloneExpanded, setStandaloneExpanded] = useState(defaultExpanded);
+  const expanded = groupDisclosure
+    ? groupDisclosure.expandedId === groupDisclosure.itemId
+    : standaloneExpanded;
   const hasDetail = children !== undefined && children !== null && children !== false && children !== "";
   const visibleSummary = summary?.slice(0, 2_048);
+  const toggleExpanded = () => {
+    if (!hasDetail) return;
+    if (groupDisclosure) {
+      groupDisclosure.setExpandedId(expanded ? null : groupDisclosure.itemId);
+      return;
+    }
+    setStandaloneExpanded((value) => !value);
+  };
+  const detail = expanded && hasDetail
+    ? <div className="desktop-agent-tool-branch">{children}</div>
+    : null;
   return (
     <div className={`desktop-agent-tool-call is-${status}${hasDetail ? " has-detail" : ""}${expanded ? " is-expanded" : ""} ${className}`.trim()}>
       <div className="desktop-agent-tool-header">
@@ -33,7 +50,7 @@ export function AgentActivityShell({
           className="desktop-agent-tool-row"
           disabled={!hasDetail}
           aria-expanded={hasDetail ? expanded : undefined}
-          onClick={() => hasDetail && setExpanded((value) => !value)}
+          onClick={toggleExpanded}
         >
           <span className="desktop-agent-tool-icon" aria-hidden="true">{icon}</span>
           <strong className="desktop-agent-tool-name">{title}</strong>
@@ -41,7 +58,9 @@ export function AgentActivityShell({
           <StatusIcon status={status} />
         </button>
       </div>
-      {expanded && hasDetail && <div className="desktop-agent-tool-branch">{children}</div>}
+      {detail && groupDisclosure?.detailHost
+        ? createPortal(detail, groupDisclosure.detailHost)
+        : detail}
     </div>
   );
 }

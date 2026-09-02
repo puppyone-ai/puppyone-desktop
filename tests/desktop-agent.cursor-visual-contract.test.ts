@@ -302,7 +302,7 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).not.toMatch(/\.desktop-agent-tool-(?:name|row)[^{]*(?:is-read|is-edit)\s*\{[^}]*(?:color|background):/s);
     expect(css).toMatch(/\.desktop-agent-tool-branch\s*\{[^}]*border:\s*0[^}]*border-inline-start:\s*2px solid var\(--agent-border-subtle\)[^}]*background:\s*transparent/s);
     expect(css).toMatch(/\.desktop-agent-tool-call\s*\{[^}]*margin:\s*0 4px var\(--agent-work-handoff-gap\)/s);
-    expect(css).toMatch(/\.desktop-agent-tool-call\s*\{[^}]*--agent-evidence-rail-inline:\s*calc\(var\(--agent-tool-row-padding-inline\) \+ var\(--agent-tool-icon-size\) \/ 2\)[^}]*--agent-evidence-row-center:\s*calc\(var\(--agent-evidence-row-height\) \/ 2\)/s);
+    expect(css).toMatch(/\.desktop-agent-tool-call,\s*\.desktop-agent-tool-group\s*\{[^}]*--agent-evidence-rail-inline:\s*calc\(var\(--agent-tool-row-padding-inline\) \+ var\(--agent-tool-icon-size\) \/ 2\)[^}]*--agent-evidence-row-center:\s*calc\(var\(--agent-evidence-row-height\) \/ 2\)/s);
     expect(css).toMatch(/\.desktop-agent-tool-branch:has\(> \.desktop-agent-evidence-tree\)\s*\{[^}]*margin-inline:\s*0 4px[^}]*padding:\s*0[^}]*overflow:\s*clip[^}]*border:\s*0/s);
     expect(css).toMatch(/\.desktop-agent-evidence-tree\s*\{[^}]*gap:\s*0[^}]*padding-inline:\s*var\(--agent-evidence-rail-inline\) 0[^}]*font-family:\s*var\(--po-font-mono\)[^}]*font-size:\s*var\(--agent-font-size-meta\)[^}]*line-height:\s*1\.5/s);
     expect(css).toMatch(/\.desktop-agent-evidence-node\s*\{[^}]*min-height:\s*var\(--agent-evidence-row-height\)[^}]*grid-template-columns:\s*var\(--agent-evidence-elbow-width\) var\(--agent-tool-icon-size\) minmax\(0, 1fr\)[^}]*column-gap:\s*var\(--agent-evidence-column-gap\)[^}]*padding:\s*0/s);

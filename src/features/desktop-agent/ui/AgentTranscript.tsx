@@ -11,6 +11,7 @@ import type { AgentPart, AgentProjection } from "../domain/agent-projection-type
 import { AgentConnectionStatus } from "./AgentConnectionStatus";
 import { AgentMessagePart } from "./AgentMessagePart";
 import { AgentPartRenderer } from "./AgentPartRenderer";
+import { AgentToolActivityGroup } from "./AgentToolActivityGroup";
 import {
   agentTimelineLimits,
   buildAgentTimelineLayout,
@@ -22,6 +23,7 @@ import {
   type AgentTimelineScrollAnchor,
 } from "./agent-timeline-viewport";
 import { buildAgentTimeline } from "./agent-timeline-presentation";
+import { groupAgentToolRows } from "./agent-tool-group-presentation";
 import {
   agentTranscriptFadeGeometry,
   agentVirtualCanvasGeometry,
@@ -84,7 +86,11 @@ function AgentTranscriptView({
   const [viewportHeight, setViewportHeight] = useState(DEFAULT_VIEWPORT_HEIGHT);
   const [pinned, setPinned] = useState(initialPinned);
   const [unreadCount, setUnreadCount] = useState(0);
-  const timeline = useMemo(() => buildAgentTimeline(projection), [projection]);
+  const sourceTimeline = useMemo(() => buildAgentTimeline(projection), [projection]);
+  const timeline = useMemo(() => ({
+    parts: sourceTimeline.parts,
+    rows: groupAgentToolRows(sourceTimeline.rows, sourceTimeline.parts),
+  }), [sourceTimeline]);
   const layout = useMemo(
     () => buildAgentTimelineLayout(timeline.rows, measurements),
     [measurements, timeline.rows],
@@ -183,6 +189,15 @@ function AgentTranscriptView({
     pendingMeasurementsRef.current.set(rowId, height);
     if (measurementFrameRef.current !== null) return;
     measurementFrameRef.current = window.requestAnimationFrame(flushMeasurements);
+  }, [flushMeasurements]);
+
+  const commitMeasurement = useCallback((rowId: string, height: number) => {
+    pendingMeasurementsRef.current.set(rowId, height);
+    if (measurementFrameRef.current !== null) {
+      window.cancelAnimationFrame(measurementFrameRef.current);
+      measurementFrameRef.current = null;
+    }
+    flushMeasurements();
   }, [flushMeasurements]);
 
   const observeMeasuredRow = useCallback((rowId: string, element: HTMLDivElement | null) => {
@@ -330,13 +345,16 @@ function AgentTranscriptView({
           <div ref={canvasRef} className="desktop-agent-virtual-canvas" style={agentVirtualCanvasGeometry(layout.totalHeight)}>
             {visibleRows.map((row, relativeIndex) => {
               const index = range.start + relativeIndex;
-              const part = timeline.parts.get(row.partId);
+              const parts = row.partIds
+                .map((partId) => timeline.parts.get(partId))
+                .filter((part): part is AgentPart => Boolean(part));
+              const part = parts[0];
               if (!part) return null;
               // User prompts are already shown optimistically. Animating their
               // committed replacement makes the same message visibly enter
               // twice during the first-turn handoff.
               const animate = part.kind !== "user" && !seenPartIdsRef.current.has(part.id);
-              seenPartIdsRef.current.add(part.id);
+              for (const visiblePart of parts) seenPartIdsRef.current.add(visiblePart.id);
               return (
                 <MeasuredRow
                   key={row.id}
@@ -347,7 +365,15 @@ function AgentTranscriptView({
                   animate={animate}
                   onMeasureElement={observeMeasuredRow}
                 >
-                  <MemoAgentPartRenderer part={part} runtimeLabel={runtimeLabel} onOpenFile={onOpenFile} />
+                  {row.toolGroup
+                    ? <AgentToolActivityGroup
+                        parts={parts}
+                        rowId={row.id}
+                        runtimeLabel={runtimeLabel}
+                        onOpenFile={onOpenFile}
+                        onRowHeightChange={commitMeasurement}
+                      />
+                    : <MemoAgentPartRenderer part={part} runtimeLabel={runtimeLabel} onOpenFile={onOpenFile} />}
                 </MeasuredRow>
               );
             })}
