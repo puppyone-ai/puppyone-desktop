@@ -358,6 +358,7 @@
   "panes.viewActions": "View",
   "tabs.close": "Close {name}",
   "tabs.openEditors": "Open editors",
+  "unavailable.resourceLimit": "This file exceeds the safe preview limit ({limit}).",
   "unavailable.title": "Cannot open in editor",
   "viewer.chooseFor": "Choose a viewer for {name}",
   "viewer.noHostSurface": "This viewer pack cannot render here — no host surface is available."

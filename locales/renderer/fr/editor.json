@@ -358,6 +358,7 @@
   "panes.viewActions": "Affichage",
   "tabs.close": "Fermer {name}",
   "tabs.openEditors": "Éditeurs ouverts",
+  "unavailable.resourceLimit": "Ce fichier dépasse la limite de prévisualisation sûre ({limit}).",
   "unavailable.title": "Impossible d’ouvrir dans l’éditeur",
   "viewer.chooseFor": "Choisissez une visionneuse pour {name}",
   "viewer.noHostSurface": "Ce pack de visualisation ne peut pas être rendu ici : aucune surface hôte n’est disponible."

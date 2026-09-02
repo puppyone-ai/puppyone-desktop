@@ -358,6 +358,7 @@
   "panes.viewActions": "Exibição",
   "tabs.close": "Fechar {name}",
   "tabs.openEditors": "Editores abertos",
+  "unavailable.resourceLimit": "Este arquivo excede o limite seguro de visualização ({limit}).",
   "unavailable.title": "Não foi possível abrir no editor",
   "viewer.chooseFor": "Escolha um visualizador para {name}",
   "viewer.noHostSurface": "Este pacote de visualizador não pode ser renderizado aqui — nenhuma superfície do host está disponível."

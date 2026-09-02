@@ -8,7 +8,7 @@ import type {
 import type { FileFormat } from "../../core/fileFormats";
 import type { FileIconThemeId } from "../../file/fileIcons";
 import type { AiEditFile } from "../ai-edits/types";
-import type { PresetViewerSource } from "./viewerContract";
+import type { PresetViewerResourcePolicy, PresetViewerSource } from "./viewerContract";
 import type { DocumentSourceKind } from "../documentSource";
 import type { PresetViewerDefinition } from "./presetViewerManifest";
 
@@ -152,6 +152,8 @@ export type EditorViewerMatch = {
 
 export type PresetViewerRenderContext = EditorViewerMatch & {
   content: string;
+  /** Host-admitted immutable budget for this concrete Viewer execution. */
+  resourcePolicy: PresetViewerResourcePolicy;
   aiEditFile?: AiEditFile | null;
   fileUrl?: string | null;
   fileUrlLoading: boolean;

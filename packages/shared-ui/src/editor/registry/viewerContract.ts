@@ -4,7 +4,7 @@
  * registry; a viewer contribution only declares host capabilities.
  */
 
-export const PRESET_VIEWER_CONTRACT_VERSION = 5 as const;
+export const PRESET_VIEWER_CONTRACT_VERSION = 6 as const;
 
 export const PRESET_VIEWER_CAPABILITIES = ["edit", "preview", "placeholder"] as const;
 export type CoreViewerCapability = (typeof PRESET_VIEWER_CAPABILITIES)[number];
@@ -24,21 +24,34 @@ export type PresetViewerSource = (typeof PRESET_VIEWER_SOURCES)[number];
 export const PRESET_VIEWER_RUNTIMES = ["eager", "lazy"] as const;
 export type PresetViewerRuntime = (typeof PRESET_VIEWER_RUNTIMES)[number];
 
-/** Where format-owned code is allowed to execute. This is a fault boundary,
- * unlike `runtime`, which controls only module loading. */
-export const PRESET_VIEWER_EXECUTION_ISOLATIONS = [
+/** Where the visual surface is allowed to execute. This is the renderer fault
+ * boundary; it is intentionally independent from parser/compute placement. */
+export const PRESET_VIEWER_SURFACE_ISOLATIONS = [
   "inline",
-  "worker-backed",
   "isolated-webcontents",
 ] as const;
-export type PresetViewerExecutionIsolation =
-  (typeof PRESET_VIEWER_EXECUTION_ISOLATIONS)[number];
+export type PresetViewerSurfaceIsolation =
+  (typeof PRESET_VIEWER_SURFACE_ISOLATIONS)[number];
+
+/** Where CPU-intensive format work executes. A worker preserves UI
+ * responsiveness, but is not a renderer-process fault boundary. */
+export const PRESET_VIEWER_COMPUTE_ISOLATIONS = ["main-thread", "worker"] as const;
+export type PresetViewerComputeIsolation =
+  (typeof PRESET_VIEWER_COMPUTE_ISOLATIONS)[number];
+
+/** Whether document-controlled executable markup receives a nested browser
+ * sandbox. This is a content-authority boundary, not process containment. */
+export const PRESET_VIEWER_CONTENT_SANDBOXES = ["none", "sandboxed-frame"] as const;
+export type PresetViewerContentSandbox =
+  (typeof PRESET_VIEWER_CONTENT_SANDBOXES)[number];
 
 export const PRESET_VIEWER_MEMORY_CLASSES = ["small", "medium", "large"] as const;
 export type PresetViewerMemoryClass = (typeof PRESET_VIEWER_MEMORY_CLASSES)[number];
 
 export type PresetViewerResourcePolicy = Readonly<{
   memoryClass: PresetViewerMemoryClass;
+  /** Maximum UTF-8 source or declared resource bytes admitted to one surface. */
+  maxSourceBytes: number;
   maxCanvasPixels: number;
   maxActiveCanvases: number;
   maxWorkers: number;

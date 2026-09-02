@@ -15,8 +15,11 @@ type SurfaceBootstrap = Readonly<{
   title: string;
   safeMode: boolean;
   resourcePolicy: Readonly<{
+    memoryClass: "small" | "medium" | "large";
+    maxSourceBytes: number;
     maxCanvasPixels: number;
     maxActiveCanvases: number;
+    maxWorkers: number;
   }>;
   appearance: SurfaceAppearance;
 }>;

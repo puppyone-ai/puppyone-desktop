@@ -358,6 +358,7 @@
   "panes.viewActions": "Vista",
   "tabs.close": "Cerrar {name}",
   "tabs.openEditors": "Editores abiertos",
+  "unavailable.resourceLimit": "Este archivo supera el límite seguro de vista previa ({limit}).",
   "unavailable.title": "No se puede abrir en el editor",
   "viewer.chooseFor": "Elige un visor para {name}",
   "viewer.noHostSurface": "Este paquete de visor no puede mostrarse aquí: no hay una superficie anfitriona disponible."

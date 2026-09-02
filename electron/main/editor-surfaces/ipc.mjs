@@ -20,7 +20,13 @@ export function registerEditorSurfaceIpcHandlers({
     manager.activate({ ...request, ownerWebContentsId: event.sender.id })
   ));
   trustedIpcMain.handle(EDITOR_SURFACE_CHANNELS.setBounds, (event, request) => (
-    manager.setBounds(request?.sessionId, request?.bounds, event.sender.id)
+    manager.setBounds(
+      request?.sessionId,
+      request?.bounds,
+      event.sender.id,
+      request?.geometryRevision,
+      request?.visible,
+    )
   ));
   trustedIpcMain.handle(EDITOR_SURFACE_CHANNELS.updateAppearance, (event, request) => (
     manager.updateAppearance(request?.sessionId, request?.appearance, event.sender.id)

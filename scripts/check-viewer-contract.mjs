@@ -83,7 +83,10 @@ if (
 
 const pdfDefinition = getPresetViewerDefinitionForViewerId("pdf-preview");
 if (
-  pdfDefinition.executionIsolation !== "isolated-webcontents"
+  pdfDefinition.surfaceIsolation !== "isolated-webcontents"
+  || pdfDefinition.computeIsolation !== "worker"
+  || pdfDefinition.contentSandbox !== "none"
+  || pdfDefinition.resourcePolicy.maxSourceBytes !== 512 * 1024 * 1024
   || pdfDefinition.resourcePolicy.maxCanvasPixels <= 0
   || pdfDefinition.resourcePolicy.maxActiveCanvases <= 0
   || pdfDefinition.resourcePolicy.maxWorkers !== 1
@@ -97,10 +100,41 @@ const presetRendererSource = readFileSync(
   "utf8",
 );
 if (
-  !presetRendererSource.includes('viewer.executionIsolation === "isolated-webcontents"')
+  !presetRendererSource.includes('viewer.surfaceIsolation === "isolated-webcontents"')
   || !presetRendererSource.includes("runtimeHost.renderIsolatedSurface")
+  || !presetRendererSource.includes('if (viewer.surfaceIsolation === "isolated-webcontents") return Promise.resolve()')
 ) {
   errors.push("Preset Viewer rendering no longer delegates isolated execution through the runtime Host port");
+}
+if (presetRendererSource.includes('viewer.surfaceIsolation === "isolated-webcontents" && runtimeHost')) {
+  errors.push("An isolated Preset Viewer can silently fall back to the shell renderer when its runtime Host is absent");
+}
+
+const editorDocumentHostSource = readFileSync(
+  path.join(repoRoot, "packages/shared-ui/src/editor/host/EditorDocumentHost.tsx"),
+  "utf8",
+);
+for (const token of ["exceedsUtf8ByteLimit", "viewer.resourcePolicy.maxSourceBytes", "editor.unavailable.resourceLimit"]) {
+  if (!editorDocumentHostSource.includes(token)) {
+    errors.push(`Editor Document Host no longer enforces manifest source admission (${token})`);
+  }
+}
+
+const officeViewerSource = readFileSync(
+  path.join(repoRoot, "packages/shared-ui/src/editor/viewers/office/OfficeViewer.tsx"),
+  "utf8",
+);
+if (!officeViewerSource.includes("maxBytes: maxSourceBytes")) {
+  errors.push("Office Preview no longer consumes the canonical source byte budget");
+}
+
+for (const relativePath of [
+  "packages/shared-ui/src/editor/viewers/html/HtmlViewer.tsx",
+  "packages/shared-ui/src/editor/viewers/app/SandboxedAppFrame.tsx",
+]) {
+  if (!readFileSync(path.join(repoRoot, relativePath), "utf8").includes("sandbox=")) {
+    errors.push(`${relativePath} no longer implements its declared sandboxed-frame boundary`);
+  }
 }
 
 const editorSurfaceManagerSource = readFileSync(
