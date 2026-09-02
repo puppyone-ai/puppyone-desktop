@@ -184,6 +184,11 @@ export type {
 } from "./editor/host/DataNodeEditorHost";
 export { EditorDocumentHost } from "./editor/host/EditorDocumentHost";
 export type { EditorDocumentHostProps } from "./editor/host/EditorDocumentHost";
+export { PresetViewerRuntimeHostProvider } from "./editor/host/PresetViewerRuntimeHost";
+export type {
+  IsolatedPresetViewerSurfaceRenderer,
+  PresetViewerRuntimeHostAdapter,
+} from "./editor/host/PresetViewerRuntimeHost";
 export {
   closestWorkbenchSplitDropEdge,
   collectWorkbenchSplitLeaves,
@@ -384,6 +389,8 @@ export type {
 export {
   PRESET_VIEWER_CAPABILITIES,
   PRESET_VIEWER_CONTRACT_VERSION,
+  PRESET_VIEWER_EXECUTION_ISOLATIONS,
+  PRESET_VIEWER_MEMORY_CLASSES,
   PRESET_VIEWER_RUNTIMES,
   PRESET_VIEWER_SOURCES,
   VIEWER_SURFACE_PREPARATIONS,
@@ -393,6 +400,10 @@ export {
 } from "./editor/registry/viewerContract";
 export type {
   PresetViewerContractVersion,
+  PresetViewerExecutionIsolation,
+  PresetViewerMemoryClass,
+  PresetViewerRecoveryPolicy,
+  PresetViewerResourcePolicy,
   PresetViewerRuntime,
   PresetViewerSource,
   ViewerSurfacePreparation,

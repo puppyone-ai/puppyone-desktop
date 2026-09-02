@@ -4,7 +4,10 @@ import "./styles.css";
 
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { flushActiveDocumentSessions } from "@puppyone/shared-ui";
+import {
+  flushActiveDocumentSessions,
+  PresetViewerRuntimeHostProvider,
+} from "@puppyone/shared-ui";
 import { LocalizationProvider } from "@puppyone/localization/react";
 import { App } from "./App";
 import { ScrollbarActivity } from "./components/ScrollbarActivity";
@@ -13,6 +16,7 @@ import { FeatureFlagsProvider } from "./features/flags";
 import { TypographyCatalogProvider } from "./features/typography";
 import { bootstrapRendererLocalization } from "./localization";
 import { startMarkdownFormatShortcutBridge } from "./lib/markdownFormatShortcutBridge";
+import { desktopPresetViewerRuntimeHost } from "./features/editor-surfaces";
 
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("PuppyOne renderer root is unavailable.");
@@ -115,7 +119,13 @@ async function renderApplication() {
     surface = (
       <TypographyCatalogProvider>
         <FeatureFlagsProvider>
-          <App />
+          <PresetViewerRuntimeHostProvider
+            adapter={window.puppyoneDesktop?.editorSurfaces
+              ? desktopPresetViewerRuntimeHost
+              : null}
+          >
+            <App />
+          </PresetViewerRuntimeHostProvider>
         </FeatureFlagsProvider>
       </TypographyCatalogProvider>
     );

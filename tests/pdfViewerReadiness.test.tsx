@@ -47,10 +47,8 @@ vi.mock("pdfjs-dist/build/pdf.worker.min.mjs?url", () => ({
 let root: Root | null = null;
 
 beforeEach(() => {
-  vi.stubGlobal("fetch", vi.fn(async () => ({
-    ok: true,
-    arrayBuffer: async () => new ArrayBuffer(16),
-  })));
+  pdfMocks.getDocument.mockClear();
+  pdfMocks.render.mockClear();
   vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(900);
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
     drawImage: vi.fn(),
@@ -81,6 +79,13 @@ describe("PDF Viewer readiness", () => {
       />,
     )));
     await waitFor(() => pdfMocks.render.mock.calls.length === 1);
+
+    expect(pdfMocks.getDocument).toHaveBeenCalledWith({
+      url: "puppyone-local://workspace/report.pdf",
+      disableAutoFetch: false,
+      disableRange: false,
+      disableStream: false,
+    });
 
     const surface = container.querySelector<HTMLElement>(".puppyone-pdf-preview");
     expect(surface?.getAttribute("aria-busy")).toBe("true");

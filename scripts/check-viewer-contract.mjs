@@ -72,11 +72,52 @@ if (
   !pdfViewerSource.includes("getDocument({")
   || !pdfViewerSource.includes("await renderTask.promise")
   || !pdfViewerSource.includes("onFirstPageReady")
+  || !pdfViewerSource.includes("PdfRenderScheduler")
+  || !pdfViewerSource.includes("resolvePdfCanvasMetrics")
   || /<iframe\b/.test(pdfViewerSource)
 ) {
   errors.push(
     "PDF Viewer must use PDF.js canvas first-frame readiness and cannot regress to an iframe",
   );
+}
+
+const pdfDefinition = getPresetViewerDefinitionForViewerId("pdf-preview");
+if (
+  pdfDefinition.executionIsolation !== "isolated-webcontents"
+  || pdfDefinition.resourcePolicy.maxCanvasPixels <= 0
+  || pdfDefinition.resourcePolicy.maxActiveCanvases <= 0
+  || pdfDefinition.resourcePolicy.maxWorkers !== 1
+  || pdfDefinition.recoveryPolicy.supportsSafeMode !== true
+) {
+  errors.push("PDF Viewer must retain isolated execution, finite resource budgets, and safe-mode recovery");
+}
+
+const presetRendererSource = readFileSync(
+  path.join(repoRoot, "packages/shared-ui/src/editor/host/PresetViewerRenderer.tsx"),
+  "utf8",
+);
+if (
+  !presetRendererSource.includes('viewer.executionIsolation === "isolated-webcontents"')
+  || !presetRendererSource.includes("runtimeHost.renderIsolatedSurface")
+) {
+  errors.push("Preset Viewer rendering no longer delegates isolated execution through the runtime Host port");
+}
+
+const editorSurfaceManagerSource = readFileSync(
+  path.join(repoRoot, "electron/main/editor-surfaces/session-manager.mjs"),
+  "utf8",
+);
+for (const token of [
+  'sandbox: true',
+  'contextIsolation: true',
+  'nodeIntegration: false',
+  '"render-process-gone"',
+  '"unresponsive"',
+  'forcefullyCrashRenderer',
+]) {
+  if (!editorSurfaceManagerSource.includes(token)) {
+    errors.push(`Built-in Editor Surface fault domain is missing ${token}`);
+  }
 }
 
 const documentSurfaceConsumers = [

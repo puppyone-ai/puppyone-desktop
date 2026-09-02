@@ -4,7 +4,7 @@
  * registry; a viewer contribution only declares host capabilities.
  */
 
-export const PRESET_VIEWER_CONTRACT_VERSION = 4 as const;
+export const PRESET_VIEWER_CONTRACT_VERSION = 5 as const;
 
 export const PRESET_VIEWER_CAPABILITIES = ["edit", "preview", "placeholder"] as const;
 export type CoreViewerCapability = (typeof PRESET_VIEWER_CAPABILITIES)[number];
@@ -23,6 +23,31 @@ export type PresetViewerSource = (typeof PRESET_VIEWER_SOURCES)[number];
  */
 export const PRESET_VIEWER_RUNTIMES = ["eager", "lazy"] as const;
 export type PresetViewerRuntime = (typeof PRESET_VIEWER_RUNTIMES)[number];
+
+/** Where format-owned code is allowed to execute. This is a fault boundary,
+ * unlike `runtime`, which controls only module loading. */
+export const PRESET_VIEWER_EXECUTION_ISOLATIONS = [
+  "inline",
+  "worker-backed",
+  "isolated-webcontents",
+] as const;
+export type PresetViewerExecutionIsolation =
+  (typeof PRESET_VIEWER_EXECUTION_ISOLATIONS)[number];
+
+export const PRESET_VIEWER_MEMORY_CLASSES = ["small", "medium", "large"] as const;
+export type PresetViewerMemoryClass = (typeof PRESET_VIEWER_MEMORY_CLASSES)[number];
+
+export type PresetViewerResourcePolicy = Readonly<{
+  memoryClass: PresetViewerMemoryClass;
+  maxCanvasPixels: number;
+  maxActiveCanvases: number;
+  maxWorkers: number;
+}>;
+
+export type PresetViewerRecoveryPolicy = Readonly<{
+  maxAutomaticRetries: number;
+  supportsSafeMode: boolean;
+}>;
 
 /** Stable visual families consumed by Interface Style surface adapters. */
 export const VIEWER_SURFACE_FAMILIES = [

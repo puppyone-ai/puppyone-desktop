@@ -77,6 +77,14 @@ describe("preset viewer contribution contract", () => {
     ))).toBe(true);
     expect(resolveEditorViewer(document("report.pdf")).viewer).toMatchObject({
       runtime: "lazy",
+      executionIsolation: "isolated-webcontents",
+      resourcePolicy: {
+        memoryClass: "large",
+        maxCanvasPixels: 8_388_608,
+        maxActiveCanvases: 6,
+        maxWorkers: 1,
+      },
+      recoveryPolicy: { maxAutomaticRetries: 0, supportsSafeMode: true },
       surfacePreparation: "requires-visible",
       readinessSignal: "first-rendered-frame",
     });
@@ -86,6 +94,9 @@ describe("preset viewer contribution contract", () => {
       .toBe("requires-visible");
     expect(resolveEditorViewer(document("photo.png")).viewer.surfacePreparation)
       .toBe("hidden-safe");
+    expect(PRESET_VIEWER_MANIFEST.viewers.every((viewer) => (
+      Object.isFrozen(viewer.resourcePolicy) && Object.isFrozen(viewer.recoveryPolicy)
+    ))).toBe(true);
   });
 
   it.each([

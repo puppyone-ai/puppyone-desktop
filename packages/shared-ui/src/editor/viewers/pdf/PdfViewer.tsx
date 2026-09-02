@@ -12,8 +12,10 @@ import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type RefObject,
 } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
@@ -23,8 +25,15 @@ import {
   ResourcePreviewState,
   type ResourceViewerProps,
 } from "../media/ResourceViewers";
+import { PdfRenderScheduler } from "./PdfRenderScheduler";
+import {
+  resolvePdfCanvasMetrics,
+  resolvePdfRenderBudget,
+  type PdfRenderBudget,
+} from "./pdfRenderPolicy";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+const EMPTY_PDF_RESOURCE_POLICY = Object.freeze({});
 
 export function PdfResourceViewer({
   document,
@@ -44,45 +53,58 @@ export function PdfResourceViewer({
   );
 }
 
-function PdfDocumentPreview({ url, title }: { url: string; title: string }) {
+export function PdfDocumentPreview({
+  url,
+  title,
+  safeMode = false,
+  resourcePolicy = EMPTY_PDF_RESOURCE_POLICY,
+}: {
+  url: string;
+  title: string;
+  safeMode?: boolean;
+  resourcePolicy?: Readonly<{
+    maxCanvasPixels?: number;
+    maxActiveCanvases?: number;
+  }>;
+}) {
   const { t } = useLocalization();
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [firstPageReady, setFirstPageReady] = useState(false);
   const markFirstPageReady = useCallback(() => setFirstPageReady(true), []);
+  const budget = useMemo(
+    () => resolvePdfRenderBudget(resourcePolicy, safeMode),
+    [resourcePolicy.maxActiveCanvases, resourcePolicy.maxCanvasPixels, safeMode],
+  );
 
   useEffect(() => {
-    const controller = new AbortController();
     let loadingTask: PDFDocumentLoadingTask | null = null;
-    let loadedDocument: PDFDocumentProxy | null = null;
     let disposed = false;
 
     setPdf(null);
     setLoadError(null);
     setFirstPageReady(false);
 
-    void (async () => {
-      try {
-        const response = await fetch(url, { signal: controller.signal });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const bytes = new Uint8Array(await response.arrayBuffer());
-        if (disposed) return;
-
-        loadingTask = getDocument({
-          data: bytes,
-        });
-        loadedDocument = await loadingTask.promise;
+    try {
+      loadingTask = getDocument({
+        url,
+        disableAutoFetch: false,
+        disableRange: false,
+        disableStream: false,
+      });
+      void loadingTask.promise.then((loadedDocument) => {
         if (disposed) return;
         setPdf(loadedDocument);
-      } catch (reason) {
-        if (disposed || controller.signal.aborted) return;
+      }, (reason) => {
+        if (disposed) return;
         setLoadError(reason instanceof Error ? reason.message : String(reason));
-      }
-    })();
+      });
+    } catch (reason) {
+      setLoadError(reason instanceof Error ? reason.message : String(reason));
+    }
 
     return () => {
       disposed = true;
-      controller.abort();
       if (loadingTask) void loadingTask.destroy();
     };
   }, [url]);
@@ -103,6 +125,7 @@ function PdfDocumentPreview({ url, title }: { url: string; title: string }) {
       className="native-preview puppyone-pdf-preview"
       data-po-scrollbar="content"
       data-pdf-url={url}
+      data-pdf-safe-mode={safeMode ? "true" : undefined}
       data-preview-state={firstPageReady ? "ready" : "loading"}
       aria-label={title}
       aria-busy={!firstPageReady}
@@ -111,6 +134,7 @@ function PdfDocumentPreview({ url, title }: { url: string; title: string }) {
       {pdf ? (
         <PdfPages
           pdf={pdf}
+          budget={budget}
           onFirstPageReady={markFirstPageReady}
         />
       ) : null}
@@ -120,12 +144,39 @@ function PdfDocumentPreview({ url, title }: { url: string; title: string }) {
 
 function PdfPages({
   pdf,
+  budget,
   onFirstPageReady,
 }: {
   pdf: PDFDocumentProxy;
+  budget: PdfRenderBudget;
   onFirstPageReady: () => void;
 }) {
   const scrollRootRef = useRef<HTMLDivElement>(null);
+  const [nearPages, setNearPages] = useState<ReadonlyMap<number, number>>(
+    () => new Map([[1, 0]]),
+  );
+  const scheduler = useMemo(
+    () => new PdfRenderScheduler(budget.maxConcurrentRenders),
+    [budget.maxConcurrentRenders],
+  );
+  const activePages = useMemo(() => new Set(
+    [...nearPages.entries()]
+      .sort((left, right) => left[1] - right[1] || left[0] - right[0])
+      .slice(0, budget.maxResidentCanvases)
+      .map(([pageNumber]) => pageNumber),
+  ), [budget.maxResidentCanvases, nearPages]);
+  const reportProximity = useCallback((pageNumber: number, distance: number | null) => {
+    setNearPages((current) => {
+      const previous = current.get(pageNumber);
+      if (distance === null && previous === undefined) return current;
+      if (distance !== null && previous === distance) return current;
+      const next = new Map(current);
+      if (distance === null) next.delete(pageNumber);
+      else next.set(pageNumber, distance);
+      return next;
+    });
+  }, []);
+
   return (
     <div ref={scrollRootRef} className="puppyone-pdf-pages">
       {Array.from({ length: pdf.numPages }, (_, index) => {
@@ -133,9 +184,13 @@ function PdfPages({
         return (
           <PdfPageCanvas
             key={pageNumber}
+            active={activePages.has(pageNumber)}
+            budget={budget}
             pdf={pdf}
             pageNumber={pageNumber}
+            scheduler={scheduler}
             scrollRootRef={scrollRootRef}
+            onProximityChange={reportProximity}
             onRendered={pageNumber === 1 ? onFirstPageReady : undefined}
           />
         );
@@ -145,131 +200,157 @@ function PdfPages({
 }
 
 function PdfPageCanvas({
+  active,
+  budget,
   pdf,
   pageNumber,
+  scheduler,
   scrollRootRef,
+  onProximityChange,
   onRendered,
 }: {
+  active: boolean;
+  budget: PdfRenderBudget;
   pdf: PDFDocumentProxy;
   pageNumber: number;
+  scheduler: PdfRenderScheduler;
   scrollRootRef: RefObject<HTMLDivElement>;
+  onProximityChange: (pageNumber: number, distance: number | null) => void;
   onRendered?: () => void;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [active, setActive] = useState(pageNumber === 1);
   const [renderWidth, setRenderWidth] = useState(0);
+  const [aspectRatio, setAspectRatio] = useState(612 / 792);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [rendered, setRendered] = useState(false);
   const renderedRef = useRef(false);
 
   useEffect(() => {
-    if (active) return undefined;
     const wrapper = wrapperRef.current;
     if (!wrapper || typeof IntersectionObserver === "undefined") {
-      setActive(true);
-      return undefined;
+      onProximityChange(pageNumber, pageNumber === 1 ? 0 : pageNumber);
+      return () => onProximityChange(pageNumber, null);
     }
-
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        setActive(true);
-        observer.disconnect();
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry?.isIntersecting) {
+        onProximityChange(pageNumber, null);
+        return;
       }
+      const rootTop = entry.rootBounds?.top ?? 0;
+      onProximityChange(pageNumber, Math.round(Math.abs(entry.boundingClientRect.top - rootTop)));
     }, {
       root: scrollRootRef.current,
-      rootMargin: "800px 0px",
+      rootMargin: `${budget.overscanPixels}px 0px`,
     });
     observer.observe(wrapper);
-    return () => observer.disconnect();
-  }, [active, scrollRootRef]);
-
-  const measure = useCallback(() => {
-    const width = Math.floor(wrapperRef.current?.clientWidth ?? 0);
-    setRenderWidth((current) => current === width ? current : width);
-  }, []);
+    return () => {
+      observer.disconnect();
+      onProximityChange(pageNumber, null);
+    };
+  }, [budget.overscanPixels, onProximityChange, pageNumber, scrollRootRef]);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return undefined;
-    measure();
-    if (typeof ResizeObserver === "undefined") return undefined;
-    const observer = new ResizeObserver(measure);
+    let frame: number | null = null;
+    const measure = () => {
+      frame = null;
+      const width = Math.floor(wrapper.clientWidth);
+      setRenderWidth((current) => Math.abs(current - width) < 2 ? current : width);
+    };
+    const scheduleMeasure = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(measure);
+    };
+    scheduleMeasure();
+    if (typeof ResizeObserver === "undefined") {
+      return () => {
+        if (frame !== null) window.cancelAnimationFrame(frame);
+      };
+    }
+    const observer = new ResizeObserver(scheduleMeasure);
     observer.observe(wrapper);
-    return () => observer.disconnect();
-  }, [measure]);
+    return () => {
+      observer.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, []);
 
   useEffect(() => {
-    if (!active || renderWidth <= 0) return undefined;
     const canvas = canvasRef.current;
-    if (!canvas) return undefined;
+    if (!active || renderWidth <= 0 || !canvas) {
+      if (canvas) releaseCanvas(canvas);
+      setRendered(false);
+      return undefined;
+    }
 
-    let cancelled = false;
+    const controller = new AbortController();
     let page: PDFPageProxy | null = null;
     let renderTask: RenderTask | null = null;
-    const nextCanvas = document.createElement("canvas");
     setRenderError(null);
     setRendered(false);
 
-    void (async () => {
-      try {
-        page = await pdf.getPage(pageNumber);
-        if (cancelled) return;
+    void scheduler.schedule(async () => {
+      page = await pdf.getPage(pageNumber);
+      if (controller.signal.aborted) throw createAbortError();
 
-        const baseViewport = page.getViewport({ scale: 1 });
-        const availableWidth = Math.max(1, renderWidth - 32);
-        const cssScale = Math.min(2, availableWidth / baseViewport.width);
-        const viewport = page.getViewport({ scale: cssScale });
-        const outputScale = Math.min(window.devicePixelRatio || 1, 2);
+      const baseViewport = page.getViewport({ scale: 1 });
+      setAspectRatio(baseViewport.width / baseViewport.height);
+      const availableWidth = Math.max(1, renderWidth - 32);
+      const cssScale = Math.min(2, availableWidth / baseViewport.width);
+      const viewport = page.getViewport({ scale: cssScale });
+      const metrics = resolvePdfCanvasMetrics({
+        cssWidth: viewport.width,
+        cssHeight: viewport.height,
+        devicePixelRatio: window.devicePixelRatio || 1,
+        budget,
+      });
+      canvas.width = metrics.width;
+      canvas.height = metrics.height;
+      canvas.style.width = `${Math.floor(viewport.width)}px`;
+      canvas.style.height = `${Math.floor(viewport.height)}px`;
 
-        nextCanvas.width = Math.max(1, Math.floor(viewport.width * outputScale));
-        nextCanvas.height = Math.max(1, Math.floor(viewport.height * outputScale));
+      renderTask = page.render({
+        canvas,
+        viewport,
+        transform: metrics.outputScale === 1
+          ? undefined
+          : [metrics.outputScale, 0, 0, metrics.outputScale, 0, 0],
+        background: "rgb(255, 255, 255)",
+      });
+      await renderTask.promise;
+      if (controller.signal.aborted) throw createAbortError();
 
-        renderTask = page.render({
-          canvas: nextCanvas,
-          viewport,
-          transform: outputScale === 1
-            ? undefined
-            : [outputScale, 0, 0, outputScale, 0, 0],
-          background: "rgb(255, 255, 255)",
-        });
-        await renderTask.promise;
-        if (cancelled) return;
-
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("PDF canvas context is unavailable.");
-        canvas.width = nextCanvas.width;
-        canvas.height = nextCanvas.height;
-        canvas.style.width = `${Math.floor(viewport.width)}px`;
-        canvas.style.height = `${Math.floor(viewport.height)}px`;
-        context.drawImage(nextCanvas, 0, 0);
-        setRenderError(null);
-        setRendered(true);
-        if (!renderedRef.current) {
-          renderedRef.current = true;
-          onRendered?.();
-        }
-      } catch (reason) {
-        if (cancelled || isRenderCancellation(reason)) return;
-        setRenderError(reason instanceof Error ? reason.message : String(reason));
+      setRendered(true);
+      if (!renderedRef.current) {
+        renderedRef.current = true;
+        onRendered?.();
       }
-    })();
+    }, controller.signal, pageNumber === 1 ? 100 : 0).catch((reason) => {
+      if (controller.signal.aborted || isRenderCancellation(reason)) return;
+      releaseCanvas(canvas);
+      setRenderError(reason instanceof Error ? reason.message : String(reason));
+    }).finally(() => {
+      page?.cleanup();
+    });
 
     return () => {
-      cancelled = true;
+      controller.abort();
       renderTask?.cancel();
       page?.cleanup();
-      nextCanvas.width = 0;
-      nextCanvas.height = 0;
+      releaseCanvas(canvas);
     };
-  }, [active, onRendered, pageNumber, pdf, renderWidth]);
+  }, [active, budget, onRendered, pageNumber, pdf, renderWidth, scheduler]);
 
+  const style = { "--pdf-page-aspect-ratio": aspectRatio } as CSSProperties;
   return (
     <div
       ref={wrapperRef}
       className="puppyone-pdf-page"
       data-page-number={pageNumber}
       data-page-state={renderError ? "error" : rendered ? "ready" : "loading"}
+      style={style}
     >
       <canvas ref={canvasRef} aria-label={`PDF page ${pageNumber}`} />
       {renderError ? <span className="puppyone-pdf-page-error" dir="ltr">{renderError}</span> : null}
@@ -277,6 +358,20 @@ function PdfPageCanvas({
   );
 }
 
+function releaseCanvas(canvas: HTMLCanvasElement) {
+  canvas.width = 0;
+  canvas.height = 0;
+  canvas.style.width = "";
+  canvas.style.height = "";
+}
+
+function createAbortError() {
+  return new DOMException("PDF render was superseded.", "AbortError");
+}
+
 function isRenderCancellation(reason: unknown): boolean {
-  return reason instanceof Error && reason.name === "RenderingCancelledException";
+  return reason instanceof Error && (
+    reason.name === "RenderingCancelledException"
+    || reason.name === "AbortError"
+  );
 }
