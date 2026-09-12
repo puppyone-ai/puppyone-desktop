@@ -1,6 +1,14 @@
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 const externalViewerPacksEnabled = process.argv.includes("--puppyone-external-viewer-packs=1");
 const gitAutoCommitAvailable = process.argv.includes("--puppyone-git-auto-commit=1");
+const markdownFormatCommands = new Set(["strong", "emphasis", "underline", "strike", "highlight"]);
+const isMarkdownFormatCommand = (value) => typeof value === "string" && markdownFormatCommands.has(value);
+const markdownEditorCommands = new Set([
+  "paragraph", "heading-1", "heading-2", "heading-3", "heading-4", "heading-5", "heading-6",
+  "bullet-list", "ordered-list", "task-list", "quote", "code-block", "math-block", "indent", "outdent",
+  ...markdownFormatCommands, "inline-code", "inline-math", "link", "clear-format",
+]);
+const isMarkdownEditorCommand = (value) => typeof value === "string" && markdownEditorCommands.has(value);
 
 contextBridge.exposeInMainWorld("puppyoneDesktop", {
   itemHosts: {
@@ -130,17 +138,19 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     if (typeof callback !== "function") return () => {};
     const listener = (_event, payload) => {
       const type = payload?.type;
-      if (
-        type === "strong"
-        || type === "emphasis"
-        || type === "underline"
-        || type === "strike"
-      ) {
-        callback({ type });
-      }
+      if (isMarkdownFormatCommand(type)) callback({ type });
     };
     ipcRenderer.on("editor:markdown-format-shortcut", listener);
     return () => ipcRenderer.removeListener("editor:markdown-format-shortcut", listener);
+  },
+  onMarkdownEditorCommand: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, payload) => {
+      const type = payload?.type;
+      if (isMarkdownEditorCommand(type)) callback({ type });
+    };
+    ipcRenderer.on("editor:markdown-command", listener);
+    return () => ipcRenderer.removeListener("editor:markdown-command", listener);
   },
   onDocumentSessionFlushRequested: (callback) => {
     if (typeof callback !== "function") return () => {};
@@ -305,6 +315,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   previewResourceDrag: () => ipcRenderer.invoke("resource-transfer:preview-drag"),
   claimResourceDrop: (request) => ipcRenderer.invoke("resource-transfer:claim-drop", {
     intent: request.intent, targetResource: request.targetResource,
+    sessionId: request.sessionId,
     paths: request.files.map((file) => webUtils.getPathForFile(file)),
   }),
   onResourceDragState: (listener) => {

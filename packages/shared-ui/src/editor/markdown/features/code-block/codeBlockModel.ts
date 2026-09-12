@@ -1,5 +1,6 @@
 import type { EditorState } from "@codemirror/state";
 import type { MarkdownCodeSourceReference } from "../../core/features/markdownFeatureData";
+import { serializeMarkdownCodeFence } from "../../core/syntax/markdownCodeFence";
 
 export type { MarkdownCodeSourceReference } from "../../core/features/markdownFeatureData";
 
@@ -171,12 +172,7 @@ export function serializeMarkdownCodeBlock(
   const infoString = sourceReference
     ? serializeCodeFenceInfo(resolvedLanguage, sourceReference)
     : resolvedLanguage;
-  const fenceCharacter = infoString.includes("`") ? "~" : "`";
-  const fenceRuns = fenceCharacter === "`" ? /`+/g : /~+/g;
-  const longestFence = Math.max(2, ...Array.from(code.matchAll(fenceRuns), (match) => match[0].length));
-  const fence = fenceCharacter.repeat(Math.max(3, longestFence + 1));
-  const info = infoString ? `${fence}${infoString}` : fence;
-  return `${info}\n${code}\n${fence}`;
+  return serializeMarkdownCodeFence(infoString, code);
 }
 
 export function sanitizeCodeLanguage(value: string): string {

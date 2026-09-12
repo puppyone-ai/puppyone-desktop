@@ -2,7 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useLocalization } from "@puppyone/localization/react";
 import { AuxiliaryWorkbenchPanel } from "../app-shell/auxiliary-workbench/AuxiliaryWorkbenchPanel";
 import { ProjectWorkbenchStore } from "../app-shell/auxiliary-workbench/ProjectWorkbenchStore";
-import type { AuxiliaryWorkbenchContribution, AuxiliaryWorkbenchItemRenderContext, AuxiliaryWorkbenchProject } from "../app-shell/auxiliary-workbench/types";
+import type {
+  AuxiliaryWorkbenchContribution,
+  AuxiliaryWorkbenchItemRenderContext,
+  AuxiliaryWorkbenchProject,
+} from "../app-shell/auxiliary-workbench/types";
 import { DesktopOverlayPortal } from "../app-shell/DesktopOverlayPortal";
 import { TerminalRuntimePool } from "../desktop-terminal/runtime/TerminalRuntimePool";
 import { TerminalSessionView } from "../desktop-terminal/ui/TerminalSessionView";
@@ -31,7 +35,7 @@ const input = { text: "" };
 const fixtureResponse = "A response uses the application's text and surface roles.";
 
 // Deterministic CLI fixture: explicit RGB composer derived from startup colors.
-// It exercises production runtime/contribution code without credentials or a real Agent.
+// It exercises the production terminal runtime without credentials or a native process.
 Object.defineProperty(window, "puppyoneDesktop", { configurable: true, value: {
   locateTerminalAgents: async () => ({ availableAgentIds: ["codex", "cursor"], scannedAt: "2026-09-11T00:00:00.000Z", source: "scan" }),
   onTerminalAgentLocationProgress: () => () => {},

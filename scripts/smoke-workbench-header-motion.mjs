@@ -145,20 +145,20 @@ async function run() {
     assert(await evaluate(`(() => {
       const tab = document.querySelector('[data-terminal-tab-session-id="${launcherId}"] [role="tab"]');
       const view = document.querySelector('.desktop-agent-history-view');
-      return tab?.textContent === 'Chat history' && tab.getAttribute('aria-selected') === 'true' && tab.querySelector('.lucide-history')
+      return tab?.textContent?.trim() === view.getAttribute('aria-label') && tab.getAttribute('aria-selected') === 'true' && tab.querySelector('.lucide-history')
         && !view.querySelector('h2, input') && view.querySelectorAll('.desktop-agent-history-option').length === 3
         && !view.querySelector('details').open;
     })()`), `${name}: History tab or compact content header is incorrect`);
     assert(await evaluate(`(() => {
       const toolbar = document.querySelector('.desktop-agent-history-toolbar');
-      const search = toolbar.querySelector('button[aria-label="Search chat history"]').getBoundingClientRect();
-      const refresh = toolbar.querySelector('button[aria-label="Refresh chat history"]').getBoundingClientRect();
+      const search = toolbar.querySelector('.desktop-agent-history-search-slot > button').getBoundingClientRect();
+      const refresh = toolbar.querySelector(':scope > button:last-of-type').getBoundingClientRect();
       const gap = document.documentElement.dir === 'rtl' ? search.left - refresh.right : refresh.left - search.right;
       return Math.abs(gap - parseFloat(getComputedStyle(toolbar).columnGap)) < 1 && Math.abs(search.top - refresh.top) < 1;
     })()`), `${name}: Search must sit immediately before Refresh, not in the center`);
     await settle();
     await writeFile(path.join(artifacts, `${name}-history.png`), (await window.capturePage()).toPNG());
-    await evaluate("document.querySelector('button[aria-label=\"Search chat history\"]').click()");
+    await evaluate("document.querySelector('.desktop-agent-history-search-slot > button').click()");
     await evaluate("new Promise(resolve => requestAnimationFrame(resolve))");
     assert(await evaluate(`(() => {
       const input = document.querySelector('.desktop-agent-history-toolbar input');
@@ -173,8 +173,8 @@ async function run() {
     window.webContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
     window.webContents.sendInputEvent({ type: "keyUp", keyCode: "Escape" });
     await evaluate("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
-    assert(await evaluate("!document.querySelector('.desktop-agent-history-view input') && document.querySelectorAll('.desktop-agent-history-option').length === 3 && document.activeElement?.getAttribute('aria-label') === 'Search chat history'"), `${name}: Escape did not reset search and focus`);
-    await evaluate("document.querySelector('button[aria-label=\"Back to Agents\"]').click()");
+    assert(await evaluate("!document.querySelector('.desktop-agent-history-view input') && document.querySelectorAll('.desktop-agent-history-option').length === 3 && document.activeElement === document.querySelector('.desktop-agent-history-search-slot > button')"), `${name}: Escape did not reset search and focus`);
+    await evaluate("document.querySelector('.desktop-agent-history-toolbar > button:first-of-type').click()");
     await evaluate("new Promise(resolve => requestAnimationFrame(resolve))");
     checkContent(await evaluate(contentExpression), `${name}: back to launcher`);
     assert(await evaluate(`document.querySelector('[data-terminal-tab-session-id="${launcherId}"] [role="tab"] .lucide-square-dashed') !== null`), `${name}: Back did not restore blank tab identity`);

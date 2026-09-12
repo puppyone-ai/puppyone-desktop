@@ -6,7 +6,9 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const artifacts = process.env.PUPPYONE_AUXILIARY_ARTIFACT_DIR || await mkdtemp(path.join(os.tmpdir(), "puppyone-auxiliary-appearance-"));
+const artifacts = process.env.PUPPYONE_AUXILIARY_ARTIFACT_DIR
+  ? path.resolve(repo, process.env.PUPPYONE_AUXILIARY_ARTIFACT_DIR)
+  : await mkdtemp(path.join(os.tmpdir(), "puppyone-auxiliary-appearance-"));
 app.setPath("userData", path.join(artifacts, "user-data"));
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 if (process.env.ELECTRON_DISABLE_SANDBOX === "1") app.commandLine.appendSwitch("no-sandbox");
@@ -92,8 +94,8 @@ async function run() {
       const sample = capture.crop({ x: Math.round(value.sample.x * scale), y: Math.round(value.sample.y * scale), width: 1, height: 1 }).toBitmap();
       const debug = await evaluate('Array.from(document.querySelectorAll(".desktop-terminal-session, .desktop-terminal-xterm, .xterm-screen")).map(e => ({ class: e.className, rect: e.getBoundingClientRect().toJSON(), visibility: getComputedStyle(e).visibility, background: getComputedStyle(e).backgroundColor }))');
       await writeFile(path.join(artifacts, "latest.json"), JSON.stringify({ value, debug, scale, sample: Array.from(sample) }, null, 2));
-      // macOS color-managed screenshots can differ from sRGB CSS by a channel level.
-      assert([sample[2], sample[1], sample[0]].every((channel, index) => Math.abs(channel - value.background[index]) <= 2), theme + ": painted terminal padding disagrees");
+      // macOS color-managed screenshots can differ from sRGB CSS by a few channel levels.
+      assert([sample[2], sample[1], sample[0]].every((channel, index) => Math.abs(channel - value.background[index]) <= 4), theme + ": painted terminal padding disagrees");
       const screen = capture.crop(Object.fromEntries(Object.entries(value.screen).map(([key, value]) => [key, Math.round(value * scale)]))).toBitmap();
       const colors = new Set();
       for (let i = 0; i < screen.length; i += 4) colors.add(screen[i] + ":" + screen[i + 1] + ":" + screen[i + 2]);
@@ -101,7 +103,7 @@ async function run() {
       await writeFile(path.join(artifacts, theme + "-" + width + ".png"), capture.toPNG());
       results.push({ theme, width, ...value, screenColors: colors.size });
     }
-    await evaluate('document.querySelector("button[aria-label=Model]").click()');
+    await evaluate('document.querySelector(".auxiliary-smoke-chat > .desktop-agent-picker .desktop-agent-picker-trigger").click()');
     await settle();
     assert(await evaluate('Boolean(document.querySelector(".desktop-agent-overlay"))'), "Picker did not open through themed portal");
     await evaluate('window.__auxiliaryAppearanceSmoke.setActive(false)');

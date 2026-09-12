@@ -10,6 +10,18 @@ const markdownFocusFixture = readFileSync(
   new URL("../scripts/fixtures/markdown-pane-focus-continuity.tsx", import.meta.url),
   "utf8",
 );
+const auxiliaryAppearanceSmoke = readFileSync(
+  new URL("../scripts/smoke-auxiliary-appearance.mjs", import.meta.url),
+  "utf8",
+);
+const auxiliaryAppearanceHarness = readFileSync(
+  new URL("../src/features/appearance/AuxiliaryAppearanceSmokeHarness.tsx", import.meta.url),
+  "utf8",
+);
+const workbenchHeaderMotionSmoke = readFileSync(
+  new URL("../scripts/smoke-workbench-header-motion.mjs", import.meta.url),
+  "utf8",
+);
 
 describe("CI Electron smoke sandbox boundary", () => {
   it("scopes the hosted Linux fallback and virtual display to Electron fixtures", () => {
@@ -29,5 +41,32 @@ describe("CI Electron smoke sandbox boundary", () => {
       "markdownEnvironment={EMPTY_MARKDOWN_WORKSPACE_ENVIRONMENT}",
     );
     expect(markdownFocusFixture).not.toContain("state={workspaceState}");
+  });
+
+  it("normalizes the auxiliary evidence directory before configuring Electron", () => {
+    expect(auxiliaryAppearanceSmoke).toContain(
+      "path.resolve(repo, process.env.PUPPYONE_AUXILIARY_ARTIFACT_DIR)",
+    );
+    expect(auxiliaryAppearanceSmoke).toContain(
+      'app.setPath("userData", path.join(artifacts, "user-data"))',
+    );
+  });
+
+  it("keeps the appearance fixture on its deterministic in-process terminal", () => {
+    expect(auxiliaryAppearanceHarness).toContain("TerminalRuntimePool");
+    expect(auxiliaryAppearanceHarness).toContain("TerminalSessionView");
+    expect(auxiliaryAppearanceHarness).not.toContain("createTerminalWorkbenchContribution");
+  });
+
+  it("keeps the Header motion smoke independent of the renderer locale", () => {
+    expect(workbenchHeaderMotionSmoke).not.toMatch(
+      /Chat history|Search chat history|Refresh chat history|Back to Agents/,
+    );
+    expect(workbenchHeaderMotionSmoke).toContain(
+      ".desktop-agent-history-search-slot > button",
+    );
+    expect(workbenchHeaderMotionSmoke).toContain(
+      ".desktop-agent-history-toolbar > button:first-of-type",
+    );
   });
 });
